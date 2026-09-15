@@ -1,0 +1,194 @@
+import AppKit
+import SwiftUI
+import ApplicationServices
+import ElmersCore
+
+final class ClipboardPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+}
+
+@MainActor
+final class PanelController: NSObject, NSWindowDelegate {
+    let model: AppModel
+    let panel: ClipboardPanel
+    private var settingsWindow: NSWindow?
+    private var previewWindow: NSWindow?
+    private var previousApp: NSRunningApplication?
+    private var localMonitor: Any?
+    private var outsideMonitor: Any?
+    private var deliveryGeneration = 0
+
+    init(model: AppModel) {
+        self.model = model
+        panel = ClipboardPanel(contentRect: .init(x: 0, y: 0, width: 1100, height: 332), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        super.init()
+        panel.title = "Elmers Clipboard History"
+        panel.isOpaque = false; panel.backgroundColor = .clear; panel.hasShadow = true
+        panel.level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1); panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.hidesOnDeactivate = false; panel.isReleasedWhenClosed = false; panel.delegate = self
+        let material = NSVisualEffectView()
+        material.material = .hudWindow; material.blendingMode = .behindWindow; material.state = .active
+        material.wantsLayer = true; material.layer?.cornerRadius = 24; material.layer?.masksToBounds = true
+        let hosting = NSHostingView(rootView: HistoryView(model: model))
+        hosting.translatesAutoresizingMaskIntoConstraints = false
+        material.addSubview(hosting)
+        NSLayoutConstraint.activate([hosting.leadingAnchor.constraint(equalTo: material.leadingAnchor), hosting.trailingAnchor.constraint(equalTo: material.trailingAnchor), hosting.topAnchor.constraint(equalTo: material.topAnchor), hosting.bottomAnchor.constraint(equalTo: material.bottomAnchor)])
+        panel.contentView = material
+        model.deliver = { [weak self] item, plain in self?.paste(item, plainText: plain) }
+        model.dismiss = { [weak self] in self?.hide() }
+        model.showSettings = { [weak self] in self?.openSettings() }
+        model.preview = { [weak self] in self?.openPreview($0) }
+        localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            var result: NSEvent? = event
+            MainActor.assumeIsolated { result = self?.handle(event) }
+            return result
+        }
+        outsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            Task { @MainActor in guard let self, self.panel.attachedSheet == nil else { return }; self.hide(restoreFocus: false) }
+        }
+    }
+    func toggle() { panel.isVisible ? hide() : show() }
+    func show() {
+        deliveryGeneration += 1
+        let front = NSWorkspace.shared.frontmostApplication
+        if front?.processIdentifier != ProcessInfo.processInfo.processIdentifier { previousApp = front }
+        let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main
+        if let screen { panel.setFrame(NSRect(x: screen.frame.minX + 6, y: screen.frame.minY + 6, width: screen.frame.width - 12, height: 326), display: true) }
+        model.reconcileSelection()
+        panel.makeKeyAndOrderFront(nil)
+        focusResults()
+    }
+    func hide(restoreFocus: Bool = true) {
+        guard panel.isVisible else { return }
+        panel.orderOut(nil)
+        if restoreFocus { previousApp?.activate(options: []) }
+    }
+    private func paste(_ item: ClipboardItem, plainText: Bool) {
+        guard model.copy(item, plainText: plainText) else { return }
+        guard model.directPaste else { hide(); return }
+        guard AXIsProcessTrusted() else {
+            model.message = "Copied. Press ⌘V in your app, or enable Accessibility in Elmers Settings for direct paste."
+            return
+        }
+        guard let target = previousApp, !target.isTerminated else {
+            model.message = "Copied. The previous app is unavailable; use ⌘V in your destination."
+            return
+        }
+        deliveryGeneration += 1
+        let generation = deliveryGeneration
+        hide(restoreFocus: false)
+        guard target.activate(options: []) else { model.message = "Copied, but the destination could not be activated."; show(); return }
+        let expectedChange = NSPasteboard.general.changeCount
+        attemptPaste(to: target, generation: generation, expectedChange: expectedChange, attempts: 12)
+    }
+    private func attemptPaste(to target: NSRunningApplication, generation: Int, expectedChange: Int, attempts: Int) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            guard let self, generation == self.deliveryGeneration else { return }
+            guard NSPasteboard.general.changeCount == expectedChange else { self.model.message = "Clipboard changed before paste. Please try again."; self.show(); return }
+            guard NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier else {
+                if attempts > 0 { self.attemptPaste(to: target, generation: generation, expectedChange: expectedChange, attempts: attempts - 1) }
+                else { self.model.message = "Copied, but the destination did not become active. Paste manually with ⌘V."; self.show() }
+                return
+            }
+            guard let source = CGEventSource(stateID: .combinedSessionState),
+                  let down = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: true),
+                  let up = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: false) else { return }
+            down.flags = .maskCommand; up.flags = .maskCommand
+            down.postToPid(target.processIdentifier); up.postToPid(target.processIdentifier)
+        }
+    }
+    func openSettings() {
+        hide(restoreFocus: false)
+        if settingsWindow == nil {
+            let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 648, height: 560), styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
+            window.title = "Elmers Settings"; window.isReleasedWhenClosed = false
+            window.contentView = NSHostingView(rootView: SettingsView(model: model)); window.center(); settingsWindow = window
+        }
+        NSApp.activate(ignoringOtherApps: true); settingsWindow?.makeKeyAndOrderFront(nil)
+    }
+    func openPreview(_ item: ClipboardItem) {
+        if previewWindow == nil {
+            let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 640, height: 460), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false; window.level = .floating; previewWindow = window
+        }
+        previewWindow?.title = "\(item.kind.rawValue) — \(item.source)"
+        previewWindow?.contentView = NSHostingView(rootView: ItemPreview(item: item))
+        previewWindow?.center(); previewWindow?.makeKeyAndOrderFront(nil)
+    }
+    private func focusResults() {
+        model.searchIsFocused = false
+        NotificationCenter.default.post(name: .elmersResults, object: nil)
+        panel.makeFirstResponder(nil)
+    }
+    private func handle(_ event: NSEvent) -> NSEvent? {
+        if event.window == previewWindow && event.keyCode == 53 { previewWindow?.orderOut(nil); return nil }
+        guard event.window == panel, panel.attachedSheet == nil else { return event }
+        let stroke = KeyStroke(event.keyCode, KeyModifiers(event.modifierFlags))
+        let context: KeyboardContext = model.searchIsFocused ? .search : .results
+        if let action = KeyboardRouter.command(for: stroke, context: context, settings: model.shortcuts) {
+            switch action {
+            case let .move(offset, extend): model.moveSelection(offset, extend: extend)
+            case .first: focusResults(); model.selectedID = model.visibleItems.first?.id
+            case .last: focusResults(); model.selectedID = model.visibleItems.last?.id
+            case .selectAll: model.selectAll()
+            case let .paste(plain): model.activate(plainText: plain)
+            case let .quickPaste(index, plain):
+                if model.visibleItems.indices.contains(index) { model.activate(model.visibleItems[index], plainText: plain) }
+            case .copy:
+                if let item = model.selectedAggregate(), model.copy(item) { model.message = "Copied to clipboard." }
+            case .preview: if let item = model.selected { openPreview(item) }
+            case .open:
+                if let item = model.selected, [.link, .file].contains(item.kind) {
+                    for value in item.text.components(separatedBy: "\n") {
+                        if let url = URL(string: value), ["http", "https", "file"].contains(url.scheme ?? "") { NSWorkspace.shared.open(url) }
+                    }
+                    hide()
+                }
+            case .rename: NotificationCenter.default.post(name: .elmersRename, object: nil)
+            case .edit: NotificationCenter.default.post(name: .elmersEdit, object: nil)
+            case .newText: if model.canEdit { NotificationCenter.default.post(name: .elmersNewText, object: nil) }
+            case .delete: model.deleteItems(model.selectedItems)
+            case .undo: model.undo()
+            case .redo: model.redo()
+            case .focusSearch: NotificationCenter.default.post(name: .elmersSearch, object: nil)
+            case .focusResults: focusResults()
+            case .filters: NotificationCenter.default.post(name: .elmersFilters, object: nil)
+            case .newBoard: if model.canEdit { NotificationCenter.default.post(name: .elmersNewBoard, object: nil) }
+            case .nextBoard: focusResults(); model.moveBoard(1)
+            case .previousBoard: focusResults(); model.moveBoard(-1)
+            case .pause: model.paused ? model.resume() : model.pause(minutes: nil)
+            case .settings: openSettings()
+            case .quit: NSApp.terminate(nil)
+            case .escape:
+                if !model.query.isEmpty || model.kind != nil || model.sourceFilter != nil || model.afterDate != nil {
+                    model.query = ""; model.kind = nil; model.sourceFilter = nil; model.afterDate = nil
+                    focusResults()
+                } else if model.selection.ids.count > 1 { model.selectedID = model.selectedID }
+                else { hide() }
+            case .showInHistory:
+                let id = model.selectedID; model.query = ""; model.kind = nil; model.boardID = nil
+                model.sourceFilter = nil; model.afterDate = nil; model.selectedID = id
+            }
+            return nil
+        }
+        if panel.firstResponder is NSTextView { return event }
+        if stroke.modifiers.isEmpty || stroke.modifiers == .shift, let characters = event.characters,
+           !characters.isEmpty, characters.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) && $0.value < 0xF700 }) {
+            model.query += characters
+            NotificationCenter.default.post(name: .elmersSearch, object: nil)
+            return nil
+        }
+        return event
+    }
+}
+
+extension KeyModifiers {
+    init(_ flags: NSEvent.ModifierFlags) {
+        self = []
+        if flags.contains(.command) { insert(.command) }
+        if flags.contains(.shift) { insert(.shift) }
+        if flags.contains(.option) { insert(.option) }
+        if flags.contains(.control) { insert(.control) }
+    }
+}
