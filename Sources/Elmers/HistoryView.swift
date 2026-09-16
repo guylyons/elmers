@@ -12,6 +12,7 @@ struct HistoryView: View {
     @State private var filtersVisible = false
     @State private var deletingBoard: Pinboard?
     @State private var helpVisible = false
+    @State private var hoveredID: UUID?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -24,10 +25,11 @@ struct HistoryView: View {
             else {
                 ScrollViewReader { proxy in
                     ScrollView(.horizontal) {
-                        LazyHStack(spacing: 22) {
+                        LazyHStack(spacing: 21) {
                             ForEach(Array(model.visibleItems.enumerated()), id: \.element.id) { index, item in
-                                CardView(item: item, selected: model.selection.ids.contains(item.id), index: index)
+                                CardView(item: item, selected: model.selection.ids.contains(item.id), ringDimmed: hoveredID != nil && hoveredID != item.id, index: index)
                                     .id(item.id)
+                                    .onHover { inside in if inside { hoveredID = item.id } else if hoveredID == item.id { hoveredID = nil } }
                                     .onTapGesture(count: 2) { model.activate(item) }
                                     .onDrag { DragSupport.itemProvider(for: item) }
                                     .background(CardMouseObserver { event in model.select(item.id, modifiers: event.modifierFlags, rightClick: event.type == .rightMouseDown); searchFocused = false })
@@ -37,7 +39,7 @@ struct HistoryView: View {
                                     .accessibilityValue(model.selection.ids.contains(item.id) ? "Selected" : "")
                                     .accessibilityAction { model.activate(item) }
                             }
-                        }.padding(.horizontal, 28).padding(.vertical, 5)
+                        }.padding(.horizontal, 28).padding(.vertical, 6)
                     }
                     .scrollIndicators(.hidden)
                     .onChange(of: model.selectedID) { _, id in
@@ -93,12 +95,12 @@ struct HistoryView: View {
                     }.padding(.horizontal, 10).frame(width: 240, height: 30).background(.primary.opacity(0.06), in: Capsule())
                 } else {
                     Button { searchVisible = true; searchFocused = true } label: { Image(systemName: "magnifyingglass").font(.system(size: 17)) }
-                        .buttonStyle(.plain).frame(width: 32, height: 32).help("Search (⌘F)")
+                        .buttonStyle(.plain).frame(width: 34, height: 34).hoverHighlight(Circle()).help("Search (⌘F)")
                 }
                 if searchVisible || model.kind != nil {
                     Button { filtersVisible.toggle() } label: {
                         Image(systemName: model.kind == nil && model.sourceFilter == nil && model.afterDate == nil ? "line.3.horizontal.decrease" : "line.3.horizontal.decrease.circle.fill")
-                    }.buttonStyle(.plain).frame(width: 24).help("Filters (⌘F)")
+                    }.buttonStyle(.plain).frame(width: 28, height: 28).hoverHighlight(Circle()).help("Filters (⌘F)")
                         .popover(isPresented: $filtersVisible) { filterPanel }
 
                 }
@@ -128,7 +130,7 @@ struct HistoryView: View {
                         }
                 }
                 Button { renamingItem = nil; editingBoard = nil; boardName = ""; boardDialog = true } label: { Image(systemName: "plus").font(.system(size: 17)) }
-                    .buttonStyle(.plain).frame(width: 32, height: 32).help("Create Pinboard (⇧⌘N)").disabled(!model.canEdit)
+                    .buttonStyle(.plain).frame(width: 34, height: 34).hoverHighlight(Circle()).help("Create Pinboard (⇧⌘N)").disabled(!model.canEdit)
             }.font(.system(size: 12)).padding(.horizontal, 60)
             HStack {
                 if model.paused { Label("Paused", systemImage: "pause.fill").font(.caption).padding(.leading, 24) }
@@ -150,7 +152,7 @@ struct HistoryView: View {
                     }
                     Button("Quit Elmers") { NSApp.terminate(nil) }.keyboardShortcut("q")
                 } label: { Image(systemName: "ellipsis").font(.system(size: 19)) }
-                .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 28).padding(.trailing, 22).help("More")
+                .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 34, height: 34).hoverHighlight(Circle()).padding(.trailing, 19).help("More")
             }
         }
     }
@@ -161,7 +163,7 @@ struct HistoryView: View {
                 if let color { Circle().fill(color).frame(width: 10, height: 10) }
                 Text(name).lineLimit(1)
             }.padding(.horizontal, 10).padding(.vertical, 6).background(selected ? Color.primary.opacity(0.1) : Color.clear, in: Capsule())
-        }.buttonStyle(.plain)
+        }.buttonStyle(.plain).hoverHighlight(Capsule(), suppressed: selected)
     }
     private var filterPanel: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -202,7 +204,7 @@ struct HistoryView: View {
             Divider()
         }
         Button(model.directPaste ? "Paste to \(model.destinationApp ?? "current app")" : "Paste") { model.activate() }.keyboardShortcut(.return, modifiers: [])
-        Button("Copy") { if let aggregate = model.selectedAggregate(), model.copy(aggregate) { model.message = "Copied to clipboard." } }.keyboardShortcut("c")
+        Button("Copy") { if let aggregate = model.selectedAggregate(), model.copy(aggregate) { model.showCopied?() } }.keyboardShortcut("c")
         Divider()
         Button("Edit") { model.openEditor?(item) }.keyboardShortcut("e").disabled(item.text.isEmpty || !model.canEdit)
         Button("Rename") { renamingItem = item; boardName = item.title ?? ""; boardDialog = true }.keyboardShortcut("r").disabled(!model.canEdit)
@@ -258,4 +260,20 @@ struct KeyboardHelp: View {
             HStack { Spacer(); Button("Done") { dismiss() }.keyboardShortcut(.defaultAction) }
         }.padding(24).frame(width: 420)
     }
+}
+
+/// Paste's toolbar hover feedback: a faint capsule on pinboard pills and a faint circle on icon buttons.
+private struct HoverHighlight<S: Shape>: ViewModifier {
+    let shape: S
+    let suppressed: Bool
+    @State private var hovered = false
+    func body(content: Content) -> some View {
+        content
+            .background(shape.fill(Color.primary.opacity(hovered && !suppressed ? 0.07 : 0)))
+            .onHover { hovered = $0 }
+    }
+}
+
+extension View {
+    func hoverHighlight<S: Shape>(_ shape: S, suppressed: Bool = false) -> some View { modifier(HoverHighlight(shape: shape, suppressed: suppressed)) }
 }

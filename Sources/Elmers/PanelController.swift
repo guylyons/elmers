@@ -15,6 +15,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     private var settingsWindow: NSWindow?
     private var previewWindow: NSWindow?
     let editor = EditorController()
+    let copiedHUD = CopiedHUD()
     private var previousApp: NSRunningApplication?
     private var localMonitor: Any?
     private var outsideMonitor: Any?
@@ -41,6 +42,8 @@ final class PanelController: NSObject, NSWindowDelegate {
         panel.contentView = material
         model.deliver = { [weak self] item, plain in self?.paste(item, plainText: plain) }
         model.dismiss = { [weak self] in self?.hide() }
+        model.showCopied = { [weak self] in self?.showCopied() }
+        copiedHUD.openSettings = { [weak self] in self?.openSettings() }
         model.showSettings = { [weak self] in self?.openSettings() }
         model.preview = { [weak self] in self?.openPreview($0) }
         model.openEditor = { [weak self] in self?.openEditor($0) }
@@ -63,7 +66,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     /// Paste's "Show during screen sharing" hides the clipboard windows from screen capture when off.
     private func applySharing() {
         let type: NSWindow.SharingType = model.showDuringScreenSharing ? .readOnly : .none
-        for window in [panel, settingsWindow, previewWindow, editor.panel] { window?.sharingType = type }
+        for window in [panel, settingsWindow, previewWindow, editor.panel, copiedHUD.panel] { window?.sharingType = type }
     }
     func show() {
         deliveryGeneration += 1
@@ -84,7 +87,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     private func paste(_ item: ClipboardItem, plainText: Bool) {
         guard model.copy(item, plainText: plainText) else { return }
         SoundEffects.shared.play(.paste)
-        guard model.directPaste else { hide(); return }
+        guard model.directPaste else { hide(); showCopied(); return }
         guard AXIsProcessTrusted() else {
             model.message = "Copied. Press ⌘V in your app, or enable Accessibility in Elmers Settings for direct paste."
             return
@@ -99,6 +102,10 @@ final class PanelController: NSObject, NSWindowDelegate {
         guard target.activate(options: []) else { model.message = "Copied, but the destination could not be activated."; show(); return }
         let expectedChange = NSPasteboard.general.changeCount
         attemptPaste(to: target, generation: generation, expectedChange: expectedChange, attempts: 12)
+    }
+    /// Paste confirms a copy with a HUD near the bottom of the screen instead of a message in the panel.
+    func showCopied() {
+        copiedHUD.show(on: panel.screen, offerDirectPaste: !model.directPaste)
     }
     private func attemptPaste(to target: NSRunningApplication, generation: Int, expectedChange: Int, attempts: Int) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
@@ -180,7 +187,7 @@ final class PanelController: NSObject, NSWindowDelegate {
             case let .quickPaste(index, plain):
                 if model.visibleItems.indices.contains(index) { model.activate(model.visibleItems[index], plainText: plain) }
             case .copy:
-                if let item = model.selectedAggregate(), model.copy(item) { model.message = "Copied to clipboard." }
+                if let item = model.selectedAggregate(), model.copy(item) { showCopied() }
             case .preview: if let item = model.selected { openPreview(item) }
             case .open:
                 if let item = model.selected, [.link, .file].contains(item.kind) {

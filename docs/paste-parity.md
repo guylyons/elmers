@@ -1,5 +1,22 @@
 # Paste parity inventory
 
+## September 16, evening — copy overlay, hover states, card typography
+
+Reference: Paste 6.3.11, main display 1512×982 pt at 2×. Evidence came from window-bound captures of Paste's panel (`screencapture -R` on the frame reported by System Events) and of the 200-pt HUD window, seeded with harmless test text; glyph extents were measured in the captures. Nothing from the user's history is committed.
+
+| Surface | Observed in Paste 6.3.11 | Elmers status |
+|---|---|---|
+| Copied overlay | After Return in clipboard mode, a 200×200 pt borderless window (`AXUnknown`) appears centered horizontally on the panel's screen with its bottom edge 140 pt above the screen bottom. Gray (about #868686 at 87 % over a soft blur), 18-pt corners. Light "checkmark" 72 pt wide centered 68 pt from the top, "Copied" (about 22 pt) at 142 pt, "Enable Direct Paste ›" (13 pt) at 166 pt. Visible at 0.25 s and 0.85 s, gone by 1.35 s. | implemented in `CopiedHUD.swift`: same size, position, layout and timing (1.0 s then a 0.25 s fade); the button opens Settings. Shown on clipboard-mode paste and on ⌘C; replaces the old "Copied to clipboard." banner. Measured on the built app: checkmark 75 pt, "Copied" and button within 1 px of Paste. Direct-paste mode shows nothing (Paste's direct-paste feedback not observed). |
+| Card hover | Hovering an unselected card adds nothing to it, but turns the selected card's ring gray; hovering the selected card, the gaps, or the toolbar keeps the ring blue. | implemented (`ringDimmed` on `CardView`, `hoveredID` in `HistoryView`) |
+| Toolbar hover | Unselected pinboard pills get a faint capsule; search, +, and … buttons get a faint 34-pt circle. | implemented (`hoverHighlight` modifier) |
+| Card geometry | 235×236 pt, 256-pt pitch (21-pt gap), 50-pt header, flat header color (#1C3EC3 top to bottom for the terminal source, #E65227 for Brave), ~46-pt app icon tucked into the top-right corner, no border on unselected cards, 3-pt accent ring just outside the selected card. | implemented; header tint now clamps brightness to 0.72–0.9 so a navy terminal icon gives Paste's vivid blue (#1A2FB0 measured) |
+| Card typography | Measured: title 15 pt semibold, time 12 pt, body 13 pt, footer 12 pt gray. | **Deliberately larger at the user's request** (September 16): title 17 semibold, time 13, body 15, footer 13. Dial back in `CardView.swift` if parity wins later. |
+| Card footer | Counts are centered on one line; link addresses show host + path without scheme, left-aligned, wrapping to two lines that grow upward from the bottom edge; link placeholder bodies are #F3F4F7 rather than white. | implemented |
+| Relative time | "now" right after a copy, then "30 seconds ago", "1 minute ago", "4 minutes ago". | implemented ("now" under 30 s, then the system relative formatter) |
+| Search open state | With the search field open, pinboard pills collapse to their icon or color dot only and the field grows to about 400 pt with a focus ring and a filter icon inside. | not implemented; noted for a later pass (the type pills inside the field stay as they are by the user's request) |
+
+Verification: `scripts/test.sh` 19/19; `--check-interaction` 34 steps including "Copied HUD shows for about a second, then fades" (also writes `panel.png` and `copied-hud.png` under `ELMERS_CAPTURE_DIR`); `--check-status-item` passes. Physical: overlay captured on the built app over the same screen region as Paste's and compared by pixel extents; card hover, pill hover and … hover captured on the built app. Note for captures: Elmers windows are excluded from `screencapture` while "Show during screen sharing" is off; enable it temporarily in Settings › Privacy (or `defaults write app.elmers.clipboard showDuringScreenSharing -bool true`) and restore it afterwards.
+
 ## September 16 — reference inspection and parity pass
 
 Reference: Paste **6.3.11** (`com.wiheads.paste`) on macOS **27.0** (26A428). Inspected with real accessibility-tree dumps (System Events), real clicks (cliclick), and window-bound screenshots. Full-screen captures were discarded because they included private desktop content; no clipboard content or screenshots are committed. Subscription and licensing surfaces are **out of scope by the user's decision** and are not tracked below.

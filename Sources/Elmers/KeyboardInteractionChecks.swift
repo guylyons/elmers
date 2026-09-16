@@ -183,10 +183,10 @@ final class KeyboardInteractionChecks {
         editor.confirm()
         guard model.history.items.first(where: { $0.id == created.id })?.text == "CHANGED editor\nsecond line" else { print("FAIL: save did not update the item"); fflush(stdout); exit(1) }
         print("PASS: editor cancel preserves and save updates the item")
-        checkDrag(model: model)
+        checkDrag(model: model, controller: controller)
     }
     /// The drag provider must hand back every stored representation under its own type.
-    static func checkDrag(model: AppModel) {
+    static func checkDrag(model: AppModel, controller: PanelController) {
         let payload = ClipboardPayload(items: [["public.utf8-plain-text": Data("dragged".utf8), "public.rtf": Data("{\\rtf1 dragged}".utf8)]])
         let item = ClipboardItem(payload: payload, source: "Check")
         let provider = DragSupport.itemProvider(for: item)
@@ -196,10 +196,33 @@ final class KeyboardInteractionChecks {
         _ = provider.loadDataRepresentation(forTypeIdentifier: "public.rtf") { data, _ in loaded = data; done.signal() }
         guard done.wait(timeout: .now() + 2) == .success, loaded == Data("{\\rtf1 dragged}".utf8) else { print("FAIL: drag data did not load"); fflush(stdout); exit(1) }
         print("PASS: drag provider offers every representation")
-        checkRecognition(model: model)
+        checkRecognition(model: model, controller: controller)
+    }
+    /// The Copied HUD appears for about a second after a clipboard-mode paste or ⌘C, then fades out on its own.
+    static func checkCopiedHUD(model: AppModel, controller: PanelController) {
+        model.query = ""; model.kind = nil; model.boardID = nil
+        model.directPaste = false
+        model.newText("https://pasteapp.io/help/keyboard-shortcuts")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            capturePanel(controller, name: "panel")
+            controller.showCopied()
+            guard controller.copiedHUD.isVisible, controller.copiedHUD.panel.frame.size == NSSize(width: 200, height: 200) else { print("FAIL: Copied HUD did not appear"); fflush(stdout); exit(1) }
+            if let directory = ProcessInfo.processInfo.environment["ELMERS_CAPTURE_DIR"], let view = controller.copiedHUD.panel.contentView, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+                view.cacheDisplay(in: view.bounds, to: rep)
+                try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: directory).appendingPathComponent("copied-hud.png"))
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                guard controller.copiedHUD.isVisible else { print("FAIL: Copied HUD vanished early"); fflush(stdout); exit(1) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    guard !controller.copiedHUD.isVisible else { print("FAIL: Copied HUD stayed visible"); fflush(stdout); exit(1) }
+                    print("PASS: Copied HUD shows for about a second, then fades")
+                    fflush(stdout); exit(0)
+                }
+            }
+        }
     }
     /// Renders text into a PNG and confirms Vision makes it searchable.
-    static func checkRecognition(model: AppModel) {
+    static func checkRecognition(model: AppModel, controller: PanelController) {
         let image = NSImage(size: NSSize(width: 600, height: 160), flipped: false) { rect in
             NSColor.white.setFill(); rect.fill()
             ("ELMERS OCR 4711" as NSString).draw(at: NSPoint(x: 30, y: 50), withAttributes: [.font: NSFont.boldSystemFont(ofSize: 48), .foregroundColor: NSColor.black])
@@ -210,7 +233,8 @@ final class KeyboardInteractionChecks {
         ImageTextRecognizer.recognize(item, level: .fast) { text in
             guard let text, text.contains("4711") else { print("FAIL: recognition returned \(text ?? "nil")"); fflush(stdout); exit(1) }
             print("PASS: image text recognition finds rendered text")
-            fflush(stdout); exit(0)
+            fflush(stdout)
+            checkCopiedHUD(model: model, controller: controller)
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 20) { print("FAIL: recognition timed out"); fflush(stdout); exit(1) }
     }

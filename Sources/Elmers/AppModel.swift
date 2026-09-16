@@ -63,6 +63,8 @@ final class AppModel: ObservableObject {
     var showSettings: (() -> Void)?
     var deliver: ((ClipboardItem, Bool) -> Void)?
     var dismiss: (() -> Void)?
+    /// Shows the Copied confirmation overlay (owned by the panel controller).
+    var showCopied: (() -> Void)?
     var preview: ((ClipboardItem) -> Void)?
     /// Opens the floating editor for a new item (nil) or an existing one.
     var openEditor: ((ClipboardItem?) -> Void)?

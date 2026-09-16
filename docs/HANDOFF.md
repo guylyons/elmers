@@ -96,3 +96,11 @@ Next session, in order:
 4. Remaining reference features: Writing Tools on cards (⇧⌘E), Share Pinboard, image rotate in the editor, Paste Stack when un-deferred, accessibility/VoiceOver audit.
 
 Testing notes: two displays are attached; panels open on the display under the pointer, so move the pointer first (`cliclick m:x,y`). Send Escape/Space with a raw CGEvent (`scratchpad/key.swift` pattern), not `cliclick kp:`. Never send System Events `keystroke` unless the target app is frontmost. Keep captures window-bound; full-screen captures exposed private content.
+
+## September 16, evening — copy overlay, hover states, larger card text
+
+Done: Paste's "Copied / Enable Direct Paste ›" overlay (`CopiedHUD.swift`, shown by `PanelController.showCopied()` on clipboard-mode paste and ⌘C; measured against Paste's 200-pt HUD window), hover states (selected ring dims to gray while the pointer is on another card; faint capsule/circle highlights on pills and toolbar buttons), card geometry matched to Paste (235×236, 50-pt flat header, 46-pt icon, outside 3-pt ring, no border when unselected), link footers with host + path on up to two lines over a #F3F4F7 body, "now"/"30 seconds ago" wording. Card text is intentionally larger than Paste's measured 15/12/13/12 (see the parity table) because the user asked for bigger history text; the search type pills are untouched by request.
+
+Checks at the stop: `scripts/test.sh` 19/19, `--check-interaction` 34 steps (new Copied HUD step; `ELMERS_CAPTURE_DIR` now also writes `panel.png` and `copied-hud.png`), `--check-status-item` pass. The user's "Show during screen sharing" setting was toggled on for captures and restored to off.
+
+Next: the search-open toolbar state (pills collapse to icon/dot, wider field with filter icon), Paste's direct-paste feedback (unobserved), the Space preview presentation, and the earlier storage/OCR/accessibility items.
