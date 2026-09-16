@@ -79,10 +79,14 @@ final class HistoryTests {
         let item = history.capture(payload, source: "Preview")
         let board = history.createBoard(name: "Images")
         history.pin(item.id, to: board.id)
+        let link = history.capture(.text("https://example.com/page"), source: "Browser")
+        history.setLinkPreview(link.id, LinkPreview(title: "Example", image: Data([9, 8, 7])))
         try archive.save(history)
         let restored = try archive.load()
-        XCTAssertEqual(restored.items[0].payload, payload)
-        XCTAssertEqual(restored.items[0].boardIDs, [board.id])
+        XCTAssertEqual(restored.items[0].linkPreview, LinkPreview(title: "Example", image: Data([9, 8, 7])))
+        XCTAssertNil(restored.items[1].linkPreview)
+        XCTAssertEqual(restored.items[1].payload, payload)
+        XCTAssertEqual(restored.items[1].boardIDs, [board.id])
         XCTAssertEqual(restored.boards[0].name, "Images")
     }
 

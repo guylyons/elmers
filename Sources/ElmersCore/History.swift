@@ -55,6 +55,10 @@ public struct History: Codable, Sendable {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return }
         items[index].payload = payload
     }
+    public mutating func setLinkPreview(_ id: UUID, _ preview: LinkPreview?) {
+        guard let index = items.firstIndex(where: { $0.id == id }) else { return }
+        items[index].linkPreview = preview
+    }
     public mutating func replaceItem(_ item: ClipboardItem) {
         items.removeAll { $0.id == item.id }
         items.append(item)

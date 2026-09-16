@@ -81,6 +81,18 @@ struct CardView: View {
             GeometryReader { geometry in
                 Image(nsImage: image).resizable().scaledToFit().frame(width: geometry.size.width, height: geometry.size.height)
             }
+        } else if item.kind == .link, let preview = item.linkPreview, preview.title != nil || preview.image != nil {
+            VStack(alignment: .leading, spacing: 0) {
+                if let data = preview.image, let image = NSImage(data: data) {
+                    Image(nsImage: image).resizable().scaledToFill().frame(maxWidth: .infinity).frame(height: preview.title == nil ? 154 : 108).clipped()
+                }
+                if let title = preview.title {
+                    Text(title).font(.system(size: 13, weight: .medium)).lineLimit(preview.image == nil ? 6 : 2).padding(12)
+                }
+            }
+        } else if item.kind == .link {
+            Image(systemName: "safari").font(.system(size: 34, weight: .thin)).foregroundStyle(.tertiary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if item.kind == .file {
             VStack(alignment: .leading, spacing: 8) {
                 Image(systemName: "doc.fill").font(.system(size: 40)).foregroundStyle(.orange)

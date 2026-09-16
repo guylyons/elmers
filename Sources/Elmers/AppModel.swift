@@ -41,6 +41,7 @@ final class AppModel: ObservableObject {
     @Published var soundEffects: Bool { didSet { defaults.set(soundEffects, forKey: "soundEffects"); SoundEffects.shared.enabled = soundEffects } }
     @Published var alwaysPlainText: Bool { didSet { defaults.set(alwaysPlainText, forKey: "alwaysPlainText") } }
     @Published var runInBackground: Bool { didSet { defaults.set(runInBackground, forKey: "runInBackground"); applyActivationPolicy() } }
+    @Published var linkPreviews: Bool { didSet { defaults.set(linkPreviews, forKey: "linkPreviews"); if linkPreviews { fetchLinkPreviews() } } }
     @Published var showDuringScreenSharing: Bool { didSet { defaults.set(showDuringScreenSharing, forKey: "showDuringScreenSharing"); sharingChanged?() } }
     /// Mirrors the login item registration; setting it registers or unregisters the app with launchd.
     @Published var openAtLogin: Bool {
@@ -71,6 +72,8 @@ final class AppModel: ObservableObject {
     private var lastPrune = Date()
     private var activationObserver: NSObjectProtocol?
     private var capturePolicy = CapturePolicy(source: NSWorkspace.shared.frontmostApplication?.bundleIdentifier)
+    private let previewFetcher = LinkPreviewFetcher()
+    private var previewsInFlight = Set<UUID>()
     var canEdit: Bool { archiveReadable }
 
     var selectedItems: [ClipboardItem] { visibleItems.filter { selection.ids.contains($0.id) } }
@@ -88,13 +91,14 @@ final class AppModel: ObservableObject {
         defaults = demo ? UserDefaults(suiteName: "app.elmers.demo")! : .standard
         defaults.register(defaults: ["retentionDays": 30, "directPaste": false, "ignoreConfidential": true, "ignoreTransient": true,
                                       "excludedApps": "com.apple.keychainaccess\ncom.apple.Passwords", "soundEffects": true,
-                                      "alwaysPlainText": false, "runInBackground": true, "showDuringScreenSharing": true])
+                                      "alwaysPlainText": false, "runInBackground": true, "showDuringScreenSharing": true, "linkPreviews": false])
         retentionDays = defaults.integer(forKey: "retentionDays")
         directPaste = defaults.bool(forKey: "directPaste")
         soundEffects = defaults.bool(forKey: "soundEffects")
         alwaysPlainText = defaults.bool(forKey: "alwaysPlainText")
         runInBackground = defaults.bool(forKey: "runInBackground")
         showDuringScreenSharing = defaults.bool(forKey: "showDuringScreenSharing")
+        linkPreviews = defaults.bool(forKey: "linkPreviews")
         openAtLogin = demo ? false : SMAppService.mainApp.status == .enabled
         ignoreConfidential = defaults.bool(forKey: "ignoreConfidential")
         ignoreTransient = defaults.bool(forKey: "ignoreTransient")
@@ -150,6 +154,7 @@ final class AppModel: ObservableObject {
                 SoundEffects.shared.play(.copy)
                 if selectedID == nil { selectedID = item.id }
                 prune(); persist()
+                if item.kind == .link { fetchLinkPreviews() }
             }
             lastChange = currentChange
         } catch PasteboardCodec.CaptureError.changedDuringRead {
@@ -196,6 +201,20 @@ final class AppModel: ObservableObject {
         guard days > 0 else { return 0 }
         let cutoff = Date().addingTimeInterval(-Double(days) * 86400)
         return history.items.filter { $0.boardIDs.isEmpty && $0.copiedAt < cutoff }.count
+    }
+    /// Fetches title/image for link items that have never been attempted. Only runs when the user enabled previews.
+    func fetchLinkPreviews() {
+        guard linkPreviews, canEdit else { return }
+        let pending = history.items.filter { $0.kind == .link && $0.linkPreview == nil && !previewsInFlight.contains($0.id) }.prefix(8)
+        for item in pending {
+            previewsInFlight.insert(item.id)
+            previewFetcher.fetch(item.text) { [weak self] preview in
+                guard let self else { return }
+                self.previewsInFlight.remove(item.id)
+                guard self.history.items.contains(where: { $0.id == item.id }) else { return }
+                self.history.setLinkPreview(item.id, preview); self.persist()
+            }
+        }
     }
     func eraseHistory() { deleteItems(history.items.filter { $0.boardIDs.isEmpty }); selection.clear() }
     var excludedBundleIDs: [String] {
@@ -264,6 +283,7 @@ final class AppModel: ObservableObject {
         if let previous { rememberUndo { $0.restoreItem(previous) } }
         else { rememberUndo { $0.delete(item) } }
         selectedID = item.id; persist()
+        if item.kind == .link { fetchLinkPreviews() }
     }
     private func restoreItem(_ item: ClipboardItem) {
         if let current = history.items.first(where: { $0.id == item.id }) {

@@ -60,6 +60,8 @@ public struct ClipboardItem: Codable, Identifiable, Equatable, Sendable {
     public var boardIDs: Set<UUID>
     public var title: String?
     public var fingerprint: String
+    /// Optional remote preview for links, filled only when the user enables link previews.
+    public var linkPreview: LinkPreview?
     private var cachedText = ""
     private var cachedKind: ContentKind = .other
     private var cachedByteCount = 0
@@ -77,7 +79,7 @@ public struct ClipboardItem: Codable, Identifiable, Equatable, Sendable {
         cachedByteCount = payload.byteCount
     }
     // Derived data is rebuilt once at load and never changes the on-disk v1 schema.
-    private enum CodingKeys: String, CodingKey { case id, payload, source, sourceBundleID, copiedAt, boardIDs, title, fingerprint }
+    private enum CodingKeys: String, CodingKey { case id, payload, source, sourceBundleID, copiedAt, boardIDs, title, fingerprint, linkPreview }
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         id = try values.decode(UUID.self, forKey: .id)
@@ -88,8 +90,17 @@ public struct ClipboardItem: Codable, Identifiable, Equatable, Sendable {
         boardIDs = try values.decode(Set<UUID>.self, forKey: .boardIDs)
         title = try values.decodeIfPresent(String.self, forKey: .title)
         fingerprint = try values.decode(String.self, forKey: .fingerprint)
+        linkPreview = try values.decodeIfPresent(LinkPreview.self, forKey: .linkPreview)
         refreshMetadata()
     }
+}
+
+/// Title and a small PNG image fetched for a link. `attempted` records a fetch that found nothing so it is not retried.
+public struct LinkPreview: Codable, Equatable, Sendable {
+    public var title: String?
+    public var image: Data?
+    public var attempted: Bool
+    public init(title: String? = nil, image: Data? = nil, attempted: Bool = true) { self.title = title; self.image = image; self.attempted = attempted }
 }
 
 public struct Pinboard: Codable, Identifiable, Equatable, Sendable {

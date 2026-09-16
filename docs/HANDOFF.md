@@ -63,13 +63,14 @@ What changed:
 - Card context menu, pinboard menu (8 colors, Delete… confirmation), and overflow menu reordered to match Paste. Card headers use the source app's dominant icon color; relative times use Paste's wording.
 - App icon from `Resources/AppIcon.png` compiled into `AppIcon.icns` by `scripts/build-app.sh`.
 - Floating rich-text editor for New Text Item (⌘N) and Edit (⌘E) with B/I/U/S, Writing Tools, live counters and Escape/⌘↩ handling.
+- Link previews (Privacy › Generate link previews, default off): title and downscaled image stored on the item and shown on link cards.
 
 Testing note: this Mac has two displays and the panel opens on the display under the pointer. Move the pointer onto the target display before scripted clicks, and send Escape with a raw CGEvent rather than cliclick.
 
 Remaining work, in priority order:
 
 1. ~~New Text Item / Edit floating editors~~ done (see `EditorController.swift`); image editing (rotate) in the editor remains open.
-2. Link previews (title/icon fetch behind a "Generate link previews" toggle) and image/file preview polish; Space preview compared against Paste's (not captured this session).
+2. ~~Link previews~~ done (default off; see `LinkPreviewFetcher.swift`). Still open: image/file preview polish and comparing the Space preview against Paste's (not captured this session).
 3. Paste Stack (still deferred by the user), drag and drop, pinboard reordering.
 4. Direct paste end-to-end with Accessibility, then "Paste to <app>" verification across apps.
 5. Visual polish: General section overflow by ~40 pt versus Paste, sidebar row offsets, scroll position when the selection is not the first card, panel materials.

@@ -137,6 +137,7 @@ private struct PrivacySettings: View {
         Form {
             Section {
                 row("Show during screen sharing", "Allow Elmers to appear to others when you share your screen.", $model.showDuringScreenSharing)
+                row("Generate link previews", "Download web content for previews; may activate one-time or analytics-sensitive links.", $model.linkPreviews)
             }
             Section {
                 row("Ignore confidential content", "Do not save passwords and sensitive data when detected.", $model.ignoreConfidential)

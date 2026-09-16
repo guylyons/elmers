@@ -28,7 +28,7 @@ Copy content in another app to populate history. Click a card to select it, doub
 
 ## Data and privacy
 
-History is saved to `~/Library/Application Support/Elmers/history.plist` using an atomic binary archive. It stays on this Mac; links are not fetched. Confidential/transient markers are excluded by default. Settings allow source-app exclusions and retention changes. Pinboards protect items from expiration. An unreadable archive is preserved and capture is suspended to avoid overwriting it.
+History is saved to `~/Library/Application Support/Elmers/history.plist` using an atomic binary archive. It stays on this Mac. Links are fetched for previews only when Privacy › Generate link previews is turned on (off by default). Confidential/transient markers are excluded by default. Settings allow source-app exclusions and retention changes. Pinboards protect items from expiration. An unreadable archive is preserved and capture is suspended to avoid overwriting it.
 
 Current bounds: 2,000 unpinned items and 32 MB per capture. History and raw formats are held in memory; a database/payload store is needed before claiming large-history performance parity. File URLs are preserved as references; Elmers does not back up the referenced files.
 
