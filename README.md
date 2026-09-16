@@ -1,51 +1,152 @@
-# Elmers
+<p align="center">
+  <img src="Resources/AppIcon.png" width="140" alt="Elmers app icon">
+</p>
 
-A native macOS clipboard manager, being built against the installed Paste app. This is the first working increment, **not full Paste parity**. The feature inventory is in [docs/paste-parity.md](docs/paste-parity.md).
+<h1 align="center">Elmers</h1>
 
-## Build and run
+<p align="center">
+  <strong>A native macOS clipboard manager that remembers everything you copy.</strong><br>
+  Swift · SwiftUI + AppKit · no dependencies · history stays on your Mac
+</p>
 
-Requires macOS 14 or later and Swift 5.9+ (Xcode Command Line Tools are sufficient). No third-party packages.
+<p align="center">
+  <img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-000?logo=apple">
+  <img alt="Swift 5.9+" src="https://img.shields.io/badge/Swift-5.9%2B-F05138?logo=swift&logoColor=white">
+  <img alt="No dependencies" src="https://img.shields.io/badge/dependencies-none-brightgreen">
+  <img alt="Status: work in progress" src="https://img.shields.io/badge/status-work%20in%20progress-orange">
+</p>
 
-Command Line Tools 27.0 ship a macOS 27 SDK whose SwiftUI `@State` macro plugin is missing, so `scripts/swift.sh` builds against the macOS 26 SDK when it is installed. Set `SDKROOT` to override.
+<p align="center">
+  <img src="docs/screenshots/panel.png" alt="The Elmers history panel showing text, image, code and link cards from different apps">
+</p>
+
+Press **⇧⌘V** from anywhere and your clipboard history slides up from the bottom of the screen as a row of cards. Each card shows what you copied, which app it came from and when. Pick one and it goes back on your clipboard, or straight into the app you're using.
+
+Elmers is modeled closely on [Paste](https://pasteapp.io) and uses it as the spec for how things should look and behave. It's a work in progress and doesn't match Paste completely yet. See [what's left](#roadmap).
+
+> Elmers is an independent project. It is not affiliated with or endorsed by Paste or its developers.
+
+## Features
+
+### Everything you copy, in one place
+- **Captures text, rich text, links, images and files** with all their pasteboard formats, so a paste keeps its formatting.
+- **Cards show where each item came from**: the header takes its color from the source app's icon, with the content type and a relative time.
+- **Previews for everything**: formatted text, image thumbnails, link cards and character or size counts. Press **Space** for a full Quick Look–style preview.
+
+### Find anything fast
+<img src="docs/screenshots/search.png" alt="Searching history for 'git'">
+
+- **Type to search** as soon as the panel opens. Arrow keys still move between results, so you can type, arrow and press Return without touching the mouse.
+- **Filter by type as you type**: typing `image`, `link`, `file` or `text` turns the word into a filter pill. Filters for app and date are in the search toolbar.
+- **On-device OCR** makes text inside screenshots and images searchable. Nothing leaves your Mac.
+
+### Pinboards
+<img src="docs/screenshots/pinboard.png" alt="A 'Snippets' pinboard with saved code snippets">
+
+- **Keep snippets you use often** on colored pinboards. Pinned items never expire.
+- Rename, recolor and drag-reorder pinboards. Switch between them with **⌘←** and **⌘→**.
+
+### Paste your way
+<img src="docs/screenshots/copied.png" width="120" align="right" alt="The Copied confirmation overlay">
+
+- **Clipboard mode** (the default) puts the item on the clipboard and shows a brief *Copied* confirmation. Then press ⌘V wherever you like.
+- **Direct paste** sends the item straight into the frontmost app. It needs Accessibility access.
+- **⇧Return** pastes as plain text. **⌘1…⌘9** paste one of the first nine items.
+- **Multi-select** to copy, paste, pin or delete several items at once. Undo and redo cover history edits.
+
+### Edit and create
+- **⌘N** creates a new text item and **⌘E** edits the selected one in a floating editor with bold, italic, underline, strikethrough and Writing Tools.
+- A card's context menu has Paste, Copy, Edit, Rename, Delete, Pin, Preview and Share.
+
+### Private by default
+<img src="docs/screenshots/settings.png" width="320" align="right" alt="Elmers Settings, General pane">
+
+- History is stored **only on this Mac**, in an atomically written archive.
+- Items marked **confidential or transient** (for example, from password managers) are skipped by default.
+- **Ignore specific apps.** Keychain Access and Passwords are excluded out of the box.
+- **Hide from screen sharing** and **pause capture** for 15 minutes to 8 hours.
+- **Link previews are off** until you turn them on, so Elmers makes no network requests until then.
+- Set how long history is kept, from one day to forever, and remap every shortcut in Settings.
+
+<br clear="right">
+
+## Keyboard shortcuts
+
+| Shortcut | Action |
+|---|---|
+| **⇧⌘V** | Show or hide the history panel (from any app) |
+| **← / →** | Move between cards |
+| **Return** / double-click | Paste the selected item |
+| **⇧Return** | Paste as plain text |
+| **⌘1 … ⌘9** | Paste one of the first nine items |
+| **Space** | Preview the selected item |
+| **⌘C** | Copy the selected item |
+| **⌘F** or start typing | Search |
+| **⌘← / ⌘→** | Previous or next pinboard |
+| **⇧⌘N** | New pinboard |
+| **⌘N** / **⌘E** | New text item / edit the selected item |
+| **⌘T** | Pause capture |
+| **⌘,** | Settings |
+| **Esc** | Close the panel |
+
+Left-click the menu bar icon to show or hide history. Right-click it to open Settings.
+
+## Install
+
+Elmers is built from source. It needs **macOS 14 or later** and **Swift 5.9+**. The Xcode Command Line Tools are enough, and there are no third-party packages.
 
 ```sh
-./scripts/build-app.sh
+git clone https://github.com/guylyons/elmers.git
+cd elmers
+./scripts/build-app.sh          # add "release" for an optimized build
 open dist/Elmers.app
 ```
 
-The app runs in the menu bar. **Shift-Command-V** shows or hides the bottom clipboard panel, matching Paste. Only one app can own it: quit Paste, then click Elmers’ menu-bar icon to retry registration.
+Elmers lives in the menu bar. Copy something in another app and press **⇧⌘V**.
 
-Left-click the menu bar icon to toggle history; right-click it to open Settings.
+> [!NOTE]
+> Only one app can own ⇧⌘V at a time. If Paste or another clipboard manager is running, quit it and click Elmers' menu bar icon to register the shortcut again. Conflicts are shown in Settings › Shortcuts.
 
-Copy content in another app to populate history. Click a card to select it, double-click or press Return to deliver it. Clipboard mode is the default: after selecting, press Command-V in the destination. Direct paste can be enabled in Settings and requires macOS Accessibility access.
+> [!TIP]
+> The Command Line Tools 27.0 macOS 27 SDK is missing SwiftUI's `@State` macro plugin. If you have the macOS 26 SDK installed, `scripts/swift.sh` uses it automatically. Set `SDKROOT` to use a different SDK.
 
-- Type to search; Command-F focuses search. Text inside images is recognized on-device and searchable. Left/Right still move between cards while you type, so type, arrow, Return works without Tab. Filter by content type from the search toolbar.
-- Left/Right selects; Command-1…9 delivers an item; Shift-Return delivers plain text.
-- Space opens a preview; Command-C copies the selected item.
-- Use + to create pinboards; a card's context menu offers Paste, Copy, Edit, Rename, Delete, Pin, Preview and Share. Right-click a pinboard to rename, delete or recolor it, and drag pinboards to reorder them. Drag a card into another app to drop its content with all formats.
-- Command-Left/Right switches pinboards; Shift-Command-N creates a pinboard.
-- Command-N creates a text item and Command-E edits the selected one in a floating editor with Bold, Italic, Underline, Strikethrough and Writing Tools; Escape cancels, Command-Return saves. The overflow menu contains settings and timed capture pause.
-
-## Data and privacy
-
-History is saved to `~/Library/Application Support/Elmers/history.plist` using an atomic binary archive. It stays on this Mac. Links are fetched for previews only when Privacy › Generate link previews is turned on (off by default). Confidential/transient markers are excluded by default. Settings allow source-app exclusions and retention changes. Pinboards protect items from expiration. An unreadable archive is preserved and capture is suspended to avoid overwriting it.
-
-Current bounds: 2,000 unpinned items and 32 MB per capture. History and raw formats are held in memory; a database/payload store is needed before claiming large-history performance parity. File URLs are preserved as references; Elmers does not back up the referenced files.
-
-## Checks
+## Testing
 
 ```sh
-./scripts/test.sh
+./scripts/test.sh                                   # core checks
+.build/debug/Elmers --demo --check-interaction      # drives the real panel with synthetic content
 ```
 
-Checks use a standalone Swift executable because Command Line Tools do not include XCTest on the development Mac. They exercise real history/archive behavior and uniquely named test pasteboards without changing the general clipboard. Pasteboard checks require access to the macOS pasteboard service; a restricted execution sandbox can deny it. `scripts/test.sh` currently runs 18 checks. With Elmers running, `.build/debug/ElmersCoreChecks --live-capture` optionally verifies capture using a synthetic item and restores the prior clipboard if unchanged.
+The core checks are a standalone Swift executable because the Command Line Tools don't include XCTest. They cover real history and archive behavior, capture policy, keyboard routing, and pasteboard round trips on uniquely named pasteboards, so your actual clipboard is never touched. The `--demo` interaction check sends real AppKit events to the panel using in-memory content only.
 
-## Remaining scope
+## Project layout
 
-Paste Stack, OCR, drag and drop, login integration, remote previews, cloud/device sync, account flows, and complete visual/accessibility parity remain open. See the inventory for observed versus implemented versus verified behavior.
+```
+Sources/
+  ElmersCore/     History, archive, capture policy, search, keyboard model, pasteboard codec
+  Elmers/         The app: panel, cards, settings, editor, shortcuts, OCR, sounds
+Tests/            ElmersCoreChecks: the core check runner
+Resources/        Info.plist, app icon and menu bar artwork
+scripts/          build-app.sh, swift.sh, test.sh
+docs/             Paste parity inventory and development checkpoints
+```
 
-Current checkpoint, verification limits, and prioritized remaining work: [docs/HANDOFF.md](docs/HANDOFF.md).
+## Data
 
-Settings mirror Paste's layout: General (Open at login, Run in background, Sound effects, Paste Items, Always paste as Plain Text, Keep History slider, Erase History…), Privacy (Show during screen sharing, confidential/transient exclusion, Ignore Applications with an app chooser) and Shortcuts (recorders for activation and pinboard navigation, Quick Paste and Plain Text modifiers, reset with confirmation). Escape cancels recording; Delete or × clears a binding. Built-in-command conflicts are rejected. Subscription/licensing features are intentionally not part of Elmers.
+- History: `~/Library/Application Support/Elmers/history.plist`
+- Limits: 2,000 unpinned items and 32 MB per capture. File URLs are stored as references, so Elmers doesn't back up the files themselves.
+- If the archive can't be read, Elmers keeps the original file and stops capturing so it never overwrites your history.
 
-Sound effects are synthesized at launch (`SoundEffects.swift`); no audio assets are bundled. The app icon is generated from `Resources/AppIcon.png` during `scripts/build-app.sh` whenever the artwork changes.
+## Roadmap
+
+Elmers tracks its progress against Paste in [docs/paste-parity.md](docs/paste-parity.md). The biggest gaps:
+
+- [ ] **Paste Stack**: copy several items, then paste them in sequence
+- [ ] **Drag and drop** in the built app, both cards into other apps and reordering pinboards
+- [ ] A custom **About** window with the character artwork
+- [ ] A search layout that matches Paste's
+- [ ] Scalable storage for very large histories
+- [ ] iCloud sync across devices
+- [ ] Full visual, accessibility and localization parity
+
+Current status and verification notes: [docs/HANDOFF.md](docs/HANDOFF.md). Known issues: [issues.md](issues.md).
