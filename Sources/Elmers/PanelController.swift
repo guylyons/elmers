@@ -169,6 +169,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         guard event.window == panel, panel.attachedSheet == nil else { return event }
         let stroke = KeyStroke(event.keyCode, KeyModifiers(event.modifierFlags))
         let context: KeyboardContext = model.searchIsFocused ? .search : .results
+        if context == .search, stroke == KeyStroke(51), model.removeTypedFilter() { return nil }
         if let action = KeyboardRouter.command(for: stroke, context: context, settings: model.shortcuts) {
             switch action {
             case let .move(offset, extend): model.moveSelection(offset, extend: extend)

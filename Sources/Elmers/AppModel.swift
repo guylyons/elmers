@@ -6,8 +6,13 @@ import ElmersCore
 @MainActor
 final class AppModel: ObservableObject {
     @Published private(set) var history = History() { didSet { refreshVisibleItems() } }
-    @Published var query = "" { didSet { refreshVisibleItems() } }
-    @Published var kind: ContentKind? { didSet { refreshVisibleItems() } }
+    @Published var query = "" { didSet { refreshVisibleItems(); if !absorbingTypedFilter { DispatchQueue.main.async { self.absorbTypedFilter() } } } }
+    @Published var kind: ContentKind? { didSet { if !absorbingTypedFilter { typedFilterWord = nil }; refreshVisibleItems() } }
+    /// The word that became the type filter, returned to the field when Backspace removes the filter.
+    private var typedFilterWord: String?
+    /// The word just put back by Backspace; it is not absorbed again until the user changes it.
+    private var restoredFilterWord: String?
+    private var absorbingTypedFilter = false
     @Published var boardID: UUID? { didSet { refreshVisibleItems() } }
     @Published var selection = ItemSelection()
     @Published private(set) var visibleItems: [ClipboardItem] = []
@@ -86,6 +91,27 @@ final class AppModel: ObservableObject {
         selection.reconcile(in: visibleItems.map(\.id))
     }
     var selected: ClipboardItem? { visibleItems.first { $0.id == selectedID } }
+    /// A type word in the query becomes the type filter and leaves the field, so what follows searches within that type.
+    /// Runs one turn after the edit: the text field ignores a binding change made inside its own update.
+    private func absorbTypedFilter() {
+        guard kind == nil, !absorbingTypedFilter, query != restoredFilterWord else { return }
+        restoredFilterWord = nil
+        let parsed = SearchQuery(query)
+        guard let typed = parsed.kind else { return }
+        absorbingTypedFilter = true
+        kind = typed; typedFilterWord = parsed.kindWord
+        query = parsed.remainder
+        absorbingTypedFilter = false
+    }
+    /// Backspace on an empty field removes the type filter. A typed word goes back into the field so it can be edited
+    /// into something longer ("link" → "linkedin"). Returns false when there is nothing to remove.
+    @discardableResult func removeTypedFilter() -> Bool {
+        guard kind != nil, query.isEmpty else { return false }
+        let word = typedFilterWord
+        kind = nil
+        if let word { absorbingTypedFilter = true; restoredFilterWord = word; query = word; absorbingTypedFilter = false }
+        return true
+    }
 
     init() {
         let demo = ProcessInfo.processInfo.arguments.contains("--demo")

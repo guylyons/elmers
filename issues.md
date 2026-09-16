@@ -8,4 +8,4 @@
   (General/Privacy/Shortcuts rebuilt from a live inspection; Subscription intentionally omitted; link-preview toggle waits on the feature)
 
 - [done 2026-09-16] I should be able to start typing by category and have it work. For instance, "Image" caps or not caps.
-  (a type word in the query — image/photo/screenshot, link/url, file, text, singular or plural, any case — filters by type and shows as a chip in the search field)
+  (a type word — image/photo/screenshot, link/url, file, text, singular or plural, any case — turns into a pill in the search field, the field clears, and further typing searches within that type; Backspace on the empty field removes the pill and gives the word back)

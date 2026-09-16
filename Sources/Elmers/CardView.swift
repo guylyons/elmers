@@ -184,4 +184,8 @@ extension ContentKind {
     var symbolName: String {
         switch self { case .text: return "text.alignleft"; case .link: return "link"; case .image: return "photo"; case .file: return "doc"; case .other: return "doc.on.clipboard" }
     }
+    /// Lowercase plural for the search placeholder: "Search images".
+    var searchNoun: String {
+        switch self { case .text: return "text"; case .other: return "content"; default: return rawValue.lowercased() + "s" }
+    }
 }

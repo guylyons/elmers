@@ -55,15 +55,21 @@ final class HistoryTests {
         _ = history.capture(.text("An image of a cat"), source: "Notes")
         _ = history.capture(.text("https://example.com/cat.png"), source: "Safari")
         history.renameItem(image.id, title: "Cat photo")
-        XCTAssertEqual(history.filtered(query: "Image").map(\.id), [image.id])
-        XCTAssertEqual(history.filtered(query: "IMAGES").map(\.id), [image.id])
-        XCTAssertEqual(history.filtered(query: "link").map(\.kind), [.link])
-        XCTAssertEqual(history.filtered(query: "image cat").map(\.id), [image.id])
-        XCTAssertTrue(history.filtered(query: "image dog").isEmpty)
-        // With a type chosen in the filter menu, the word is an ordinary search term.
+        func typed(_ raw: String) -> [ClipboardItem] {
+            let parsed = SearchQuery(raw)
+            return history.filtered(query: parsed.remainder, kind: parsed.kind)
+        }
+        XCTAssertEqual(typed("Image").map(\.id), [image.id])
+        XCTAssertEqual(typed("IMAGES").map(\.id), [image.id])
+        XCTAssertEqual(typed("link").map(\.kind), [.link])
+        XCTAssertEqual(typed("image cat").map(\.id), [image.id])
+        XCTAssertTrue(typed("image dog").isEmpty)
+        // With a type already chosen, the word stays an ordinary search term.
+        XCTAssertNil(SearchQuery("image", recognizeKind: false).kind)
         XCTAssertEqual(history.filtered(query: "image", kind: .text).map(\.text), ["An image of a cat"])
         XCTAssertEqual(SearchQuery("Photos cat").kind, .image)
-        XCTAssertEqual(SearchQuery("Photos cat").terms, ["cat"])
+        XCTAssertEqual(SearchQuery("Photos cat").kindWord, "Photos")
+        XCTAssertEqual(SearchQuery("Photos cat").remainder, "cat")
         XCTAssertNil(SearchQuery("imagery").kind)
     }
 

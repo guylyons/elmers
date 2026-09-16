@@ -81,15 +81,15 @@ struct HistoryView: View {
                 if searchVisible || !model.query.isEmpty {
                     HStack(spacing: 6) {
                         Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                        if model.kind == nil, let typedKind = SearchQuery(model.query).kind {
-                            // Paste keeps recognized filters visible inside the search field.
-                            Label(typedKind.rawValue, systemImage: typedKind.symbolName).font(.system(size: 11, weight: .medium)).labelStyle(.titleAndIcon)
+                        if let activeKind = model.kind {
+                            // Paste keeps active filters visible inside the search field; Backspace on an empty field removes it.
+                            Label(activeKind.rawValue, systemImage: activeKind.symbolName).font(.system(size: 11, weight: .medium)).labelStyle(.titleAndIcon)
                                 .padding(.horizontal, 7).padding(.vertical, 3).background(Color.accentColor.opacity(0.18), in: Capsule())
-                                .accessibilityLabel("Type filter: \(typedKind.rawValue)").help("Showing \(typedKind.rawValue.lowercased()) items")
+                                .accessibilityLabel("Type filter: \(activeKind.rawValue)").help("Showing \(activeKind.searchNoun) · ⌫ removes")
                         }
-                        TextField("Search clipboard history", text: $model.query).textFieldStyle(.plain).focused($searchFocused)
+                        TextField(model.kind.map { "Search \($0.searchNoun)" } ?? "Search clipboard history", text: $model.query).textFieldStyle(.plain).focused($searchFocused)
                             .onSubmit { searchFocused = false; model.searchIsFocused = false }
-                        Button { model.query = ""; searchVisible = false; searchFocused = false } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }.buttonStyle(.plain)
+                        Button { model.query = ""; model.kind = nil; searchVisible = false; searchFocused = false } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }.buttonStyle(.plain)
                     }.padding(.horizontal, 10).frame(width: 240, height: 30).background(.primary.opacity(0.06), in: Capsule())
                 } else {
                     Button { searchVisible = true; searchFocused = true } label: { Image(systemName: "magnifyingglass").font(.system(size: 17)) }

@@ -72,13 +72,23 @@ final class KeyboardInteractionChecks {
         func type(_ index: Int) {
             guard index < keys.count else {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    guard model.query == "image", SearchQuery(model.query).kind == .image, !model.visibleItems.isEmpty,
+                    guard model.query.isEmpty, model.kind == .image, !model.visibleItems.isEmpty,
                           model.visibleItems.allSatisfy({ $0.kind == .image }) else {
-                        print("FAIL: typing 'image' left query '\(model.query)' showing \(model.visibleItems.map(\.kind))"); fflush(stdout); exit(1)
+                        print("FAIL: typing 'image' left query '\(model.query)', kind \(String(describing: model.kind)), showing \(model.visibleItems.map(\.kind))"); fflush(stdout); exit(1)
                     }
                     capturePanel(controller, name: "search-image-filter")
-                    print("PASS: typing a type word filters to that type")
-                    checkReopening(model: model, controller: controller)
+                    print("PASS: typing a type word becomes the type filter and clears the field")
+                    let backspace = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: controller.panel.windowNumber, context: nil, characters: "\u{7F}", charactersIgnoringModifiers: "\u{7F}", isARepeat: false, keyCode: 51)!
+                    NSApp.postEvent(backspace, atStart: false)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        guard model.kind == nil, model.query == "image" else {
+                            print("FAIL: Backspace left kind \(String(describing: model.kind)) and query '\(model.query)'"); fflush(stdout); exit(1)
+                        }
+                        capturePanel(controller, name: "search-after-backspace")
+                        print("PASS: Backspace on the empty field removes the type filter and restores the word")
+                        model.query = ""
+                        checkReopening(model: model, controller: controller)
+                    }
                 }
                 return
             }

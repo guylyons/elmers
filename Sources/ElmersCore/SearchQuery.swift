@@ -7,17 +7,23 @@ import Foundation
 /// search term, so typing a category shows that category.
 public struct SearchQuery: Equatable, Sendable {
     public var kind: ContentKind?
+    /// The word that produced `kind`, so it can be put back when the filter is removed.
+    public var kindWord: String?
     public var terms: [String]
+    /// The query with the type word taken out.
+    public var remainder: String { terms.joined(separator: " ") }
 
     /// Parses `raw`. When `recognizeKind` is false every word stays a search term, which is the
     /// right behavior when a type has already been chosen from the filter menu.
     public init(_ raw: String, recognizeKind: Bool = true) {
         var kind: ContentKind? = nil
+        var kindWord: String? = nil
         var terms: [String] = []
         for token in raw.split(whereSeparator: \.isWhitespace).map(String.init) {
-            if recognizeKind, kind == nil, let match = ContentKind.matching(keyword: token) { kind = match } else { terms.append(token) }
+            if recognizeKind, kind == nil, let match = ContentKind.matching(keyword: token) { kind = match; kindWord = token } else { terms.append(token) }
         }
         self.kind = kind
+        self.kindWord = kindWord
         self.terms = terms
     }
 }
