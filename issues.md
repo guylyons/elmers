@@ -12,3 +12,6 @@
 
 - [open 2026-09-16] drag and drop does not work
   (reported by the user on the built app; card drag-out and pinboard pill reordering are implemented in DragSupport.swift / HistoryView.swift but were only verified through the in-process interaction check, never with a real pointer drag across apps. Reproduce with a real drag from a card into another app, and a pill drag in the toolbar; the mouse-down card selection in CardMouseObserver may be swallowing the drag start)
+
+- [open 2026-09-16] update the About popup to use the About png
+  (Resources/AboutElmers.png is committed but unused; the overflow menu's "About Elmers" still calls NSApp.orderFrontStandardAboutPanel. Show the artwork in the About panel — either pass it as the credits/icon of the standard panel or build a custom About window — and copy the PNG into the bundle in scripts/build-app.sh)
