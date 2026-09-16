@@ -6,8 +6,10 @@ struct CardView: View {
     let item: ClipboardItem
     let selected: Bool
     let index: Int
-    static let colors: [Color] = [.red, .orange, .green, .cyan, .blue, .purple]
+    static let colors: [Color] = [.red, .orange, .yellow, .green, .blue, .purple, .pink, .gray]
     private var accent: Color {
+        if let id = item.sourceBundleID, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id),
+           let color = CardImageCache.shared.color(for: id, url: url) { return color }
         switch item.kind {
         case .link: return Color(red: 0.19, green: 0.52, blue: 0.77)
         case .image: return Color(red: 0.57, green: 0.32, blue: 0.65)
@@ -24,8 +26,8 @@ struct CardView: View {
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(item.title ?? item.kind.rawValue).font(.system(size: 14, weight: .semibold)).lineLimit(1)
-                    TimelineView(.periodic(from: .now, by: 60)) { _ in
-                        Text(item.copiedAt, style: .relative).font(.system(size: 11)).opacity(0.85).lineLimit(1)
+                    TimelineView(.periodic(from: .now, by: 30)) { context in
+                        Text(Self.relativeTime(item.copiedAt, now: context.date)).font(.system(size: 11)).opacity(0.85).lineLimit(1)
                     }
                 }
                 Spacer(minLength: 0)
@@ -54,6 +56,14 @@ struct CardView: View {
         .accessibilityLabel("\(item.kind.rawValue), \(item.source), \(String(item.text.prefix(140)))")
         .accessibilityValue(selected ? "Selected" : "")
         .help("\(item.source) · \(item.kind.rawValue)\(index < 9 ? " · ⌘\(index + 1) to paste" : "")")
+    }
+    /// Paste's wording: "just now", "5 minutes ago", "3 hours ago", "yesterday", "2 weeks ago".
+    static func relativeTime(_ date: Date, now: Date = Date()) -> String {
+        let seconds = now.timeIntervalSince(date)
+        if seconds < 60 { return "just now" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full; formatter.dateTimeStyle = .named
+        return formatter.localizedString(for: date, relativeTo: now)
     }
     private var symbol: String {
         switch item.kind { case .text: return "text.alignleft"; case .link: return "link"; case .image: return "photo"; case .file: return "doc"; case .other: return "doc.on.clipboard" }
@@ -111,10 +121,44 @@ struct ItemPreview: View {
 private final class CardImageCache {
     static let shared = CardImageCache()
     private let icons = NSCache<NSString, NSImage>()
+    private var colors: [String: Color?] = [:]
     func icon(for id: String, url: URL) -> NSImage {
         if let icon = icons.object(forKey: id as NSString) { return icon }
         let icon = NSWorkspace.shared.icon(forFile: url.path)
         icons.setObject(icon, forKey: id as NSString)
         return icon
+    }
+    /// The card header takes the source app's dominant icon color, as Paste does (Brave is orange, Safari blue).
+    func color(for id: String, url: URL) -> Color? {
+        if let cached = colors[id] { return cached }
+        let color = Self.dominantColor(of: icon(for: id, url: url)).map(Color.init)
+        colors[id] = color
+        return color
+    }
+    private static func dominantColor(of image: NSImage) -> NSColor? {
+        let size = 24
+        guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: size, pixelsHigh: size, bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
+        image.draw(in: NSRect(x: 0, y: 0, width: size, height: size), from: .zero, operation: .copy, fraction: 1)
+        NSGraphicsContext.restoreGraphicsState()
+        // Weight opaque, saturated, mid-brightness pixels; bucket hues so a vivid accent beats a large neutral area.
+        var buckets: [Int: (weight: CGFloat, r: CGFloat, g: CGFloat, b: CGFloat)] = [:]
+        for y in 0..<size { for x in 0..<size {
+            guard let pixel = bitmap.colorAt(x: x, y: y), pixel.alphaComponent > 0.6 else { continue }
+            var h: CGFloat = 0, s: CGFloat = 0, v: CGFloat = 0, a: CGFloat = 0
+            pixel.getHue(&h, saturation: &s, brightness: &v, alpha: &a)
+            let weight = s * s * min(v, 1 - abs(v - 0.55)) + 0.001
+            let key = Int(h * 12) * 4 + Int(s * 3.99)
+            var bucket = buckets[key] ?? (0, 0, 0, 0)
+            bucket.weight += weight; bucket.r += pixel.redComponent * weight; bucket.g += pixel.greenComponent * weight; bucket.b += pixel.blueComponent * weight
+            buckets[key] = bucket
+        } }
+        guard let best = buckets.values.max(by: { $0.weight < $1.weight }), best.weight > 0.5 else { return nil }
+        let color = NSColor(red: best.r / best.weight, green: best.g / best.weight, blue: best.b / best.weight, alpha: 1)
+        var h: CGFloat = 0, s: CGFloat = 0, v: CGFloat = 0, a: CGFloat = 0
+        color.getHue(&h, saturation: &s, brightness: &v, alpha: &a)
+        // Keep white text legible: clamp brightness and lift saturation slightly.
+        return NSColor(hue: h, saturation: min(max(s, 0.55), 1), brightness: min(max(v, 0.45), 0.85), alpha: 1)
     }
 }

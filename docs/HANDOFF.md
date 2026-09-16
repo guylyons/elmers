@@ -51,3 +51,23 @@ A reference-settings screenshot export was rejected by automatic approval review
 ## Keyboard navigation follow-up
 
 Fixed results-focus handoff for first/last item commands, pinboard changes, reopening, and Escape clearing filters. The expanded AppKit interaction check reproduces the previous Command-Down/search-focus bug and passes with the fix. Core checks: 18/18 pass. Official keyboard documentation was consulted; computer-use tools were unavailable for fresh reference UI comparison. This task creates the repository's initial commit, including the previously untracked app baseline. Full parity and physical cross-app/global-shortcut verification remain outstanding.
+
+## September 16 checkpoint — reference inspection and parity pass
+
+Paste 6.3.11 was inspected live through accessibility dumps and real clicks (see the September 16 section of `paste-parity.md`). Subscription/licensing features are out of scope by the user's decision.
+
+What changed:
+
+- Return pastes with a single press from the search field; Tab switches focus. Menu bar icon toggles the panel both ways. Original synthesized sound effects for capture and paste, with a Sound effects toggle.
+- Settings rebuilt to Paste's structure: sidebar (General, Privacy, Shortcuts, Help Center), Open at login (SMAppService), Run in background (Dock icon policy), iCloud sync shown as not available, Paste Items radio group with "Always paste as Plain Text", Keep History slider with Paste's lower-limit confirmation, Erase History…, Show during screen sharing, Ignore Applications list with an app chooser, Reset shortcuts confirmation. Window chrome matches (640×592, hidden title).
+- Card context menu, pinboard menu (8 colors, Delete… confirmation), and overflow menu reordered to match Paste. Card headers use the source app's dominant icon color; relative times use Paste's wording.
+- App icon from `Resources/AppIcon.png` compiled into `AppIcon.icns` by `scripts/build-app.sh`.
+
+Remaining work, in priority order:
+
+1. New Text Item / Edit as floating windows with Bold/Italic/Underline/Strikethrough, Create/Save, and "characters · words · lines" counters (rich text payloads).
+2. Link previews (title/icon fetch behind a "Generate link previews" toggle) and image/file preview polish; Space preview compared against Paste's (not captured this session).
+3. Paste Stack (still deferred by the user), drag and drop, pinboard reordering.
+4. Direct paste end-to-end with Accessibility, then "Paste to <app>" verification across apps.
+5. Visual polish: General section overflow by ~40 pt versus Paste, sidebar row offsets, scroll position when the selection is not the first card, panel materials.
+6. Storage scalability, OCR, accessibility/localization audits.

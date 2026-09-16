@@ -27,7 +27,7 @@ public struct History: Codable, Sendable {
         }
     }
     @discardableResult public mutating func createBoard(name: String) -> Pinboard {
-        let board = Pinboard(name: name.trimmingCharacters(in: .whitespacesAndNewlines), colorIndex: boards.count % 6)
+        let board = Pinboard(name: name.trimmingCharacters(in: .whitespacesAndNewlines), colorIndex: boards.count % Pinboard.colorCount)
         boards.append(board); return board
     }
     public mutating func renameBoard(_ id: UUID, to name: String) {
@@ -71,7 +71,7 @@ public struct History: Codable, Sendable {
     }
     public mutating func recolorBoard(_ id: UUID, color: Int) {
         guard let index = boards.firstIndex(where: { $0.id == id }) else { return }
-        boards[index].colorIndex = max(0, color) % 6
+        boards[index].colorIndex = max(0, color) % Pinboard.colorCount
     }
     public mutating func moveBoard(_ id: UUID, before targetID: UUID) {
         guard id != targetID, let old = boards.firstIndex(where: { $0.id == id }) else { return }

@@ -57,11 +57,15 @@ final class InteractionModelTests {
             XCTAssertEqual(KeyboardRouter.command(for: stroke, context: .results), expected)
         }
     }
-    func testSearchReturnFocusesResultsAndTextEditingKeepsItsKeys() {
-        XCTAssertEqual(KeyboardRouter.command(for: .init(36), context: .search), .focusResults)
+    func testSearchReturnPastesAndTextEditingKeepsItsKeys() {
+        XCTAssertEqual(KeyboardRouter.command(for: .init(36), context: .search), .paste(plain: false))
+        XCTAssertEqual(KeyboardRouter.command(for: .init(36, .shift), context: .search), .paste(plain: true))
         XCTAssertEqual(KeyboardRouter.command(for: .init(48), context: .search), .focusResults)
         XCTAssertEqual(KeyboardRouter.command(for: .init(3, .command), context: .search), .filters)
-        XCTAssertEqual(KeyboardRouter.command(for: .init(123), context: .search), nil)
+        XCTAssertEqual(KeyboardRouter.command(for: .init(123), context: .search), .move(-1, extend: false))
+        XCTAssertEqual(KeyboardRouter.command(for: .init(124, .shift), context: .search), .move(1, extend: true))
+        XCTAssertEqual(KeyboardRouter.command(for: .init(123, .option), context: .search), nil)
+        XCTAssertEqual(KeyboardRouter.command(for: .init(51), context: .search), nil)
         XCTAssertEqual(KeyboardRouter.command(for: .init(8, .command), context: .editor), nil)
         XCTAssertEqual(KeyboardRouter.command(for: .init(18, [.command, .shift]), context: .search), .quickPaste(0, plain: true))
     }

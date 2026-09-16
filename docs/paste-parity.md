@@ -1,5 +1,45 @@
 # Paste parity inventory
 
+## September 16 — reference inspection and parity pass
+
+Reference: Paste **6.3.11** (`com.wiheads.paste`) on macOS **27.0** (26A428). Inspected with real accessibility-tree dumps (System Events), real clicks (cliclick), and window-bound screenshots. Full-screen captures were discarded because they included private desktop content; no clipboard content or screenshots are committed. Subscription and licensing surfaces are **out of scope by the user's decision** and are not tracked below.
+
+### Observed reference behavior
+
+| Surface | Observed in Paste 6.3.11 | Elmers status |
+|---|---|---|
+| Menu bar / overflow menu | About Paste · New Text Item ⌘N · Settings… ⌘, · Help › (Getting Started, Keyboard Shortcuts, Help Center, Product Updates, Feature Request, Contact Support, Start/Stop Diagnostic, Reset Search Index) · Paste on Twitter · Pause Paste › (Pause ⌘T, Pause for 15m/30m/1h/3h/8h) · Quit ⌘Q | implemented: About, New Text Item ⌘N, Settings ⌘,, Help › Keyboard Shortcuts, Pause › (⌘T + timed), Quit. Web-only help links and diagnostics intentionally absent |
+| Settings window | 640×592, sidebar 200 pt: General, Privacy, Shortcuts, Subscription; "Help Center" at sidebar bottom; no title text | implemented (Subscription omitted); verified by window capture side by side |
+| Settings › General | Open at login · Run in background · iCloud sync (Not available ⓘ, disabled) · Sound effects · **Paste Items** radio group with descriptions and illustration, "Always paste as Plain Text" checkbox · **Keep History** slider Day/Week/Month/Year/Forever · Erase History… | implemented: login item via SMAppService, background = Dock icon policy, sync row shown as not available, sound toggle, radio group with descriptions (no illustration), plain-text checkbox, slider with lower-limit confirmation ("You have items older than the new history limit…"), Erase History… with confirmation |
+| Settings › Privacy | Show during screen sharing · Generate link previews · Ignore confidential content · Ignore transient content · Ignore Applications list (icons, names, +/−; defaults Keychain Access, Passwords) | implemented except link previews (no remote fetch yet, so no toggle). Screen-sharing toggle sets window sharing type. App list uses an application chooser |
+| Settings › Shortcuts | Activate Paste ⇧⌘V · Activate Paste Stack ⇧⌘C · Show next Pinboard ⌘→ · Show previous Pinboard ⌘← · Quick Paste ⌘ + 1…9 · Plain Text mode ⇧ · Reset shortcuts to default… (confirmation) | implemented except the Stack recorder (Stack deferred; no dead control) |
+| Card context menu (text) | Paste to <previous app> ↩ · Copy ⌘C · — · Edit ⌘E · Writing Tools ⇧⌘E · Rename ⌘R · Delete ⌫ · — · Pin › (pinboards with color dots, Create Pinboard…) · — · Preview Space · Share › | implemented: same order; "Paste to <app>" label when direct paste is on, "Paste" in clipboard mode; Share uses the system share sheet; Writing Tools absent |
+| Card context menu (link) | Open ⌘O at top, then the text menu | implemented; file items add Reveal in Finder |
+| Pinboard pill context menu | Rename · Share Pinboard · Delete… · row of 8 color swatches (red, orange, yellow, green, blue, purple, pink, gray) | implemented: Rename, Delete… with confirmation, 8 colors; Share Pinboard absent (sync feature) |
+| Delete pinboard alert | "Delete “name”?" / "The Pinboard and all its content will be deleted. This action cannot be undone." | implemented with Paste's title; message differs because Elmers keeps items in history and supports undo |
+| New Text Item window | Floating 500×360: Cancel · B I U S · Writing Tools · Create; text area; footer "0 characters · 0 words · 0 lines" | **gap**: Elmers uses a plain sheet without formatting or counters |
+| Edit window | Floating 390×316 sized to content: Cancel · B I U S · Writing Tools · Save; footer counters | **gap**: same as above |
+| Cards | 230-pt cards; header colored by the source app (Brave orange, Safari blue, terminal navy), app icon top right, kind + relative time ("3 hours ago", "yesterday"); footer "41 characters" or link host; link placeholder compass | implemented: dominant icon color header, relative wording, footer; link previews/OCR still open |
+| Sounds | Copy.aiff (0.21 s) on capture, Paste.aiff (0.08 s) on paste, toggled by Sound effects | implemented with original synthesized sounds (no assets copied) |
+| Search | Field replaces pinboard pills, ≡ filter button at its right; Return with search focused pastes the selection (documented) | implemented; reference search index returned no results locally, so Return-in-search is verified against documentation and Elmers' own checks |
+
+### Fixes from `issues.md`
+
+- Return sometimes needed two presses: the first press only moved focus from the search field. Return now pastes from either context; Tab still switches focus. Covered by the core routing check and the AppKit dispatch check "Return from search delivers with a single press".
+- Menu bar icon could not hide the panel: the outside-click monitor hid the panel on mouse-down, then the button action re-showed it. The monitor now ignores clicks inside the status item. Verified with real clicks: show, hide, show.
+- Sound effects: synthesized copy "pop" and paste "tick", toggle in General.
+- Settings now mirror Paste's sections, rows, wording and dialogs (see table).
+
+- Arrow keys while typing: Left/Right (and Shift variants) now move the card selection while the search field keeps focus, so type → arrow → Return needs no Tab. Option-arrows, Home/End and Delete stay with the text field. Reference behavior not observable locally (Paste's search index returned no results); implemented from the user's request.
+
+### Verification on September 16
+
+- `scripts/test.sh`: 18 checks, 0 failures (Return-in-search expectation updated).
+- `.build/debug/Elmers --demo --check-interaction`: all steps pass, including the new single-press Return step.
+- `.build/debug/Elmers --demo --check-status-item`: passes.
+- Physical: status item click cycle on the built app; Settings sections captured and compared with Paste's captures; panel captured showing app-colored headers and relative times.
+- Not verified: Open at login on an ad-hoc signed bundle (SMAppService may refuse), Run in background beyond Dock-icon behavior, screen-sharing exclusion with a real share, sound levels by ear.
+
 ## Menu bar right-click fix — September 15
 
 - User-reported behavior: right-clicking the Elmers menu bar icon should open Settings. Fresh Paste UI inspection is unavailable in this session because no computer-use tools are exposed; reference parity remains unverified.

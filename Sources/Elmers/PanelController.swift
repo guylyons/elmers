@@ -18,6 +18,9 @@ final class PanelController: NSObject, NSWindowDelegate {
     private var localMonitor: Any?
     private var outsideMonitor: Any?
     private var deliveryGeneration = 0
+    /// Screen frame of the menu bar item that toggles the panel. Clicks there are handled by the
+    /// status item action, so the outside-click monitor must not hide the panel first.
+    var statusItemFrame: (() -> NSRect?)?
 
     init(model: AppModel) {
         self.model = model
@@ -39,20 +42,32 @@ final class PanelController: NSObject, NSWindowDelegate {
         model.dismiss = { [weak self] in self?.hide() }
         model.showSettings = { [weak self] in self?.openSettings() }
         model.preview = { [weak self] in self?.openPreview($0) }
+        model.sharingChanged = { [weak self] in self?.applySharing() }
+        applySharing()
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             var result: NSEvent? = event
             MainActor.assumeIsolated { result = self?.handle(event) }
             return result
         }
         outsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            Task { @MainActor in guard let self, self.panel.attachedSheet == nil else { return }; self.hide(restoreFocus: false) }
+            Task { @MainActor in
+                guard let self, self.panel.attachedSheet == nil else { return }
+                if let frame = self.statusItemFrame?(), frame.contains(NSEvent.mouseLocation) { return }
+                self.hide(restoreFocus: false)
+            }
         }
     }
     func toggle() { panel.isVisible ? hide() : show() }
+    /// Paste's "Show during screen sharing" hides the clipboard windows from screen capture when off.
+    private func applySharing() {
+        let type: NSWindow.SharingType = model.showDuringScreenSharing ? .readOnly : .none
+        for window in [panel, settingsWindow, previewWindow] { window?.sharingType = type }
+    }
     func show() {
         deliveryGeneration += 1
         let front = NSWorkspace.shared.frontmostApplication
         if front?.processIdentifier != ProcessInfo.processInfo.processIdentifier { previousApp = front }
+        model.destinationApp = previousApp?.localizedName
         let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main
         if let screen { panel.setFrame(NSRect(x: screen.frame.minX + 6, y: screen.frame.minY + 6, width: screen.frame.width - 12, height: 326), display: true) }
         model.reconcileSelection()
@@ -66,6 +81,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     }
     private func paste(_ item: ClipboardItem, plainText: Bool) {
         guard model.copy(item, plainText: plainText) else { return }
+        SoundEffects.shared.play(.paste)
         guard model.directPaste else { hide(); return }
         guard AXIsProcessTrusted() else {
             model.message = "Copied. Press ⌘V in your app, or enable Accessibility in Elmers Settings for direct paste."
@@ -101,9 +117,10 @@ final class PanelController: NSObject, NSWindowDelegate {
     func openSettings() {
         hide(restoreFocus: false)
         if settingsWindow == nil {
-            let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 648, height: 560), styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
-            window.title = "Elmers Settings"; window.isReleasedWhenClosed = false
+            let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 640, height: 564), styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
+            window.title = "Elmers Settings"; window.titleVisibility = .hidden; window.isReleasedWhenClosed = false
             window.contentView = NSHostingView(rootView: SettingsView(model: model)); window.center(); settingsWindow = window
+            applySharing()
         }
         NSApp.activate(ignoringOtherApps: true); settingsWindow?.makeKeyAndOrderFront(nil)
     }
@@ -111,6 +128,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         if previewWindow == nil {
             let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 640, height: 460), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false; window.level = .floating; previewWindow = window
+            applySharing()
         }
         previewWindow?.title = "\(item.kind.rawValue) — \(item.source)"
         previewWindow?.contentView = NSHostingView(rootView: ItemPreview(item: item))

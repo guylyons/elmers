@@ -21,11 +21,14 @@ final class KeyboardInteractionChecks {
             (124, [], { model.selectedID == ids.last }, "Right selects next item"),
             (124, [], { model.selectedID == ids.last }, "Right stops at last item"),
             (3, .command, { model.searchIsFocused }, "Search can be focused again"),
-            (36, [], { !model.searchIsFocused && deliveries.isEmpty }, "Return leaves search without pasting"),
-            (36, [], { deliveries == [false] }, "Return delivers selection"),
-            (36, .shift, { deliveries == [false, true] }, "Shift-Return delivers plain text"),
-            (18, .command, { deliveries == [false, true, false] }, "Command-1 quick pastes"),
-            (18, [.command, .shift], { deliveries == [false, true, false, true] }, "Shift-Command-1 quick pastes plain text")
+            (123, [], { model.selectedID == ids[ids.count - 2] && model.searchIsFocused }, "Left moves the selection while search keeps focus"),
+            (124, [], { model.selectedID == ids.last && model.searchIsFocused }, "Right moves the selection while search keeps focus"),
+            (36, [], { deliveries == [false] }, "Return from search delivers with a single press"),
+            (48, [], { !model.searchIsFocused }, "Tab focuses results"),
+            (36, [], { deliveries == [false, false] }, "Return delivers selection"),
+            (36, .shift, { deliveries == [false, false, true] }, "Shift-Return delivers plain text"),
+            (18, .command, { deliveries == [false, false, true, false] }, "Command-1 quick pastes"),
+            (18, [.command, .shift], { deliveries == [false, false, true, false, true] }, "Shift-Command-1 quick pastes plain text")
         ]
         func step(_ index: Int) {
             guard index < steps.count else { checkReopening(model: model, controller: controller); return }

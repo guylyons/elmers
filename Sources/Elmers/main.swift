@@ -7,8 +7,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
     let shortcut = GlobalShortcut()
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)
         model = AppModel()
+        model.applyActivationPolicy()
         panelController = PanelController(model: model)
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem.button {
@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             button.toolTip = "Elmers — Shift-Command-V · Right-click for Settings"
         }
+        panelController.statusItemFrame = { [weak self] in self?.statusItem.button?.window?.frame }
         shortcut.onActivate = { [weak self] in self?.panelController.toggle() }
         model.shortcutsChanged = { [weak self] in
             guard let self else { return }

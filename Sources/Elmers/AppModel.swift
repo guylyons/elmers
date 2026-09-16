@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import ServiceManagement
 import ElmersCore
 
 @MainActor
@@ -32,9 +33,24 @@ final class AppModel: ObservableObject {
         set { if let newValue { selection.select(newValue, in: visibleItems.map(\.id)) } else { selection.clear() } }
     }
     @Published var message: String?
+    /// Name of the app that will receive a paste, shown in the card context menu as "Paste to …".
+    @Published var destinationApp: String?
     @Published var paused = false
     @Published var retentionDays: Int { didSet { defaults.set(retentionDays, forKey: "retentionDays"); prune(); persist() } }
     @Published var directPaste: Bool { didSet { defaults.set(directPaste, forKey: "directPaste") } }
+    @Published var soundEffects: Bool { didSet { defaults.set(soundEffects, forKey: "soundEffects"); SoundEffects.shared.enabled = soundEffects } }
+    @Published var alwaysPlainText: Bool { didSet { defaults.set(alwaysPlainText, forKey: "alwaysPlainText") } }
+    @Published var runInBackground: Bool { didSet { defaults.set(runInBackground, forKey: "runInBackground"); applyActivationPolicy() } }
+    @Published var showDuringScreenSharing: Bool { didSet { defaults.set(showDuringScreenSharing, forKey: "showDuringScreenSharing"); sharingChanged?() } }
+    /// Mirrors the login item registration; setting it registers or unregisters the app with launchd.
+    @Published var openAtLogin: Bool {
+        didSet {
+            guard !isDemo, openAtLogin != oldValue, openAtLogin != (SMAppService.mainApp.status == .enabled) else { return }
+            do { if openAtLogin { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() } }
+            catch { message = "Login item could not be changed: \(error.localizedDescription)"; openAtLogin = oldValue }
+        }
+    }
+    var sharingChanged: (() -> Void)?
     @Published var ignoreConfidential: Bool { didSet { defaults.set(ignoreConfidential, forKey: "ignoreConfidential") } }
     @Published var ignoreTransient: Bool { didSet { defaults.set(ignoreTransient, forKey: "ignoreTransient") } }
     @Published var excludedApps: String { didSet { defaults.set(excludedApps, forKey: "excludedApps") } }
@@ -69,9 +85,15 @@ final class AppModel: ObservableObject {
         let demo = ProcessInfo.processInfo.arguments.contains("--demo")
         defaults = demo ? UserDefaults(suiteName: "app.elmers.demo")! : .standard
         defaults.register(defaults: ["retentionDays": 30, "directPaste": false, "ignoreConfidential": true, "ignoreTransient": true,
-                                      "excludedApps": "com.apple.keychainaccess\ncom.apple.Passwords"])
+                                      "excludedApps": "com.apple.keychainaccess\ncom.apple.Passwords", "soundEffects": true,
+                                      "alwaysPlainText": false, "runInBackground": true, "showDuringScreenSharing": true])
         retentionDays = defaults.integer(forKey: "retentionDays")
         directPaste = defaults.bool(forKey: "directPaste")
+        soundEffects = defaults.bool(forKey: "soundEffects")
+        alwaysPlainText = defaults.bool(forKey: "alwaysPlainText")
+        runInBackground = defaults.bool(forKey: "runInBackground")
+        showDuringScreenSharing = defaults.bool(forKey: "showDuringScreenSharing")
+        openAtLogin = demo ? false : SMAppService.mainApp.status == .enabled
         ignoreConfidential = defaults.bool(forKey: "ignoreConfidential")
         ignoreTransient = defaults.bool(forKey: "ignoreTransient")
         excludedApps = defaults.string(forKey: "excludedApps") ?? ""
@@ -83,6 +105,7 @@ final class AppModel: ObservableObject {
         }
         if let data = defaults.data(forKey: "shortcuts"), let stored = try? JSONDecoder().decode(ShortcutSettings.self, from: data) { shortcuts = stored }
         undoManager.levelsOfUndo = 30
+        SoundEffects.shared.enabled = soundEffects
         refreshVisibleItems()
         selectedID = visibleItems.first?.id
     }
@@ -122,6 +145,7 @@ final class AppModel: ObservableObject {
         do {
             if let payload = try PasteboardCodec.read(from: board, ignoreConfidential: ignoreConfidential, ignoreTransient: ignoreTransient) {
                 let item = history.capture(payload, source: sourceName, sourceBundleID: sourceID)
+                SoundEffects.shared.play(.copy)
                 if selectedID == nil { selectedID = item.id }
                 prune(); persist()
             }
@@ -162,7 +186,24 @@ final class AppModel: ObservableObject {
         lastChange = NSPasteboard.general.changeCount
         return true
     }
-    func activate(_ item: ClipboardItem? = nil, plainText: Bool = false) { if let item = item ?? selectedAggregate() { deliver?(item, plainText) } }
+    func activate(_ item: ClipboardItem? = nil, plainText: Bool = false) { if let item = item ?? selectedAggregate() { deliver?(item, plainText || alwaysPlainText) } }
+    func applyActivationPolicy() { NSApp.setActivationPolicy(runInBackground ? .accessory : .regular) }
+    /// Paste's history limit steps: Day, Week, Month, Year, Forever (0).
+    static let retentionSteps = [1, 7, 30, 365, 0]
+    func unpinnedItemCount(olderThanRetentionDays days: Int) -> Int {
+        guard days > 0 else { return 0 }
+        let cutoff = Date().addingTimeInterval(-Double(days) * 86400)
+        return history.items.filter { $0.boardIDs.isEmpty && $0.copiedAt < cutoff }.count
+    }
+    func eraseHistory() { deleteItems(history.items.filter { $0.boardIDs.isEmpty }); selection.clear() }
+    var excludedBundleIDs: [String] {
+        excludedApps.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+    func excludeApp(bundleID: String) {
+        guard !excludedBundleIDs.contains(bundleID) else { return }
+        excludedApps = (excludedBundleIDs + [bundleID]).joined(separator: "\n")
+    }
+    func includeApp(bundleID: String) { excludedApps = excludedBundleIDs.filter { $0 != bundleID }.joined(separator: "\n") }
     private func rememberUndo(_ action: @escaping @MainActor (AppModel) -> Void) {
         undoManager.registerUndo(withTarget: self) { target in MainActor.assumeIsolated { action(target) } }
     }

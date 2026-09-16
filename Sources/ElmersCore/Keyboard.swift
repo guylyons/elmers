@@ -57,7 +57,8 @@ public enum KeyboardRouter {
         if let number = numbers.firstIndex(of: key), modifiers == settings.quickPasteModifier || modifiers == settings.quickPasteModifier.union(settings.plainTextModifier) { return .quickPaste(number, plain: plain) }
         if key == 53 && modifiers.isEmpty { return .escape }
         if key == 48 && (modifiers.isEmpty || modifiers == .shift) { return context == .search ? .focusResults : .focusSearch }
-        if [36,76].contains(key), modifiers.isEmpty || modifiers == settings.plainTextModifier { return context == .search ? .focusResults : .paste(plain: plain) }
+        // Return pastes the selection even while the search field has focus, as in Paste; Tab moves between the two.
+        if [36,76].contains(key), modifiers.isEmpty || modifiers == settings.plainTextModifier { return .paste(plain: plain) }
         if modifiers == .command {
             switch key {
             case 3: return context == .search ? .filters : .focusSearch
@@ -71,6 +72,12 @@ public enum KeyboardRouter {
             }
         }
         if modifiers == [.command, .shift], key == 45 { return .newBoard }
+        // Left/Right move the card selection even while typing a query, so type → arrow → Return works
+        // without Tab. Option-arrows and Home/End still move the text cursor.
+        if modifiers.isEmpty || modifiers == .shift {
+            if key == 123 { return .move(-1, extend: modifiers == .shift) }
+            if key == 124 { return .move(1, extend: modifiers == .shift) }
+        }
         guard context == .results else { return nil }
         if modifiers == .command {
             switch key {
@@ -85,10 +92,6 @@ public enum KeyboardRouter {
             }
         }
         if modifiers == [.command, .shift], key == 6 { return .redo }
-        if modifiers.isEmpty || modifiers == .shift {
-            if key == 123 { return .move(-1, extend: modifiers == .shift) }
-            if key == 124 { return .move(1, extend: modifiers == .shift) }
-        }
         if modifiers.isEmpty {
             switch key { case 49: return .preview; case 51,117: return .delete; default: break }
         }

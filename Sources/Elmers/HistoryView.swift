@@ -13,6 +13,8 @@ struct HistoryView: View {
     @State private var editingItem: ClipboardItem?
     @State private var renamingItem: ClipboardItem?
     @State private var filtersVisible = false
+    @State private var deletingBoard: Pinboard?
+    @State private var helpVisible = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -69,6 +71,11 @@ struct HistoryView: View {
                 if let item = renamingItem { model.renameItem(item, title: boardName) } else if let board = editingBoard { model.renameBoard(board, name: boardName) } else { model.createBoard(name: boardName) }
             }.keyboardShortcut(.defaultAction).disabled(boardName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
+        .alert("Delete “\(deletingBoard?.name ?? "")”?", isPresented: Binding(get: { deletingBoard != nil }, set: { if !$0 { deletingBoard = nil } })) {
+            Button("Delete", role: .destructive) { if let board = deletingBoard { model.deleteBoard(board) } }
+            Button("Cancel", role: .cancel) {}
+        } message: { Text("The Pinboard will be deleted. Its items stay in Clipboard History. You can undo this with ⌘Z.") }
+        .sheet(isPresented: $helpVisible) { KeyboardHelp() }
         .sheet(isPresented: $textDialog) {
             VStack(alignment: .leading, spacing: 16) {
                 Text(editingItem == nil ? "New Text Item" : "Edit Item").font(.title2.bold())
@@ -102,8 +109,15 @@ struct HistoryView: View {
                 ForEach(model.history.boards) { board in
                     boardPill(board.name, symbol: nil, color: CardView.colors[board.colorIndex % CardView.colors.count], selected: model.boardID == board.id) { model.boardID = board.id }
                         .contextMenu {
-                            Button("Rename…") { renamingItem = nil; editingBoard = board; boardName = board.name; boardDialog = true }
-                            Button("Delete Pinboard", role: .destructive) { model.deleteBoard(board) }
+                            Button("Rename") { renamingItem = nil; editingBoard = board; boardName = board.name; boardDialog = true }
+                            Button("Delete…") { deletingBoard = board }
+                            Divider()
+                            Picker("Color", selection: Binding(get: { board.colorIndex }, set: { model.recolorBoard(board, color: $0) })) {
+                                ForEach(0..<Pinboard.colorCount, id: \.self) { index in
+                                    Label(["Red", "Orange", "Yellow", "Green", "Blue", "Purple", "Pink", "Gray"][index], systemImage: "circle.fill")
+                                        .tint(CardView.colors[index]).tag(index)
+                                }
+                            }.pickerStyle(.inline)
                         }
                 }
                 Button { renamingItem = nil; editingBoard = nil; boardName = ""; boardDialog = true } label: { Image(systemName: "plus").font(.system(size: 17)) }
@@ -113,18 +127,21 @@ struct HistoryView: View {
                 if model.paused { Label("Paused", systemImage: "pause.fill").font(.caption).padding(.leading, 24) }
                 Spacer()
                 Menu {
-                    Button("New Text Item…") { editingItem = nil; newText = ""; textDialog = true }.disabled(!model.canEdit)
-                    Button("Settings…") { model.showSettings?() }
+                    Button("About Elmers") { NSApp.orderFrontStandardAboutPanel(nil); NSApp.activate(ignoringOtherApps: true) }
                     Divider()
-                    if model.paused { Button("Resume Capture") { model.resume() } }
+                    Button("New Text Item") { editingItem = nil; newText = ""; textDialog = true }.keyboardShortcut("n").disabled(!model.canEdit)
+                    Button("Settings…") { model.showSettings?() }.keyboardShortcut(",")
+                    Divider()
+                    Menu("Help") { Button("Keyboard Shortcuts") { helpVisible = true } }
+                    Divider()
+                    if model.paused { Button("Resume Elmers") { model.resume() } }
                     else {
-                        Menu("Pause Capture") {
-                            Button("Pause") { model.pause(minutes: nil) }
-                            ForEach([15, 30, 60, 180, 480], id: \.self) { minutes in Button("For \(minutes < 60 ? "\(minutes) minutes" : "\(minutes / 60) hours")") { model.pause(minutes: minutes) } }
+                        Menu("Pause Elmers") {
+                            Button("Pause") { model.pause(minutes: nil) }.keyboardShortcut("t")
+                            ForEach([15, 30, 60, 180, 480], id: \.self) { minutes in Button("Pause for \(minutes < 60 ? "\(minutes)m" : "\(minutes / 60)h")") { model.pause(minutes: minutes) } }
                         }
                     }
-                    Divider()
-                    Button("Quit Elmers") { NSApp.terminate(nil) }
+                    Button("Quit Elmers") { NSApp.terminate(nil) }.keyboardShortcut("q")
                 } label: { Image(systemName: "ellipsis").font(.system(size: 19)) }
                 .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 28).padding(.trailing, 22).help("More")
             }
@@ -168,20 +185,38 @@ struct HistoryView: View {
         }.frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     @ViewBuilder private func itemMenu(_ item: ClipboardItem) -> some View {
-        Button("Paste") { model.activate() }
-        Button("Paste as Plain Text") { model.activate(plainText: true) }.disabled(item.text.isEmpty)
-        Button("Copy") { if let aggregate = model.selectedAggregate(), model.copy(aggregate) { model.message = "Copied to clipboard." } }
-        Button("Edit") { editingItem = item; newText = item.text; textDialog = true }.disabled(item.text.isEmpty || !model.canEdit)
-        Button("Rename") { renamingItem = item; boardName = item.title ?? ""; boardDialog = true }.disabled(!model.canEdit)
-        Button("Preview") { model.preview?(item) }
-        Divider()
-        Menu("Pin to") {
-            ForEach(model.history.boards) { board in Button(board.name) { model.selectedItems.forEach { model.pin($0, to: board) } } }
-            if model.history.boards.isEmpty { Text("Create a pinboard with + first") }
+        let urls = item.text.components(separatedBy: "\n").compactMap { URL(string: $0) }.filter { ["http", "https", "file"].contains($0.scheme ?? "") }
+        if item.kind == .link {
+            Button("Open") { urls.forEach { NSWorkspace.shared.open($0) }; model.dismiss?() }.keyboardShortcut("o")
+            Divider()
         }
-        if let board = model.boardID { Button("Remove from Pinboard") { model.selectedItems.forEach { model.unpin($0, from: board) } } }
+        if item.kind == .file {
+            Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting(urls); model.dismiss?() }
+            Divider()
+        }
+        Button(model.directPaste ? "Paste to \(model.destinationApp ?? "current app")" : "Paste") { model.activate() }.keyboardShortcut(.return, modifiers: [])
+        Button("Copy") { if let aggregate = model.selectedAggregate(), model.copy(aggregate) { model.message = "Copied to clipboard." } }.keyboardShortcut("c")
         Divider()
-        Button("Delete", role: .destructive) { model.deleteItems(model.selectedItems) }
+        Button("Edit") { editingItem = item; newText = item.text; textDialog = true }.keyboardShortcut("e").disabled(item.text.isEmpty || !model.canEdit)
+        Button("Rename") { renamingItem = item; boardName = item.title ?? ""; boardDialog = true }.keyboardShortcut("r").disabled(!model.canEdit)
+        Button("Delete") { model.deleteItems(model.selectedItems) }.keyboardShortcut(.delete, modifiers: []).disabled(!model.canEdit)
+        Divider()
+        Menu("Pin") {
+            ForEach(model.history.boards) { board in
+                let pinned = model.selectedItems.allSatisfy { $0.boardIDs.contains(board.id) }
+                Button { model.selectedItems.forEach { pinned ? model.unpin($0, from: board.id) : model.pin($0, to: board) } } label: {
+                    Label(board.name, systemImage: pinned ? "checkmark.circle.fill" : "circle.fill").tint(CardView.colors[board.colorIndex % CardView.colors.count])
+                }
+            }
+            if !model.history.boards.isEmpty { Divider() }
+            Button("Create Pinboard…") { renamingItem = nil; editingBoard = nil; boardName = ""; boardDialog = true }
+        }.disabled(!model.canEdit)
+        if let board = model.boardID { Button("Unpin") { model.selectedItems.forEach { model.unpin($0, from: board) } } }
+        Divider()
+        Button("Preview") { model.preview?(item) }.keyboardShortcut(.space, modifiers: [])
+        if item.kind == .image, let image = imagePreview(item) { ShareLink("Share…", item: Image(nsImage: image), preview: SharePreview(item.title ?? "Image", image: Image(nsImage: image))) }
+        else if let url = urls.first, item.kind == .link { ShareLink("Share…", item: url) }
+        else if !item.text.isEmpty { ShareLink("Share…", item: item.text) }
     }
 }
 
@@ -193,4 +228,27 @@ extension Notification.Name {
     static let elmersSearch = Notification.Name("elmers.search")
     static let elmersNewBoard = Notification.Name("elmers.newBoard")
     static let elmersNewText = Notification.Name("elmers.newText")
+}
+
+/// Keyboard reference reachable from the overflow menu's Help submenu.
+struct KeyboardHelp: View {
+    @Environment(\.dismiss) private var dismiss
+    private let rows: [(String, String)] = [
+        ("Show or hide Elmers", "⇧⌘V"), ("Move between items", "← →  ·  ⇧ extends"), ("First / last item", "⌘↑ / ⌘↓"),
+        ("Paste selected items", "↩"), ("Paste as plain text", "⇧↩"), ("Quick paste", "⌘1…⌘9"), ("Copy", "⌘C"),
+        ("Preview", "Space"), ("Open link", "⌘O"), ("Edit / Rename", "⌘E / ⌘R"), ("Delete", "⌫"), ("Undo / Redo", "⌘Z / ⇧⌘Z"),
+        ("Search / Filters", "⌘F  ·  ⇥ switches focus"), ("New text item", "⌘N"), ("New pinboard", "⇧⌘N"),
+        ("Next / previous pinboard", "⌘→ / ⌘←"), ("Pause capture", "⌘T"), ("Settings", "⌘,")
+    ]
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Keyboard Shortcuts").font(.title3.bold())
+            Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 6) {
+                ForEach(rows, id: \.0) { row in
+                    GridRow { Text(row.0); Text(row.1).font(.system(.body, design: .monospaced)).foregroundStyle(.secondary) }
+                }
+            }
+            HStack { Spacer(); Button("Done") { dismiss() }.keyboardShortcut(.defaultAction) }
+        }.padding(24).frame(width: 420)
+    }
 }

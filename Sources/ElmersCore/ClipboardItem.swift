@@ -97,4 +97,6 @@ public struct Pinboard: Codable, Identifiable, Equatable, Sendable {
     public var name: String
     public var colorIndex: Int
     public init(name: String, colorIndex: Int = 0) { id = UUID(); self.name = name; self.colorIndex = colorIndex }
+    /// Red, orange, yellow, green, blue, purple, pink, gray.
+    public static let colorCount = 8
 }
