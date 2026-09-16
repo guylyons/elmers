@@ -35,6 +35,7 @@ let checks: [(String, () throws -> Void)] = [
     ("excluded source attribution", history.testSourceTransitionDoesNotAttributeExcludedContentToNextApp),
     ("duplicate promotion preserves pinboards", history.testDuplicateMovesToFrontAndKeepsPinboardMembership),
     ("search and type filters", history.testSearchMatchesTextAndSourceCaseInsensitivelyAndFiltersType),
+    ("category keywords in search", history.testTypingCategoryKeywordsFiltersByKind),
     ("retention protects pins", history.testRetentionPreservesPinnedItems),
     ("board deletion preserves history", history.testDeletingBoardPreservesClipboardItem),
     ("binary archive round trip", history.testArchiveRoundTripPreservesBinaryFormatsAndBoards),

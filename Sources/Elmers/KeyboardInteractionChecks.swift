@@ -57,9 +57,44 @@ final class KeyboardInteractionChecks {
             type("p", 35) { type("a", 0) { type("i", 34) {
                 guard model.query == "pai" else { print("FAIL: typed 'pai' but the query is '\(model.query)'"); fflush(stdout); exit(1) }
                 print("PASS: typing into a fresh search keeps the first letter")
-                checkReopening(model: model, controller: controller)
+                checkTypingCategory(model: model, controller: controller)
             } } }
         }
+    }
+    /// Typing a content type word ("image") narrows results to that type and shows the filter in the search field.
+    static func checkTypingCategory(model: AppModel, controller: PanelController) {
+        let image = NSImage(size: NSSize(width: 160, height: 100), flipped: false) { rect in NSColor.systemTeal.setFill(); rect.fill(); return true }
+        guard let tiff = image.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else { print("FAIL: category fixture image"); exit(1) }
+        model.newItem(payload: ClipboardPayload(items: [["public.png": png, NSPasteboard.PasteboardType.string.rawValue: Data("Category fixture".utf8)]]))
+        model.query = ""
+        NotificationCenter.default.post(name: .elmersResults, object: nil)
+        let keys: [(String, UInt16)] = [("i", 34), ("m", 46), ("a", 0), ("g", 5), ("e", 14)]
+        func type(_ index: Int) {
+            guard index < keys.count else {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    guard model.query == "image", SearchQuery(model.query).kind == .image, !model.visibleItems.isEmpty,
+                          model.visibleItems.allSatisfy({ $0.kind == .image }) else {
+                        print("FAIL: typing 'image' left query '\(model.query)' showing \(model.visibleItems.map(\.kind))"); fflush(stdout); exit(1)
+                    }
+                    capturePanel(controller, name: "search-image-filter")
+                    print("PASS: typing a type word filters to that type")
+                    checkReopening(model: model, controller: controller)
+                }
+                return
+            }
+            let (character, code) = keys[index]
+            let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: controller.panel.windowNumber, context: nil, characters: character, charactersIgnoringModifiers: character, isARepeat: false, keyCode: code)!
+            NSApp.postEvent(event, atStart: false)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { type(index + 1) }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { type(0) }
+    }
+    /// Writes a PNG of the panel to $ELMERS_CAPTURE_DIR when set, so a demo run can be inspected by eye without touching real history.
+    static func capturePanel(_ controller: PanelController, name: String) {
+        guard let directory = ProcessInfo.processInfo.environment["ELMERS_CAPTURE_DIR"], let view = controller.panel.contentView,
+              let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
+        view.cacheDisplay(in: view.bounds, to: rep)
+        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: directory).appendingPathComponent("\(name).png"))
     }
     static func checkReopening(model: AppModel, controller: PanelController) {
         NotificationCenter.default.post(name: .elmersSearch, object: nil)

@@ -49,6 +49,24 @@ final class HistoryTests {
         XCTAssertTrue(history.filtered(query: "recipe", kind: .link).isEmpty)
     }
 
+    func testTypingCategoryKeywordsFiltersByKind() {
+        var history = History()
+        let image = history.capture(ClipboardPayload(items: [["public.png": Data([0, 1, 255])]]), source: "Preview")
+        _ = history.capture(.text("An image of a cat"), source: "Notes")
+        _ = history.capture(.text("https://example.com/cat.png"), source: "Safari")
+        history.renameItem(image.id, title: "Cat photo")
+        XCTAssertEqual(history.filtered(query: "Image").map(\.id), [image.id])
+        XCTAssertEqual(history.filtered(query: "IMAGES").map(\.id), [image.id])
+        XCTAssertEqual(history.filtered(query: "link").map(\.kind), [.link])
+        XCTAssertEqual(history.filtered(query: "image cat").map(\.id), [image.id])
+        XCTAssertTrue(history.filtered(query: "image dog").isEmpty)
+        // With a type chosen in the filter menu, the word is an ordinary search term.
+        XCTAssertEqual(history.filtered(query: "image", kind: .text).map(\.text), ["An image of a cat"])
+        XCTAssertEqual(SearchQuery("Photos cat").kind, .image)
+        XCTAssertEqual(SearchQuery("Photos cat").terms, ["cat"])
+        XCTAssertNil(SearchQuery("imagery").kind)
+    }
+
     func testRetentionPreservesPinnedItems() {
         var history = History()
         let old = Date(timeIntervalSince1970: 100)

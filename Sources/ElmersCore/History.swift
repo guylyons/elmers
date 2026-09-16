@@ -16,10 +16,12 @@ public struct History: Codable, Sendable {
         return item
     }
     public func filtered(query: String = "", kind: ContentKind? = nil, boardID: UUID? = nil) -> [ClipboardItem] {
-        let tokens = query.split(whereSeparator: \.isWhitespace).map(String.init)
+        // A type word typed into the query acts as a type filter unless the menu already chose one.
+        let parsed = SearchQuery(query, recognizeKind: kind == nil)
+        let kind = kind ?? parsed.kind
         return items.filter { item in
             (kind == nil || item.kind == kind) && (boardID == nil || item.boardIDs.contains(boardID!)) &&
-            tokens.allSatisfy { token in
+            parsed.terms.allSatisfy { token in
                 [item.text, item.source, item.title ?? "", item.recognizedText ?? "", item.linkPreview?.title ?? ""].contains {
                     $0.range(of: token, options: [.caseInsensitive, .diacriticInsensitive]) != nil
                 }

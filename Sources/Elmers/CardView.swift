@@ -65,9 +65,7 @@ struct CardView: View {
         formatter.unitsStyle = .full; formatter.dateTimeStyle = .named
         return formatter.localizedString(for: date, relativeTo: now)
     }
-    private var symbol: String {
-        switch item.kind { case .text: return "text.alignleft"; case .link: return "link"; case .image: return "photo"; case .file: return "doc"; case .other: return "doc.on.clipboard" }
-    }
+    private var symbol: String { item.kind.symbolName }
     private var footer: String {
         switch item.kind {
         case .text: return "\(item.text.count) characters"
@@ -178,5 +176,12 @@ private final class CardImageCache {
         color.getHue(&h, saturation: &s, brightness: &v, alpha: &a)
         // Keep white text legible: clamp brightness and lift saturation slightly.
         return NSColor(hue: h, saturation: min(max(s, 0.55), 1), brightness: min(max(v, 0.45), 0.85), alpha: 1)
+    }
+}
+
+extension ContentKind {
+    /// SF Symbol used for this type on cards and in the search field's type filter.
+    var symbolName: String {
+        switch self { case .text: return "text.alignleft"; case .link: return "link"; case .image: return "photo"; case .file: return "doc"; case .other: return "doc.on.clipboard" }
     }
 }

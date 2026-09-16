@@ -31,6 +31,7 @@ Reference: Paste **6.3.11** (`com.wiheads.paste`) on macOS **27.0** (26A428). In
 - Sound effects: synthesized copy "pop" and paste "tick", toggle in General.
 - Settings now mirror Paste's sections, rows, wording and dialogs (see table).
 
+- Typing a category: Paste's help says relevant filters appear inside the search field as you type and stay visible there. Elmers now reads a content-type word in the query (image/images/photo/picture/screenshot, link/links/url, file/files, text/texts, content; any case) as a type filter and shows it as a chip in the search field; the remaining words search as before. A type chosen from the filter menu takes precedence, and the word then stays an ordinary term. Covered by the core check "category keywords in search" and the AppKit step "typing a type word filters to that type" (real key events, capture via `ELMERS_CAPTURE_DIR`). Not matched: Paste's suggested-filter menu for app and date words; app names already match through the source text search.
 - Arrow keys while typing: Left/Right (and Shift variants) now move the card selection while the search field keeps focus, so type → arrow → Return needs no Tab. Option-arrows, Home/End and Delete stay with the text field. Reference behavior not observable locally (Paste's search index returned no results); implemented from the user's request.
 
 ### Editor (later on September 16)

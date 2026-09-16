@@ -81,6 +81,12 @@ struct HistoryView: View {
                 if searchVisible || !model.query.isEmpty {
                     HStack(spacing: 6) {
                         Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                        if model.kind == nil, let typedKind = SearchQuery(model.query).kind {
+                            // Paste keeps recognized filters visible inside the search field.
+                            Label(typedKind.rawValue, systemImage: typedKind.symbolName).font(.system(size: 11, weight: .medium)).labelStyle(.titleAndIcon)
+                                .padding(.horizontal, 7).padding(.vertical, 3).background(Color.accentColor.opacity(0.18), in: Capsule())
+                                .accessibilityLabel("Type filter: \(typedKind.rawValue)").help("Showing \(typedKind.rawValue.lowercased()) items")
+                        }
                         TextField("Search clipboard history", text: $model.query).textFieldStyle(.plain).focused($searchFocused)
                             .onSubmit { searchFocused = false; model.searchIsFocused = false }
                         Button { model.query = ""; searchVisible = false; searchFocused = false } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }.buttonStyle(.plain)
