@@ -19,7 +19,7 @@ Left-click the menu bar icon to toggle history; right-click it to open Settings.
 
 Copy content in another app to populate history. Click a card to select it, double-click or press Return to deliver it. Clipboard mode is the default: after selecting, press Command-V in the destination. Direct paste can be enabled in Settings and requires macOS Accessibility access.
 
-- Type to search; Command-F focuses search. Left/Right still move between cards while you type, so type, arrow, Return works without Tab. Filter by content type from the search toolbar.
+- Type to search; Command-F focuses search. Text inside images is recognized on-device and searchable. Left/Right still move between cards while you type, so type, arrow, Return works without Tab. Filter by content type from the search toolbar.
 - Left/Right selects; Command-1…9 delivers an item; Shift-Return delivers plain text.
 - Space opens a preview; Command-C copies the selected item.
 - Use + to create pinboards; a card's context menu offers Paste, Copy, Edit, Rename, Delete, Pin, Preview and Share. Right-click a pinboard to rename, delete or recolor it, and drag pinboards to reorder them. Drag a card into another app to drop its content with all formats.
@@ -48,4 +48,4 @@ Current checkpoint, verification limits, and prioritized remaining work: [docs/H
 
 Settings mirror Paste's layout: General (Open at login, Run in background, Sound effects, Paste Items, Always paste as Plain Text, Keep History slider, Erase History…), Privacy (Show during screen sharing, confidential/transient exclusion, Ignore Applications with an app chooser) and Shortcuts (recorders for activation and pinboard navigation, Quick Paste and Plain Text modifiers, reset with confirmation). Escape cancels recording; Delete or × clears a binding. Built-in-command conflicts are rejected. Subscription/licensing features are intentionally not part of Elmers.
 
-Sound effects are synthesized at launch (`SoundEffects.swift`); no audio assets are bundled. The app icon is built from `Resources/AppIcon.png` into `AppIcon.icns` during `scripts/build-app.sh`.
+Sound effects are synthesized at launch (`SoundEffects.swift`); no audio assets are bundled. The app icon is generated from `Resources/AppIcon.png` during `scripts/build-app.sh` whenever the artwork changes.

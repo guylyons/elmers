@@ -74,6 +74,7 @@ final class AppModel: ObservableObject {
     private var capturePolicy = CapturePolicy(source: NSWorkspace.shared.frontmostApplication?.bundleIdentifier)
     private let previewFetcher = LinkPreviewFetcher()
     private var previewsInFlight = Set<UUID>()
+    private var recognitionInFlight = Set<UUID>()
     var canEdit: Bool { archiveReadable }
 
     var selectedItems: [ClipboardItem] { visibleItems.filter { selection.ids.contains($0.id) } }
@@ -110,6 +111,7 @@ final class AppModel: ObservableObject {
             catch { archiveReadable = false; message = "History could not be opened. The original archive is preserved. \(error.localizedDescription)" }
         }
         if let data = defaults.data(forKey: "shortcuts"), let stored = try? JSONDecoder().decode(ShortcutSettings.self, from: data) { shortcuts = stored }
+        recognizeImageText()
         undoManager.levelsOfUndo = 30
         SoundEffects.shared.enabled = soundEffects
         refreshVisibleItems()
@@ -155,6 +157,7 @@ final class AppModel: ObservableObject {
                 if selectedID == nil { selectedID = item.id }
                 prune(); persist()
                 if item.kind == .link { fetchLinkPreviews() }
+                if item.kind == .image { recognizeImageText() }
             }
             lastChange = currentChange
         } catch PasteboardCodec.CaptureError.changedDuringRead {
@@ -213,6 +216,20 @@ final class AppModel: ObservableObject {
                 self.previewsInFlight.remove(item.id)
                 guard self.history.items.contains(where: { $0.id == item.id }) else { return }
                 self.history.setLinkPreview(item.id, preview); self.persist()
+            }
+        }
+    }
+    /// Runs on-device text recognition for image items that have not been processed yet.
+    func recognizeImageText() {
+        guard canEdit else { return }
+        let pending = history.items.filter { $0.kind == .image && $0.recognizedText == nil && !recognitionInFlight.contains($0.id) }.prefix(2)
+        for item in pending {
+            recognitionInFlight.insert(item.id)
+            ImageTextRecognizer.recognize(item) { [weak self] text in
+                guard let self else { return }
+                self.recognitionInFlight.remove(item.id)
+                guard self.history.items.contains(where: { $0.id == item.id }) else { return }
+                self.history.setRecognizedText(item.id, text ?? ""); self.persist()
             }
         }
     }

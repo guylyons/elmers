@@ -133,7 +133,23 @@ final class KeyboardInteractionChecks {
         _ = provider.loadDataRepresentation(forTypeIdentifier: "public.rtf") { data, _ in loaded = data; done.signal() }
         guard done.wait(timeout: .now() + 2) == .success, loaded == Data("{\\rtf1 dragged}".utf8) else { print("FAIL: drag data did not load"); fflush(stdout); exit(1) }
         print("PASS: drag provider offers every representation")
-        fflush(stdout); exit(0)
+        checkRecognition(model: model)
+    }
+    /// Renders text into a PNG and confirms Vision makes it searchable.
+    static func checkRecognition(model: AppModel) {
+        let image = NSImage(size: NSSize(width: 600, height: 160), flipped: false) { rect in
+            NSColor.white.setFill(); rect.fill()
+            ("ELMERS OCR 4711" as NSString).draw(at: NSPoint(x: 30, y: 50), withAttributes: [.font: NSFont.boldSystemFont(ofSize: 48), .foregroundColor: NSColor.black])
+            return true
+        }
+        guard let tiff = image.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else { print("FAIL: fixture image"); exit(1) }
+        let item = ClipboardItem(payload: ClipboardPayload(items: [["public.png": png]]), source: "Check")
+        ImageTextRecognizer.recognize(item, level: .fast) { text in
+            guard let text, text.contains("4711") else { print("FAIL: recognition returned \(text ?? "nil")"); fflush(stdout); exit(1) }
+            print("PASS: image text recognition finds rendered text")
+            fflush(stdout); exit(0)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 20) { print("FAIL: recognition timed out"); fflush(stdout); exit(1) }
     }
 }
 #endif

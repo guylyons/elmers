@@ -48,6 +48,12 @@ Reference: Paste **6.3.11** (`com.wiheads.paste`) on macOS **27.0** (26A428). In
 - Cards use `onDrag` with an `NSItemProvider` that registers each pasteboard representation under its own type (`DragSupport.swift`); check "drag provider offers every representation" loads RTF back from the provider.
 - Pinboard pills are draggable and accept drops to reorder; dropping on the Clipboard History pill moves a board to the front. Not automated and not compared with Paste's reorder gesture.
 
+### OCR (later on September 16)
+
+- `ImageTextRecognizer` runs on-device recognition for image items without stored text, on capture and at launch for older items. An empty string records a run that found nothing. `History.filtered` also matches recognized text and link-preview titles (core check "binary archive round trip" now covers both fields).
+- Accurate recognition took about 35 s on first use on this Mac (model warm-up); the fast level took 0.25 s. The app uses accurate in the background; the check uses fast.
+- Space preview: a raw Space key event on a selected Paste card produced no separate window and nothing above the panel, so Paste's preview presentation is still unobserved.
+
 ### Verification on September 16
 
 - `scripts/test.sh`: 18 checks, 0 failures (Return-in-search expectation updated).
@@ -84,7 +90,7 @@ Statuses distinguish observation from implementation. No feature is verified sol
 | Multi-selection / drag and drop | Multi-selection observed via ⇧/⌘ clicks and ⌘A; drag-out from cards not exercised on the reference this session | in progress | Elmers: cards drag out with every stored representation (checked in-process); pinboard pills reorder by drag (not automated). Cross-app drop and reference comparison remain unverified |
 | Edit / new text / previews | New Text Item observed in menu | unexplored | Inspect reference workflows |
 | Paste Stack | Shortcut entry observed | unexplored | Inspect queue ordering and delivery |
-| OCR | Official search documentation describes image text search | unexplored | Installed-version verification required |
+| OCR | Official search documentation describes image text search | implemented | Vision `VNRecognizeTextRequest` (accurate level, background, two images at a time) fills `recognizedText`; search matches it and the preview window shows it. Checked with a rendered fixture (fast level). Reference behavior not observed locally |
 | iCloud and companion devices | iCloud toggle observed | blocked | Requires signing, entitlements, and device testing |
 | Accessibility / localization | Discovery required | unexplored | VoiceOver, keyboard, contrast, language tests |
 | Import/export / recovery | Discovery required | unexplored | Inspect reference |

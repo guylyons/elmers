@@ -122,7 +122,13 @@ struct ItemPreview: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack { Text(item.title ?? item.kind.rawValue).font(.title2.bold()); Spacer(); Text(item.source).foregroundStyle(.secondary) }
             Divider()
-            if let image = imagePreview(item) { Image(nsImage: image).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: .infinity) }
+            if let image = imagePreview(item) {
+                Image(nsImage: image).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: .infinity)
+                if let text = item.recognizedText, !text.isEmpty {
+                    Text("Recognized text").font(.caption.bold()).foregroundStyle(.secondary)
+                    ScrollView { Text(text).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }.frame(maxHeight: 120)
+                }
+            }
             else { ScrollView { Text(item.text.isEmpty ? "No text preview available." : item.text).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) } }
             Text(item.copiedAt.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
         }.padding(24).frame(minWidth: 480, minHeight: 320)

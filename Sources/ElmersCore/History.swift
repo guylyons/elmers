@@ -20,7 +20,7 @@ public struct History: Codable, Sendable {
         return items.filter { item in
             (kind == nil || item.kind == kind) && (boardID == nil || item.boardIDs.contains(boardID!)) &&
             tokens.allSatisfy { token in
-                [item.text, item.source, item.title ?? ""].contains {
+                [item.text, item.source, item.title ?? "", item.recognizedText ?? "", item.linkPreview?.title ?? ""].contains {
                     $0.range(of: token, options: [.caseInsensitive, .diacriticInsensitive]) != nil
                 }
             }
@@ -54,6 +54,10 @@ public struct History: Codable, Sendable {
     public mutating func editItem(_ id: UUID, payload: ClipboardPayload) {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return }
         items[index].payload = payload
+    }
+    public mutating func setRecognizedText(_ id: UUID, _ text: String?) {
+        guard let index = items.firstIndex(where: { $0.id == id }) else { return }
+        items[index].recognizedText = text
     }
     public mutating func setLinkPreview(_ id: UUID, _ preview: LinkPreview?) {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return }

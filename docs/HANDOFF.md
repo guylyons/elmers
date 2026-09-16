@@ -76,3 +76,21 @@ Remaining work, in priority order:
 4. Direct paste end-to-end with Accessibility, then "Paste to <app>" verification across apps.
 5. Visual polish: General section overflow by ~40 pt versus Paste, sidebar row offsets, scroll position when the selection is not the first card, panel materials.
 6. Storage scalability, OCR, accessibility/localization audits.
+
+## September 16, end of session — stopping point
+
+Commits this session, newest first: OCR + icon build, drag and drop, link previews, floating editor, settings/menus/sounds. All checks green at the stop: `scripts/test.sh` 18/18, `--check-interaction` 30 steps (three consecutive clean runs), `--check-status-item` pass.
+
+State of the built app (`dist/Elmers.app`, running from the menu bar):
+
+- Done today: Return-in-search single press, arrows navigate while typing, menu bar toggle, synthesized sounds, Paste-shaped Settings, matching menus, app-colored cards, floating rich-text editor (⌘N/⌘E), link previews (Privacy toggle, default off), card drag-out and pinboard drag reorder, OCR search for images, app icon generated at build time from `Resources/AppIcon.png` (the `.icns` is no longer tracked; `scripts/build-app.sh` regenerates it when the PNG is newer).
+- User decisions: no subscription/licensing features; Paste Stack stays deferred.
+
+Next session, in order:
+
+1. Verify by hand what scripting could not: Paste's Space preview presentation, a real cross-app drag from a card, link previews with the toggle on, OCR search on a real screenshot, direct paste with Accessibility.
+2. Visual pass on the panel against Paste at the same width: card radius/shadow/selection ring, toolbar spacing, hidden horizontal scroller, empty and paused states. General settings overflows Paste's height by roughly 40 pt.
+3. Storage: move large payloads out of the single plist (payload files keyed by fingerprint, schema v2 with migration) before claiming large-history parity; raise the 2,000-item/32 MB bounds afterwards.
+4. Remaining reference features: Writing Tools on cards (⇧⌘E), Share Pinboard, image rotate in the editor, Paste Stack when un-deferred, accessibility/VoiceOver audit.
+
+Testing notes: two displays are attached; panels open on the display under the pointer, so move the pointer first (`cliclick m:x,y`). Send Escape/Space with a raw CGEvent (`scratchpad/key.swift` pattern), not `cliclick kp:`. Never send System Events `keystroke` unless the target app is frontmost. Keep captures window-bound; full-screen captures exposed private content.

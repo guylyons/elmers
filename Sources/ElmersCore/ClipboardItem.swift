@@ -62,6 +62,8 @@ public struct ClipboardItem: Codable, Identifiable, Equatable, Sendable {
     public var fingerprint: String
     /// Optional remote preview for links, filled only when the user enables link previews.
     public var linkPreview: LinkPreview?
+    /// Text recognized in an image item; empty string records that recognition ran and found nothing.
+    public var recognizedText: String?
     private var cachedText = ""
     private var cachedKind: ContentKind = .other
     private var cachedByteCount = 0
@@ -79,7 +81,7 @@ public struct ClipboardItem: Codable, Identifiable, Equatable, Sendable {
         cachedByteCount = payload.byteCount
     }
     // Derived data is rebuilt once at load and never changes the on-disk v1 schema.
-    private enum CodingKeys: String, CodingKey { case id, payload, source, sourceBundleID, copiedAt, boardIDs, title, fingerprint, linkPreview }
+    private enum CodingKeys: String, CodingKey { case id, payload, source, sourceBundleID, copiedAt, boardIDs, title, fingerprint, linkPreview, recognizedText }
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         id = try values.decode(UUID.self, forKey: .id)
@@ -91,6 +93,7 @@ public struct ClipboardItem: Codable, Identifiable, Equatable, Sendable {
         title = try values.decodeIfPresent(String.self, forKey: .title)
         fingerprint = try values.decode(String.self, forKey: .fingerprint)
         linkPreview = try values.decodeIfPresent(LinkPreview.self, forKey: .linkPreview)
+        recognizedText = try values.decodeIfPresent(String.self, forKey: .recognizedText)
         refreshMetadata()
     }
 }
