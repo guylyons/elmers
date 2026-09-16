@@ -13,8 +13,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem.button {
             button.image = NSImage(systemSymbolName: "square.on.square", accessibilityDescription: "Elmers clipboard history")
-            button.target = self; button.action = #selector(toggle)
-            button.toolTip = "Elmers — Shift-Command-V"
+            button.target = self; button.action = #selector(statusItemClicked)
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+            button.toolTip = "Elmers — Shift-Command-V · Right-click for Settings"
         }
         shortcut.onActivate = { [weak self] in self?.panelController.toggle() }
         model.shortcutsChanged = { [weak self] in
@@ -37,6 +38,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let editItem = NSMenuItem(); editItem.submenu = edit; menu.addItem(editItem)
         NSApp.mainMenu = menu
         #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--check-status-item") {
+            precondition(model.isDemo)
+            StatusItemChecks.run(delegate: self)
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--check-global-shortcut") {
             precondition(model.isDemo)
             guard model.shortcutConflict == nil else { print("FAIL: shortcut registration conflict"); fflush(stdout); exit(1) }
@@ -53,6 +59,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         #endif
         model.start(); panelController.show()
+    }
+    @objc func statusItemClicked() {
+        if NSApp.currentEvent?.type == .rightMouseUp { settings() }
+        else { toggle() }
     }
     @objc func toggle() { if model.shortcutConflict != nil { model.shortcutsChanged?() }; panelController.toggle() }
     @objc func settings() { panelController.openSettings() }

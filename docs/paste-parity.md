@@ -1,5 +1,12 @@
 # Paste parity inventory
 
+## Menu bar right-click fix — September 15
+
+- User-reported behavior: right-clicking the Elmers menu bar icon should open Settings. Fresh Paste UI inspection is unavailable in this session because no computer-use tools are exposed; reference parity remains unverified.
+- Root cause: the status button only dispatched left-click actions, and Settings was available only through other menus.
+- Implemented: dispatch left/right mouse-up events; right-click opens the existing Settings window and dismisses history, while left-click retains history toggle behavior. Tooltip describes the Settings gesture.
+- Verification: `Elmers --demo --check-status-item` failed before the fix and passed afterward using real AppKit event dispatch. Covers opening Settings, left-click history, and reopening Settings from visible history. Existing `--check-interaction` checks and all 18 core checks pass with macOS service access. App bundle rebuilt and signed. Physical pointer and reference screenshot comparison remain unverified.
+
 Reference: Paste **6.3.11**, `com.wiheads.paste`, macOS **26.5**, observed 2026-09-14. Local UI inspected through macOS accessibility and a temporary screenshot. Personal clipboard content/screenshots are not committed.
 
 Statuses distinguish observation from implementation. No feature is verified solely by compiling.

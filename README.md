@@ -6,12 +6,16 @@ A native macOS clipboard manager, being built against the installed Paste app. T
 
 Requires macOS 14 or later and Swift 5.9+ (Xcode Command Line Tools are sufficient). No third-party packages.
 
+Command Line Tools 27.0 ship a macOS 27 SDK whose SwiftUI `@State` macro plugin is missing, so `scripts/swift.sh` builds against the macOS 26 SDK when it is installed. Set `SDKROOT` to override.
+
 ```sh
 ./scripts/build-app.sh
 open dist/Elmers.app
 ```
 
 The app runs in the menu bar. **Shift-Command-V** shows or hides the bottom clipboard panel, matching Paste. Only one app can own it: quit Paste, then click Elmers’ menu-bar icon to retry registration.
+
+Left-click the menu bar icon to toggle history; right-click it to open Settings.
 
 Copy content in another app to populate history. Click a card to select it, double-click or press Return to deliver it. Clipboard mode is the default: after selecting, press Command-V in the destination. Direct paste can be enabled in Settings and requires macOS Accessibility access.
 
