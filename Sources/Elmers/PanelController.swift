@@ -220,9 +220,21 @@ final class PanelController: NSObject, NSWindowDelegate {
            !characters.isEmpty, characters.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) && $0.value < 0xF700 }) {
             model.query += characters
             NotificationCenter.default.post(name: .elmersSearch, object: nil)
+            placeSearchCursorAtEnd()
             return nil
         }
         return event
+    }
+    /// Focusing the search field selects its whole text, so the next typed letter would replace the first one.
+    /// Once the field editor takes focus, move the insertion point to the end instead.
+    private func placeSearchCursorAtEnd(attempt: Int = 0) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + (attempt == 0 ? 0 : 0.016)) { [weak self] in
+            guard let self else { return }
+            if let editor = self.panel.firstResponder as? NSTextView, editor.window == self.panel {
+                let end = (editor.string as NSString).length
+                editor.setSelectedRange(NSRange(location: end, length: 0))
+            } else if attempt < 12 { self.placeSearchCursorAtEnd(attempt: attempt + 1) }
+        }
     }
 }
 

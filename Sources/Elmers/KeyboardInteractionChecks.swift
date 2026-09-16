@@ -31,7 +31,7 @@ final class KeyboardInteractionChecks {
             (18, [.command, .shift], { deliveries == [false, false, true, false, true] }, "Shift-Command-1 quick pastes plain text")
         ]
         func step(_ index: Int) {
-            guard index < steps.count else { checkReopening(model: model, controller: controller); return }
+            guard index < steps.count else { checkTypingIntoSearch(model: model, controller: controller); return }
             let (code, flags, verify, description) = steps[index]
             let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: controller.panel.windowNumber, context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: code)!
             NSApp.postEvent(event, atStart: false)
@@ -42,6 +42,24 @@ final class KeyboardInteractionChecks {
             }
         }
         step(0)
+    }
+    /// Typing while results have focus must produce the whole word: the first letter opens the search field and
+    /// the following letters go into it without replacing a select-all.
+    static func checkTypingIntoSearch(model: AppModel, controller: PanelController) {
+        NotificationCenter.default.post(name: .elmersResults, object: nil)
+        model.query = ""
+        func type(_ character: String, _ code: UInt16, then next: @escaping () -> Void) {
+            let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: controller.panel.windowNumber, context: nil, characters: character, charactersIgnoringModifiers: character, isARepeat: false, keyCode: code)!
+            NSApp.postEvent(event, atStart: false)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: next)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            type("p", 35) { type("a", 0) { type("i", 34) {
+                guard model.query == "pai" else { print("FAIL: typed 'pai' but the query is '\(model.query)'"); fflush(stdout); exit(1) }
+                print("PASS: typing into a fresh search keeps the first letter")
+                checkReopening(model: model, controller: controller)
+            } } }
+        }
     }
     static func checkReopening(model: AppModel, controller: PanelController) {
         NotificationCenter.default.post(name: .elmersSearch, object: nil)

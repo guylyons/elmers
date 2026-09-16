@@ -26,6 +26,7 @@ Reference: Paste **6.3.11** (`com.wiheads.paste`) on macOS **27.0** (26A428). In
 ### Fixes from `issues.md`
 
 - Return sometimes needed two presses: the first press only moved focus from the search field. Return now pastes from either context; Tab still switches focus. Covered by the core routing check and the AppKit dispatch check "Return from search delivers with a single press".
+- First typed letter lost ("paige" became "aige"): focusing the search field selected all of its text, so the second letter replaced the first. The insertion point is now moved to the end once the field editor takes focus. Reproduced and fixed by the AppKit check "typing into a fresh search keeps the first letter"; confirmed on the built app.
 - Menu bar icon could not hide the panel: the outside-click monitor hid the panel on mouse-down, then the button action re-showed it. The monitor now ignores clicks inside the status item. Verified with real clicks: show, hide, show.
 - Sound effects: synthesized copy "pop" and paste "tick", toggle in General.
 - Settings now mirror Paste's sections, rows, wording and dialogs (see table).
