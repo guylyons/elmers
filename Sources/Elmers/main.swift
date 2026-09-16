@@ -12,7 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panelController = PanelController(model: model)
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "square.on.square", accessibilityDescription: "Elmers clipboard history")
+            button.image = StatusIcon.make()
             button.target = self; button.action = #selector(statusItemClicked)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             button.toolTip = "Elmers — Shift-Command-V · Right-click for Settings"

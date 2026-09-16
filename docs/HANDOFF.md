@@ -85,6 +85,7 @@ State of the built app (`dist/Elmers.app`, running from the menu bar):
 
 - Done today: Return-in-search single press, arrows navigate while typing, menu bar toggle, synthesized sounds, Paste-shaped Settings, matching menus, app-colored cards, floating rich-text editor (⌘N/⌘E), link previews (Privacy toggle, default off), card drag-out and pinboard drag reorder, OCR search for images, app icon generated at build time from `Resources/AppIcon.png` (the `.icns` is no longer tracked; `scripts/build-app.sh` regenerates it when the PNG is newer).
 - Later on September 16: typing a content-type word (any case) into the search turns it into a type pill, clears the field, and searches within that type; Backspace on the empty field removes the pill (`SearchQuery.swift`, `AppModel.absorbTypedFilter`). Core suite 19/19; `--check-interaction` 33 steps. Setting `ELMERS_CAPTURE_DIR` while running the interaction check writes a PNG of the demo panel, which is the safe way to eyeball the panel without exposing real history.
+- Menu bar icon: the character from `Resources/Toolbar.png`, rendered in color at 20 pt by `StatusIcon.swift`; the template variant looked like a small blob because the white cloud disappears.
 - User decisions: no subscription/licensing features; Paste Stack stays deferred.
 
 Next session, in order:

@@ -23,6 +23,10 @@ Reference: Paste **6.3.11** (`com.wiheads.paste`) on macOS **27.0** (26A428). In
 | Sounds | Copy.aiff (0.21 s) on capture, Paste.aiff (0.08 s) on paste, toggled by Sound effects | implemented with original synthesized sounds (no assets copied) |
 | Search | Field replaces pinboard pills, ≡ filter button at its right; Return with search focused pastes the selection (documented) | implemented; reference search index returned no results locally, so Return-in-search is verified against documentation and Elmers' own checks |
 
+### Menu bar icon (September 16, evening)
+
+- The status item now shows the user's character artwork (`Resources/Toolbar.png`, copied into the bundle by `scripts/build-app.sh`). `StatusIcon.swift` fits the visible bounds of the artwork into a 20 pt square at 1x/2x/3x. It is drawn in its own colors: as a template image only the dark parts would survive and the white cloud became a hole, leaving a 10 pt body. A darkness-to-opacity template variant is kept in `StatusIcon.template(from:pointSize:)` if a tinted look is wanted later. Verified with a menu bar capture on the built app; running from `.build` (checks) falls back to the SF Symbol because the resource is not present there.
+
 ### Fixes from `issues.md`
 
 - Return sometimes needed two presses: the first press only moved focus from the search field. Return now pastes from either context; Tab still switches focus. Covered by the core routing check and the AppKit dispatch check "Return from search delivers with a single press".
