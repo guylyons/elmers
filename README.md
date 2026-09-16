@@ -22,7 +22,7 @@ Copy content in another app to populate history. Click a card to select it, doub
 - Type to search; Command-F focuses search. Left/Right still move between cards while you type, so type, arrow, Return works without Tab. Filter by content type from the search toolbar.
 - Left/Right selects; Command-1…9 delivers an item; Shift-Return delivers plain text.
 - Space opens a preview; Command-C copies the selected item.
-- Use + to create pinboards; a card's context menu offers Paste, Copy, Edit, Rename, Delete, Pin, Preview and Share. Right-click a pinboard to rename, delete or recolor it.
+- Use + to create pinboards; a card's context menu offers Paste, Copy, Edit, Rename, Delete, Pin, Preview and Share. Right-click a pinboard to rename, delete or recolor it, and drag pinboards to reorder them. Drag a card into another app to drop its content with all formats.
 - Command-Left/Right switches pinboards; Shift-Command-N creates a pinboard.
 - Command-N creates a text item and Command-E edits the selected one in a floating editor with Bold, Italic, Underline, Strikethrough and Writing Tools; Escape cancels, Command-Return saves. The overflow menu contains settings and timed capture pause.
 

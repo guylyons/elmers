@@ -43,6 +43,11 @@ Reference: Paste **6.3.11** (`com.wiheads.paste`) on macOS **27.0** (26A428). In
 - `LinkPreviewFetcher` uses `LPMetadataProvider`; fetches run for link items without a stored preview, at most eight per pass, tracked in memory so a quit mid-fetch retries next time. A fetch that yields nothing is stored as attempted and never retried.
 - Verified: archive round trip of `LinkPreview` (core check), and a standalone LinkPresentation probe on this Mac returned a title and a 1024×537 image for a public Apple page. The in-app card rendering with a real fetch was not captured: the scripted UI run kept landing on the second display. Verify by enabling Privacy › Generate link previews and copying a public URL.
 
+### Drag and drop (later on September 16)
+
+- Cards use `onDrag` with an `NSItemProvider` that registers each pasteboard representation under its own type (`DragSupport.swift`); check "drag provider offers every representation" loads RTF back from the provider.
+- Pinboard pills are draggable and accept drops to reorder; dropping on the Clipboard History pill moves a board to the front. Not automated and not compared with Paste's reorder gesture.
+
 ### Verification on September 16
 
 - `scripts/test.sh`: 18 checks, 0 failures (Return-in-search expectation updated).
@@ -76,7 +81,7 @@ Statuses distinguish observation from implementation. No feature is verified sol
 | Shortcuts | Activation, Stack, next/previous pinboard, Quick Paste, Plain Text | observed | Inspect actual key values and behavior |
 | Subscription | Sidebar category exists | observed | Account/payment requirements unexplored |
 | Rich content and files | Full format preservation required by project | unexplored | Round-trip tests plus cross-app verification |
-| Multi-selection / drag and drop | Discovery required | unexplored | Inspect reference |
+| Multi-selection / drag and drop | Multi-selection observed via ⇧/⌘ clicks and ⌘A; drag-out from cards not exercised on the reference this session | in progress | Elmers: cards drag out with every stored representation (checked in-process); pinboard pills reorder by drag (not automated). Cross-app drop and reference comparison remain unverified |
 | Edit / new text / previews | New Text Item observed in menu | unexplored | Inspect reference workflows |
 | Paste Stack | Shortcut entry observed | unexplored | Inspect queue ordering and delivery |
 | OCR | Official search documentation describes image text search | unexplored | Installed-version verification required |

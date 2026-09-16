@@ -120,6 +120,19 @@ final class KeyboardInteractionChecks {
         editor.confirm()
         guard model.history.items.first(where: { $0.id == created.id })?.text == "CHANGED editor\nsecond line" else { print("FAIL: save did not update the item"); fflush(stdout); exit(1) }
         print("PASS: editor cancel preserves and save updates the item")
+        checkDrag(model: model)
+    }
+    /// The drag provider must hand back every stored representation under its own type.
+    static func checkDrag(model: AppModel) {
+        let payload = ClipboardPayload(items: [["public.utf8-plain-text": Data("dragged".utf8), "public.rtf": Data("{\\rtf1 dragged}".utf8)]])
+        let item = ClipboardItem(payload: payload, source: "Check")
+        let provider = DragSupport.itemProvider(for: item)
+        guard Set(provider.registeredTypeIdentifiers) == ["public.utf8-plain-text", "public.rtf"] else { print("FAIL: drag types \(provider.registeredTypeIdentifiers)"); fflush(stdout); exit(1) }
+        let done = DispatchSemaphore(value: 0)
+        var loaded: Data?
+        _ = provider.loadDataRepresentation(forTypeIdentifier: "public.rtf") { data, _ in loaded = data; done.signal() }
+        guard done.wait(timeout: .now() + 2) == .success, loaded == Data("{\\rtf1 dragged}".utf8) else { print("FAIL: drag data did not load"); fflush(stdout); exit(1) }
+        print("PASS: drag provider offers every representation")
         fflush(stdout); exit(0)
     }
 }

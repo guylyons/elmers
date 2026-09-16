@@ -29,6 +29,7 @@ struct HistoryView: View {
                                 CardView(item: item, selected: model.selection.ids.contains(item.id), index: index)
                                     .id(item.id)
                                     .onTapGesture(count: 2) { model.activate(item) }
+                                    .onDrag { DragSupport.itemProvider(for: item) }
                                     .background(CardMouseObserver { event in model.select(item.id, modifiers: event.modifierFlags, rightClick: event.type == .rightMouseDown); searchFocused = false })
                                     .contextMenu { itemMenu(item) }
                                     .accessibilityAddTraits(.isButton)
@@ -96,8 +97,18 @@ struct HistoryView: View {
 
                 }
                 boardPill("Clipboard History", symbol: "clock.arrow.circlepath", color: nil, selected: model.boardID == nil) { model.boardID = nil }
+                    .dropDestination(for: String.self) { ids, _ in
+                        // Dropping a pinboard on the history pill moves it to the front.
+                        guard let id = ids.first.flatMap(UUID.init), let first = model.history.boards.first?.id else { return false }
+                        model.reorderBoard(id, before: first); return true
+                    }
                 ForEach(model.history.boards) { board in
                     boardPill(board.name, symbol: nil, color: CardView.colors[board.colorIndex % CardView.colors.count], selected: model.boardID == board.id) { model.boardID = board.id }
+                        .draggable(board.id.uuidString)
+                        .dropDestination(for: String.self) { ids, _ in
+                            guard let id = ids.first.flatMap(UUID.init), id != board.id else { return false }
+                            model.reorderBoard(id, before: board.id); return true
+                        }
                         .contextMenu {
                             Button("Rename") { renamingItem = nil; editingBoard = board; boardName = board.name; boardDialog = true }
                             Button("Delete…") { deletingBoard = board }
