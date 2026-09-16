@@ -58,6 +58,8 @@ final class AppModel: ObservableObject {
     var deliver: ((ClipboardItem, Bool) -> Void)?
     var dismiss: (() -> Void)?
     var preview: ((ClipboardItem) -> Void)?
+    /// Opens the floating editor for a new item (nil) or an existing one.
+    var openEditor: ((ClipboardItem?) -> Void)?
     var isDemo: Bool { ProcessInfo.processInfo.arguments.contains("--demo") }
     private let defaults: UserDefaults
     private let archive: Archive
@@ -253,9 +255,9 @@ final class AppModel: ObservableObject {
         guard canEdit else { return }; history.recolorBoard(board.id, color: color); persist()
     }
     func reorderBoard(_ id: UUID, before target: UUID) { guard canEdit else { return }; history.moveBoard(id, before: target); persist() }
-    func newText(_ text: String) {
-        guard canEdit, !text.isEmpty else { return }
-        let payload = ClipboardPayload.text(text)
+    func newText(_ text: String) { newItem(payload: .text(text)) }
+    func newItem(payload: ClipboardPayload) {
+        guard canEdit, !payload.text.isEmpty else { return }
         let previous = history.items.first { $0.fingerprint == payload.fingerprint }
         let item = history.capture(payload, source: "Elmers", sourceBundleID: "app.elmers.clipboard")
         if let boardID { history.pin(item.id, to: boardID) }

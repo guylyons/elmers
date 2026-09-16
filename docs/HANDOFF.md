@@ -62,10 +62,13 @@ What changed:
 - Settings rebuilt to Paste's structure: sidebar (General, Privacy, Shortcuts, Help Center), Open at login (SMAppService), Run in background (Dock icon policy), iCloud sync shown as not available, Paste Items radio group with "Always paste as Plain Text", Keep History slider with Paste's lower-limit confirmation, Erase History…, Show during screen sharing, Ignore Applications list with an app chooser, Reset shortcuts confirmation. Window chrome matches (640×592, hidden title).
 - Card context menu, pinboard menu (8 colors, Delete… confirmation), and overflow menu reordered to match Paste. Card headers use the source app's dominant icon color; relative times use Paste's wording.
 - App icon from `Resources/AppIcon.png` compiled into `AppIcon.icns` by `scripts/build-app.sh`.
+- Floating rich-text editor for New Text Item (⌘N) and Edit (⌘E) with B/I/U/S, Writing Tools, live counters and Escape/⌘↩ handling.
+
+Testing note: this Mac has two displays and the panel opens on the display under the pointer. Move the pointer onto the target display before scripted clicks, and send Escape with a raw CGEvent rather than cliclick.
 
 Remaining work, in priority order:
 
-1. New Text Item / Edit as floating windows with Bold/Italic/Underline/Strikethrough, Create/Save, and "characters · words · lines" counters (rich text payloads).
+1. ~~New Text Item / Edit floating editors~~ done (see `EditorController.swift`); image editing (rotate) in the editor remains open.
 2. Link previews (title/icon fetch behind a "Generate link previews" toggle) and image/file preview polish; Space preview compared against Paste's (not captured this session).
 3. Paste Stack (still deferred by the user), drag and drop, pinboard reordering.
 4. Direct paste end-to-end with Accessibility, then "Paste to <app>" verification across apps.

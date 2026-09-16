@@ -8,9 +8,6 @@ struct HistoryView: View {
     @State private var boardDialog = false
     @State private var boardName = ""
     @State private var editingBoard: Pinboard?
-    @State private var textDialog = false
-    @State private var newText = ""
-    @State private var editingItem: ClipboardItem?
     @State private var renamingItem: ClipboardItem?
     @State private var filtersVisible = false
     @State private var deletingBoard: Pinboard?
@@ -55,11 +52,11 @@ struct HistoryView: View {
         .onChange(of: model.boardID) { _, _ in model.reconcileSelection() }
         .onReceive(NotificationCenter.default.publisher(for: .elmersSearch)) { _ in searchVisible = true; searchFocused = true }
         .onReceive(NotificationCenter.default.publisher(for: .elmersNewBoard)) { _ in renamingItem = nil; editingBoard = nil; boardName = ""; boardDialog = true }
-        .onReceive(NotificationCenter.default.publisher(for: .elmersNewText)) { _ in editingItem = nil; newText = ""; textDialog = true }
+        .onReceive(NotificationCenter.default.publisher(for: .elmersNewText)) { _ in model.openEditor?(nil) }
         .onReceive(NotificationCenter.default.publisher(for: .elmersResults)) { _ in searchFocused = false; filtersVisible = false }
         .onReceive(NotificationCenter.default.publisher(for: .elmersFilters)) { _ in searchVisible = true; filtersVisible.toggle() }
         .onReceive(NotificationCenter.default.publisher(for: .elmersEdit)) { _ in
-            if let item = model.selected, !item.text.isEmpty, model.canEdit { editingItem = item; newText = item.text; textDialog = true }
+            if let item = model.selected, !item.text.isEmpty, model.canEdit { model.openEditor?(item) }
         }
         .onReceive(NotificationCenter.default.publisher(for: .elmersRename)) { _ in
             if let item = model.selected, model.canEdit { renamingItem = item; boardName = item.title ?? ""; boardDialog = true }
@@ -76,13 +73,6 @@ struct HistoryView: View {
             Button("Cancel", role: .cancel) {}
         } message: { Text("The Pinboard will be deleted. Its items stay in Clipboard History. You can undo this with ⌘Z.") }
         .sheet(isPresented: $helpVisible) { KeyboardHelp() }
-        .sheet(isPresented: $textDialog) {
-            VStack(alignment: .leading, spacing: 16) {
-                Text(editingItem == nil ? "New Text Item" : "Edit Item").font(.title2.bold())
-                TextEditor(text: $newText).font(.body).frame(width: 440, height: 220).border(.quaternary)
-                HStack { Spacer(); Button("Cancel") { textDialog = false }; Button("Save") { if let item = editingItem { model.editItem(item, payload: .text(newText)) } else { model.newText(newText) }; textDialog = false }.keyboardShortcut(.defaultAction).disabled(newText.isEmpty) }
-            }.padding(24)
-        }
     }
     private var toolbar: some View {
         ZStack {
@@ -129,7 +119,7 @@ struct HistoryView: View {
                 Menu {
                     Button("About Elmers") { NSApp.orderFrontStandardAboutPanel(nil); NSApp.activate(ignoringOtherApps: true) }
                     Divider()
-                    Button("New Text Item") { editingItem = nil; newText = ""; textDialog = true }.keyboardShortcut("n").disabled(!model.canEdit)
+                    Button("New Text Item") { model.openEditor?(nil) }.keyboardShortcut("n").disabled(!model.canEdit)
                     Button("Settings…") { model.showSettings?() }.keyboardShortcut(",")
                     Divider()
                     Menu("Help") { Button("Keyboard Shortcuts") { helpVisible = true } }
@@ -197,7 +187,7 @@ struct HistoryView: View {
         Button(model.directPaste ? "Paste to \(model.destinationApp ?? "current app")" : "Paste") { model.activate() }.keyboardShortcut(.return, modifiers: [])
         Button("Copy") { if let aggregate = model.selectedAggregate(), model.copy(aggregate) { model.message = "Copied to clipboard." } }.keyboardShortcut("c")
         Divider()
-        Button("Edit") { editingItem = item; newText = item.text; textDialog = true }.keyboardShortcut("e").disabled(item.text.isEmpty || !model.canEdit)
+        Button("Edit") { model.openEditor?(item) }.keyboardShortcut("e").disabled(item.text.isEmpty || !model.canEdit)
         Button("Rename") { renamingItem = item; boardName = item.title ?? ""; boardDialog = true }.keyboardShortcut("r").disabled(!model.canEdit)
         Button("Delete") { model.deleteItems(model.selectedItems) }.keyboardShortcut(.delete, modifiers: []).disabled(!model.canEdit)
         Divider()

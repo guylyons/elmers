@@ -14,6 +14,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     let panel: ClipboardPanel
     private var settingsWindow: NSWindow?
     private var previewWindow: NSWindow?
+    let editor = EditorController()
     private var previousApp: NSRunningApplication?
     private var localMonitor: Any?
     private var outsideMonitor: Any?
@@ -42,6 +43,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         model.dismiss = { [weak self] in self?.hide() }
         model.showSettings = { [weak self] in self?.openSettings() }
         model.preview = { [weak self] in self?.openPreview($0) }
+        model.openEditor = { [weak self] in self?.openEditor($0) }
         model.sharingChanged = { [weak self] in self?.applySharing() }
         applySharing()
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
@@ -61,7 +63,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     /// Paste's "Show during screen sharing" hides the clipboard windows from screen capture when off.
     private func applySharing() {
         let type: NSWindow.SharingType = model.showDuringScreenSharing ? .readOnly : .none
-        for window in [panel, settingsWindow, previewWindow] { window?.sharingType = type }
+        for window in [panel, settingsWindow, previewWindow, editor.panel] { window?.sharingType = type }
     }
     func show() {
         deliveryGeneration += 1
@@ -124,6 +126,18 @@ final class PanelController: NSObject, NSWindowDelegate {
         }
         NSApp.activate(ignoringOtherApps: true); settingsWindow?.makeKeyAndOrderFront(nil)
     }
+    /// As in Paste, the history panel closes while the editor is open and focus returns to the previous app afterwards.
+    func openEditor(_ item: ClipboardItem?) {
+        guard model.canEdit else { return }
+        hide(restoreFocus: false)
+        editor.open(item) { [weak self] payload in
+            guard let self else { return }
+            if let payload {
+                if let item { self.model.editItem(item, payload: payload) } else { self.model.newItem(payload: payload) }
+            }
+            self.previousApp?.activate(options: [])
+        }
+    }
     func openPreview(_ item: ClipboardItem) {
         if previewWindow == nil {
             let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 640, height: 460), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
@@ -141,6 +155,17 @@ final class PanelController: NSObject, NSWindowDelegate {
     }
     private func handle(_ event: NSEvent) -> NSEvent? {
         if event.window == previewWindow && event.keyCode == 53 { previewWindow?.orderOut(nil); return nil }
+        if event.window == editor.panel {
+            let stroke = KeyStroke(event.keyCode, KeyModifiers(event.modifierFlags))
+            switch stroke {
+            case KeyStroke(53): editor.cancel(); return nil
+            case KeyStroke(11, .command): editor.toggleBold(); return nil
+            case KeyStroke(34, .command): editor.toggleItalic(); return nil
+            case KeyStroke(32, .command): editor.toggleUnderline(); return nil
+            case KeyStroke(36, .command), KeyStroke(76, .command): editor.confirm(); return nil
+            default: return event
+            }
+        }
         guard event.window == panel, panel.attachedSheet == nil else { return event }
         let stroke = KeyStroke(event.keyCode, KeyModifiers(event.modifierFlags))
         let context: KeyboardContext = model.searchIsFocused ? .search : .results

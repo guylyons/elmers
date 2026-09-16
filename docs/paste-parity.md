@@ -17,8 +17,8 @@ Reference: Paste **6.3.11** (`com.wiheads.paste`) on macOS **27.0** (26A428). In
 | Card context menu (link) | Open ⌘O at top, then the text menu | implemented; file items add Reveal in Finder |
 | Pinboard pill context menu | Rename · Share Pinboard · Delete… · row of 8 color swatches (red, orange, yellow, green, blue, purple, pink, gray) | implemented: Rename, Delete… with confirmation, 8 colors; Share Pinboard absent (sync feature) |
 | Delete pinboard alert | "Delete “name”?" / "The Pinboard and all its content will be deleted. This action cannot be undone." | implemented with Paste's title; message differs because Elmers keeps items in history and supports undo |
-| New Text Item window | Floating 500×360: Cancel · B I U S · Writing Tools · Create; text area; footer "0 characters · 0 words · 0 lines" | **gap**: Elmers uses a plain sheet without formatting or counters |
-| Edit window | Floating 390×316 sized to content: Cancel · B I U S · Writing Tools · Save; footer counters | **gap**: same as above |
+| New Text Item window | Floating 500×360: Cancel · B I U S · Writing Tools · Create; text area; footer "0 characters · 0 words · 0 lines" | implemented (`EditorController`): floating light panel, Bold/Italic/Underline/Strikethrough on selection or typing, Writing Tools on macOS 15.2+, Create enabled once text exists, live counters, Escape cancels, ⌘↩ confirms. RTF is stored only when formatting was applied. Verified by window capture and AppKit checks |
+| Edit window | Floating 390×316 sized to content: Cancel · B I U S · Writing Tools · Save; footer counters | implemented with the same editor at 390×316; loads RTF when present; cancel leaves the item unchanged (checked) |
 | Cards | 230-pt cards; header colored by the source app (Brave orange, Safari blue, terminal navy), app icon top right, kind + relative time ("3 hours ago", "yesterday"); footer "41 characters" or link host; link placeholder compass | implemented: dominant icon color header, relative wording, footer; link previews/OCR still open |
 | Sounds | Copy.aiff (0.21 s) on capture, Paste.aiff (0.08 s) on paste, toggled by Sound effects | implemented with original synthesized sounds (no assets copied) |
 | Search | Field replaces pinboard pills, ≡ filter button at its right; Return with search focused pastes the selection (documented) | implemented; reference search index returned no results locally, so Return-in-search is verified against documentation and Elmers' own checks |
@@ -31,6 +31,12 @@ Reference: Paste **6.3.11** (`com.wiheads.paste`) on macOS **27.0** (26A428). In
 - Settings now mirror Paste's sections, rows, wording and dialogs (see table).
 
 - Arrow keys while typing: Left/Right (and Shift variants) now move the card selection while the search field keeps focus, so type → arrow → Return needs no Tab. Option-arrows, Home/End and Delete stay with the text field. Reference behavior not observable locally (Paste's search index returned no results); implemented from the user's request.
+
+### Editor (later on September 16)
+
+- `EditorController` replaces the SwiftUI sheet for ⌘N, ⌘E and the menu entries. The history panel closes while the editor is open and focus returns to the previous app afterwards, as observed in Paste.
+- Checks: "editor counters, bold range, and formatted create", "unformatted create stays plain text", "editor cancel preserves and save updates the item" (Escape sent as a real key event). Physical: ⌘N, typing, ⌘B on a selection, Escape via a raw CGEvent (the cliclick key-press path does not deliver Escape to nonactivating panels, which misled two earlier test runs).
+- Not matched: Paste's image rotate tools in the editor (images are not editable in Elmers yet).
 
 ### Verification on September 16
 

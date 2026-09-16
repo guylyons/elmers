@@ -83,6 +83,43 @@ final class KeyboardInteractionChecks {
         guard !button.recording else { print("FAIL: recorder window cancellation"); fflush(stdout); exit(1) }
         print("PASS: shortcut recorder capture, cancellation, clearing, and window deactivation")
         window.orderOut(nil)
+        checkEditor(controller: controller)
+    }
+    /// Exercises the floating editor with real text storage: counters, bold on a range, RTF-only-when-formatted, cancel.
+    static func checkEditor(controller: PanelController) {
+        let model = controller.model, editor = controller.editor
+        let countBefore = model.history.items.count
+        controller.openEditor(nil)
+        guard editor.panel.isVisible, !controller.panel.isVisible else { print("FAIL: editor did not replace the panel"); fflush(stdout); exit(1) }
+        editor.textView.insertText("Hello editor\nsecond line", replacementRange: NSRange(location: 0, length: 0))
+        guard editor.statistics == "24 characters · 4 words · 2 lines" else { print("FAIL: editor statistics: \(editor.statistics)"); fflush(stdout); exit(1) }
+        editor.textView.setSelectedRange(NSRange(location: 0, length: 5))
+        editor.toggleBold()
+        let bolded = (editor.textView.textStorage?.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)?.fontDescriptor.symbolicTraits.contains(.bold) == true
+        let plainTail = (editor.textView.textStorage?.attribute(.font, at: 8, effectiveRange: nil) as? NSFont)?.fontDescriptor.symbolicTraits.contains(.bold) == false
+        guard bolded, plainTail else { print("FAIL: bold was not applied to the selection only"); fflush(stdout); exit(1) }
+        editor.confirm()
+        guard !editor.panel.isVisible, model.history.items.count == countBefore + 1 else { print("FAIL: create did not add an item"); fflush(stdout); exit(1) }
+        let created = model.history.items[0]
+        guard created.text == "Hello editor\nsecond line", created.payload.items[0]["public.rtf"] != nil else { print("FAIL: created item lacks text or RTF"); fflush(stdout); exit(1) }
+        print("PASS: editor counters, bold range, and formatted create")
+        controller.openEditor(nil)
+        editor.textView.insertText("plain only", replacementRange: NSRange(location: 0, length: 0))
+        editor.confirm()
+        guard model.history.items[0].payload.items[0]["public.rtf"] == nil, model.history.items[0].text == "plain only" else { print("FAIL: unformatted text should stay plain"); fflush(stdout); exit(1) }
+        print("PASS: unformatted create stays plain text")
+        controller.openEditor(created)
+        guard editor.textView.string == created.text, editor.panel.isVisible else { print("FAIL: edit did not load the item"); fflush(stdout); exit(1) }
+        editor.textView.insertText("CHANGED", replacementRange: NSRange(location: 0, length: 5))
+        let escape = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: editor.panel.windowNumber, context: nil, characters: "\u{1B}", charactersIgnoringModifiers: "\u{1B}", isARepeat: false, keyCode: 53)!
+        NSApp.sendEvent(escape)
+        guard !editor.panel.isVisible else { print("FAIL: Escape did not cancel the editor"); fflush(stdout); exit(1) }
+        guard model.history.items.first(where: { $0.id == created.id })?.text == created.text else { print("FAIL: cancel changed the item"); fflush(stdout); exit(1) }
+        controller.openEditor(created)
+        editor.textView.insertText("CHANGED", replacementRange: NSRange(location: 0, length: 5))
+        editor.confirm()
+        guard model.history.items.first(where: { $0.id == created.id })?.text == "CHANGED editor\nsecond line" else { print("FAIL: save did not update the item"); fflush(stdout); exit(1) }
+        print("PASS: editor cancel preserves and save updates the item")
         fflush(stdout); exit(0)
     }
 }
