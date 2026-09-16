@@ -103,4 +103,4 @@ Done: Paste's "Copied / Enable Direct Paste ›" overlay (`CopiedHUD.swift`, sho
 
 Checks at the stop: `scripts/test.sh` 19/19, `--check-interaction` 34 steps (new Copied HUD step; `ELMERS_CAPTURE_DIR` now also writes `panel.png` and `copied-hud.png`), `--check-status-item` pass. The user's "Show during screen sharing" setting was toggled on for captures and restored to off.
 
-Next: the search-open toolbar state (pills collapse to icon/dot, wider field with filter icon), Paste's direct-paste feedback (unobserved), the Space preview presentation, and the earlier storage/OCR/accessibility items.
+Next: **drag and drop does not work on the built app (user report, September 16)**; the drag-out and pill-reorder code only passed the in-process provider check, so verify with a real pointer drag first (suspect the mouse-down selection observer swallowing the drag). Then the search-open toolbar state (pills collapse to icon/dot, wider field with filter icon), Paste's direct-paste feedback (unobserved), the Space preview presentation, and the earlier storage/OCR/accessibility items.
