@@ -6,6 +6,10 @@ Build a phenomenal clipboard manager that faithfully replicates **all features o
 
 The target is a complete, polished application suitable for daily use. A static mockup, partial feature set, or generic clipboard manager does not meet the goal. Work may ship in increments, but an increment must never be described as full parity.
 
+## Scope exclusions
+
+Standing decision by the user: **everything subscription, licensing, account, payment or trial related is out of scope.** Do not build, stub, or track it — no Subscription settings pane, no upgrade prompts, paywalls, feature gating, license checks, trial timers, purchase or restore flows, or account sign-in that exists only to carry entitlements. Every Elmers feature is unlocked for the local user. When the reference shows one of these surfaces, note that it was observed and excluded rather than treating it as a parity gap. This exclusion does not extend to iCloud sync itself, which stays in scope and is blocked only on signing, entitlements and a second device.
+
 ## Reference app and discovery
 
 - Inspect the running Paste app before implementing the corresponding behavior. Use the computer-use skill and tools for local UI inspection.
