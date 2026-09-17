@@ -23,6 +23,7 @@ if CommandLine.arguments.contains("--live-capture") {
 let interaction = InteractionModelTests()
 let history = HistoryTests()
 let pasteboard = PasteboardTests()
+let screenshot = ScreenshotTests()
 let checks: [(String, () throws -> Void)] = [
     ("custom shortcut persistence, routing, and conflicts", interaction.testCustomShortcutsRoundTripAndConflicts),
     ("Paste default shortcuts", interaction.testPasteDefaultGlobalAndModifierBindings),
@@ -42,7 +43,12 @@ let checks: [(String, () throws -> Void)] = [
     ("corrupt archive protection", history.testCorruptArchiveIsRejectedAndNeverOverwrittenByLoad),
     ("multi-item format round trip", pasteboard.testMultiItemRoundTripPreservesEveryRepresentation),
     ("plain-text transformation", pasteboard.testPlainTextDeliveryStripsRichRepresentations),
-    ("confidential content exclusion", pasteboard.testConfidentialMarkerPreventsCapture)
+    ("confidential content exclusion", pasteboard.testConfidentialMarkerPreventsCapture),
+    ("screenshot marker sets the kind", screenshot.testMarkerMakesTheItemAScreenshot),
+    ("clearing the screenshot marker", screenshot.testClearingTheMarkerRestoresTheDerivedKind),
+    ("screenshot archive round trip", screenshot.testArchiveRoundTripPreservesTheMarker),
+    ("archive without a screenshot marker", screenshot.testArchiveWithoutTheMarkerStillLoads),
+    ("same screenshot file promotes", screenshot.testSameFileCapturedTwicePromotesInsteadOfDuplicating)
 ]
 for (name, check) in checks {
     let before = failures

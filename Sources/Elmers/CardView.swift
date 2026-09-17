@@ -206,7 +206,7 @@ private final class CardImageCache {
 extension ContentKind {
     /// SF Symbol used for this type on cards and in the search field's type filter.
     var symbolName: String {
-        switch self { case .text: return "text.alignleft"; case .link: return "link"; case .image: return "photo"; case .file: return "doc"; case .other: return "doc.on.clipboard" }
+        switch self { case .text: return "text.alignleft"; case .link: return "link"; case .image: return "photo"; case .screenshot: return "camera.viewfinder"; case .file: return "doc"; case .other: return "doc.on.clipboard" }
     }
     /// Lowercase plural for the search placeholder: "Search images".
     var searchNoun: String {

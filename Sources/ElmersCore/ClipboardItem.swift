@@ -3,7 +3,7 @@ import CryptoKit
 import Foundation
 
 public enum ContentKind: String, Codable, CaseIterable, Identifiable, Sendable {
-    case text = "Text", link = "Link", image = "Image", file = "File", other = "Content"
+    case text = "Text", link = "Link", image = "Image", screenshot = "Screenshot", file = "File", other = "Content"
     public var id: String { rawValue }
 }
 
@@ -51,6 +51,22 @@ public struct ClipboardPayload: Codable, Equatable, Sendable {
     }
 }
 
+/// Records that an item came from a macOS screenshot file.
+/// `ContentKind` is derived from the payload, so this stored marker is what
+/// keeps a screenshot a screenshot across a reload.
+public struct ScreenshotInfo: Codable, Equatable, Sendable {
+    /// Absolute path of the screenshot on disk. May no longer exist.
+    public var path: String
+    /// "selection", "window" or "display" when Spotlight reported it.
+    public var captureType: String?
+    public var pixelWidth: Int
+    public var pixelHeight: Int
+    public init(path: String, captureType: String?, pixelWidth: Int, pixelHeight: Int) {
+        self.path = path; self.captureType = captureType
+        self.pixelWidth = pixelWidth; self.pixelHeight = pixelHeight
+    }
+}
+
 public struct ClipboardItem: Codable, Identifiable, Equatable, Sendable {
     public let id: UUID
     public var payload: ClipboardPayload { didSet { refreshMetadata(); fingerprint = payload.fingerprint } }
@@ -64,24 +80,27 @@ public struct ClipboardItem: Codable, Identifiable, Equatable, Sendable {
     public var linkPreview: LinkPreview?
     /// Text recognized in an image item; empty string records that recognition ran and found nothing.
     public var recognizedText: String?
+    /// Set only for items imported from a macOS screenshot file.
+    public var screenshot: ScreenshotInfo? { didSet { refreshMetadata() } }
     private var cachedText = ""
     private var cachedKind: ContentKind = .other
     private var cachedByteCount = 0
     public var text: String { cachedText }
     public var kind: ContentKind { cachedKind }
     public var byteCount: Int { cachedByteCount }
-    public init(payload: ClipboardPayload, source: String, sourceBundleID: String? = nil, at: Date = Date()) {
+    public init(payload: ClipboardPayload, source: String, sourceBundleID: String? = nil, at: Date = Date(), screenshot: ScreenshotInfo? = nil) {
         id = UUID(); self.payload = payload; self.source = source; self.sourceBundleID = sourceBundleID
         copiedAt = at; boardIDs = []; fingerprint = payload.fingerprint
+        self.screenshot = screenshot
         refreshMetadata()
     }
     private mutating func refreshMetadata() {
         cachedText = payload.text
-        cachedKind = payload.kind(for: cachedText)
+        cachedKind = screenshot != nil ? .screenshot : payload.kind(for: cachedText)
         cachedByteCount = payload.byteCount
     }
     // Derived data is rebuilt once at load and never changes the on-disk v1 schema.
-    private enum CodingKeys: String, CodingKey { case id, payload, source, sourceBundleID, copiedAt, boardIDs, title, fingerprint, linkPreview, recognizedText }
+    private enum CodingKeys: String, CodingKey { case id, payload, source, sourceBundleID, copiedAt, boardIDs, title, fingerprint, linkPreview, recognizedText, screenshot }
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         id = try values.decode(UUID.self, forKey: .id)
@@ -94,6 +113,7 @@ public struct ClipboardItem: Codable, Identifiable, Equatable, Sendable {
         fingerprint = try values.decode(String.self, forKey: .fingerprint)
         linkPreview = try values.decodeIfPresent(LinkPreview.self, forKey: .linkPreview)
         recognizedText = try values.decodeIfPresent(String.self, forKey: .recognizedText)
+        screenshot = try values.decodeIfPresent(ScreenshotInfo.self, forKey: .screenshot)
         refreshMetadata()
     }
 }

@@ -5,13 +5,14 @@ public struct History: Codable, Sendable {
     public private(set) var boards: [Pinboard] = []
     public init() {}
 
-    @discardableResult public mutating func capture(_ payload: ClipboardPayload, source: String, sourceBundleID: String? = nil, at date: Date = Date()) -> ClipboardItem {
+    @discardableResult public mutating func capture(_ payload: ClipboardPayload, source: String, sourceBundleID: String? = nil, at date: Date = Date(), screenshot: ScreenshotInfo? = nil) -> ClipboardItem {
         let fingerprint = payload.fingerprint
         var item: ClipboardItem
         if let index = items.firstIndex(where: { $0.fingerprint == fingerprint }) {
             item = items.remove(at: index)
             item.copiedAt = date; item.source = source; item.sourceBundleID = sourceBundleID
-        } else { item = ClipboardItem(payload: payload, source: source, sourceBundleID: sourceBundleID, at: date) }
+            if let screenshot { item.screenshot = screenshot }
+        } else { item = ClipboardItem(payload: payload, source: source, sourceBundleID: sourceBundleID, at: date, screenshot: screenshot) }
         items.insert(item, at: 0)
         return item
     }
