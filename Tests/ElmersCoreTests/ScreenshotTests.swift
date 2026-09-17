@@ -66,4 +66,26 @@ final class ScreenshotTests {
         XCTAssertEqual(first.id, second.id)
         XCTAssertEqual(history.items[0].id, first.id)
     }
+
+    /// "screenshot" used to select Image. It must now select Screenshot, and
+    /// Image must keep its own words.
+    func testScreenshotKeywordSelectsTheScreenshotKind() {
+        XCTAssertEqual(ContentKind.matching(keyword: "screenshot"), .screenshot)
+        XCTAssertEqual(ContentKind.matching(keyword: "Screenshots"), .screenshot)
+        XCTAssertEqual(ContentKind.matching(keyword: "screengrab"), .screenshot)
+        XCTAssertEqual(ContentKind.matching(keyword: "image"), .image)
+        XCTAssertEqual(ContentKind.matching(keyword: "photos"), .image)
+    }
+
+    /// Typing the word filters history down to screenshots and clears the field.
+    func testTypingScreenshotFiltersToScreenshotsOnly() {
+        var history = History()
+        let shot = history.capture(payload(), source: "Screenshot", screenshot: info())
+        _ = history.capture(ClipboardPayload(items: [["public.png": Data([9, 9, 9])]]), source: "Preview")
+        _ = history.capture(.text("a screenshot of the bug"), source: "Notes")
+        let parsed = SearchQuery("screenshot")
+        XCTAssertEqual(parsed.kind, .screenshot)
+        XCTAssertEqual(parsed.remainder, "")
+        XCTAssertEqual(history.filtered(query: parsed.remainder, kind: parsed.kind).map(\.id), [shot.id])
+    }
 }

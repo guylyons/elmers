@@ -48,7 +48,9 @@ let checks: [(String, () throws -> Void)] = [
     ("clearing the screenshot marker", screenshot.testClearingTheMarkerRestoresTheDerivedKind),
     ("screenshot archive round trip", screenshot.testArchiveRoundTripPreservesTheMarker),
     ("archive without a screenshot marker", screenshot.testArchiveWithoutTheMarkerStillLoads),
-    ("same screenshot file promotes", screenshot.testSameFileCapturedTwicePromotesInsteadOfDuplicating)
+    ("same screenshot file promotes", screenshot.testSameFileCapturedTwicePromotesInsteadOfDuplicating),
+    ("screenshot search keywords", screenshot.testScreenshotKeywordSelectsTheScreenshotKind),
+    ("typing screenshot filters to screenshots", screenshot.testTypingScreenshotFiltersToScreenshotsOnly)
 ]
 for (name, check) in checks {
     let before = failures

@@ -34,13 +34,13 @@ extension ContentKind {
         switch self {
         case .text: return ["text", "texts"]
         case .link: return ["link", "links", "url", "urls"]
-        case .image: return ["image", "images", "photo", "photos", "picture", "pictures", "screenshot", "screenshots"]
+        case .image: return ["image", "images", "photo", "photos", "picture", "pictures"]
         case .screenshot: return ["screenshot", "screenshots", "screengrab", "screengrabs", "grab", "grabs"]
         case .file: return ["file", "files"]
         case .other: return ["content"]
         }
     }
-    static func matching(keyword: String) -> ContentKind? {
+    public static func matching(keyword: String) -> ContentKind? {
         allCases.first { kind in kind.keywords.contains { $0.compare(keyword, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame } }
     }
 }
