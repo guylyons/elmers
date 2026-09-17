@@ -46,10 +46,18 @@ final class InteractionChecks {
             print("FAIL: context click collapsed selection"); fflush(stdout); exit(1)
         }
         print("PASS: context click preserves multiple selected items")
+        model.kind = .text; model.sourceFilter = "No such app"; model.boardID = board.id; model.afterDate = Date()
+        controller.show()
+        guard model.query.isEmpty, model.kind == nil, model.sourceFilter == nil, model.afterDate == nil, model.boardID == nil,
+              !model.searchIsFocused, model.selectedID == model.history.items.first?.id, model.selectedItems.count == 1 else {
+            print("FAIL: opening the history did not clear search and filters and select the most recent item"); fflush(stdout); exit(1)
+        }
+        print("PASS: opening the history clears search and filters and selects the most recent item")
+        model.query = "Interaction fixture"
         model.selectedID = model.visibleItems[0].id
         var deliveries = 0
         model.deliver = { _, _ in deliveries += 1 }
-        controller.show()
+        controller.show(resetState: false)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             let started = ProcessInfo.processInfo.systemUptime
             observation = model.$selection.dropFirst().sink { selection in

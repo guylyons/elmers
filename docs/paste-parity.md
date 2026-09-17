@@ -1,5 +1,16 @@
 # Paste parity inventory
 
+## September 17 — default state when the history opens
+
+User request, not a reference observation: pressing ⇧⌘V (or clicking the menu bar item, or launching) must open the history in a known state — search cleared, no type/source/date filter, the All pinboard, and the most recent item selected so Return pastes it immediately.
+
+| Surface | Behavior | Elmers status |
+|---|---|---|
+| Activation state | Every fresh activation clears `query`, `kind` (and its typed-filter word), `sourceFilter`, `afterDate` and `boardID`, then selects the newest item with focus on the results, not the search field. | implemented: `AppModel.resetForActivation()`, called from `PanelController.show()` |
+| Re-show after a failed paste | The three direct-paste failure paths bring the panel back with the user's search and selection intact. | implemented: those calls pass `show(resetState: false)` |
+
+Verification: `scripts/test.sh` 19/19; `--check-interaction` 35 steps, including the new "opening the history clears search and filters and selects the most recent item" step, which seeds a query, a type filter, a source filter, a date filter and a pinboard, calls the real `show()`, and asserts the cleared state and newest-item focus. The physical ⇧⌘V key press itself is unchanged (`GlobalShortcut` → `toggle()` → `show()`) and remains user-verified only.
+
 ## September 16, evening — copy overlay, hover states, card typography
 
 Reference: Paste 6.3.11, main display 1512×982 pt at 2×. Evidence came from window-bound captures of Paste's panel (`screencapture -R` on the frame reported by System Events) and of the 200-pt HUD window, seeded with harmless test text; glyph extents were measured in the captures. Nothing from the user's history is committed.

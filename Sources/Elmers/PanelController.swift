@@ -68,14 +68,15 @@ final class PanelController: NSObject, NSWindowDelegate {
         let type: NSWindow.SharingType = model.showDuringScreenSharing ? .readOnly : .none
         for window in [panel, settingsWindow, previewWindow, editor.panel, copiedHUD.panel] { window?.sharingType = type }
     }
-    func show() {
+    /// A fresh activation starts from the default state; a re-show after a failed paste keeps what was on screen.
+    func show(resetState: Bool = true) {
         deliveryGeneration += 1
         let front = NSWorkspace.shared.frontmostApplication
         if front?.processIdentifier != ProcessInfo.processInfo.processIdentifier { previousApp = front }
         model.destinationApp = previousApp?.localizedName
         let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main
         if let screen { panel.setFrame(NSRect(x: screen.frame.minX + 6, y: screen.frame.minY + 6, width: screen.frame.width - 12, height: 326), display: true) }
-        model.reconcileSelection()
+        if resetState { model.resetForActivation() } else { model.reconcileSelection() }
         panel.makeKeyAndOrderFront(nil)
         focusResults()
     }
@@ -99,7 +100,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         deliveryGeneration += 1
         let generation = deliveryGeneration
         hide(restoreFocus: false)
-        guard target.activate(options: []) else { model.message = "Copied, but the destination could not be activated."; show(); return }
+        guard target.activate(options: []) else { model.message = "Copied, but the destination could not be activated."; show(resetState: false); return }
         let expectedChange = NSPasteboard.general.changeCount
         attemptPaste(to: target, generation: generation, expectedChange: expectedChange, attempts: 12)
     }
@@ -110,10 +111,10 @@ final class PanelController: NSObject, NSWindowDelegate {
     private func attemptPaste(to target: NSRunningApplication, generation: Int, expectedChange: Int, attempts: Int) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
             guard let self, generation == self.deliveryGeneration else { return }
-            guard NSPasteboard.general.changeCount == expectedChange else { self.model.message = "Clipboard changed before paste. Please try again."; self.show(); return }
+            guard NSPasteboard.general.changeCount == expectedChange else { self.model.message = "Clipboard changed before paste. Please try again."; self.show(resetState: false); return }
             guard NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier else {
                 if attempts > 0 { self.attemptPaste(to: target, generation: generation, expectedChange: expectedChange, attempts: attempts - 1) }
-                else { self.model.message = "Copied, but the destination did not become active. Paste manually with ⌘V."; self.show() }
+                else { self.model.message = "Copied, but the destination did not become active. Paste manually with ⌘V."; self.show(resetState: false) }
                 return
             }
             guard let source = CGEventSource(stateID: .combinedSessionState),

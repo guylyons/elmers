@@ -198,6 +198,15 @@ final class AppModel: ObservableObject {
     }
     func resume() { paused = false; pauseUntil = nil }
     func reconcileSelection() { selection.reconcile(in: visibleItems.map(\.id)) }
+    /// Opening the history starts from a known state, as Paste does: no search, no filters, the All pinboard,
+    /// and the most recent item selected so Return pastes it straight away.
+    func resetForActivation() {
+        absorbingTypedFilter = true
+        query = ""; kind = nil; typedFilterWord = nil; restoredFilterWord = nil
+        absorbingTypedFilter = false
+        sourceFilter = nil; afterDate = nil; boardID = nil
+        selectedID = visibleItems.first?.id
+    }
     func select(_ id: UUID, modifiers: NSEvent.ModifierFlags = [], rightClick: Bool = false) {
         if rightClick, selection.ids.contains(id) { return }
         selection.select(id, extend: modifiers.contains(.shift), toggle: modifiers.contains(.command), in: visibleItems.map(\.id))
