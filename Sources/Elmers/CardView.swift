@@ -30,9 +30,9 @@ struct CardView: View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(item.title ?? item.kind.rawValue).font(.system(size: 17, weight: .semibold)).lineLimit(1)
+                    Text(item.title ?? item.kind.rawValue).font(.system(size: 15, weight: .semibold)).lineLimit(1)
                     TimelineView(.periodic(from: .now, by: 15)) { context in
-                        Text(Self.relativeTime(item.copiedAt, now: context.date)).font(.system(size: 13)).opacity(0.9).lineLimit(1)
+                        Text(Self.relativeTime(item.copiedAt, now: context.date)).font(.system(size: 12)).opacity(0.9).lineLimit(1)
                     }
                 }
                 Spacer(minLength: 0)
@@ -55,7 +55,7 @@ struct CardView: View {
                         Text(footer).lineLimit(1).frame(maxWidth: .infinity)
                     }
                 }
-                .font(.system(size: 13)).foregroundStyle(.secondary).padding(.horizontal, 13).padding(.bottom, 10).padding(.top, 4)
+                .font(.system(size: 12)).foregroundStyle(.secondary).padding(.horizontal, 13).padding(.bottom, 10).padding(.top, 4)
             }.background(item.kind == .link && item.linkPreview == nil ? Self.linkBodyColor : Color(nsColor: .textBackgroundColor))
         }
         .frame(width: Self.width, height: Self.height)
@@ -109,7 +109,7 @@ struct CardView: View {
                     Image(nsImage: image).resizable().scaledToFill().frame(maxWidth: .infinity).frame(height: preview.title == nil ? 154 : 108).clipped()
                 }
                 if let title = preview.title {
-                    Text(title).font(.system(size: 15, weight: .medium)).lineLimit(preview.image == nil ? 5 : 2).padding(13)
+                    Text(title).font(.system(size: 13, weight: .medium)).lineLimit(preview.image == nil ? 5 : 2).padding(13)
                 }
             }
         } else if item.kind == .link {
@@ -119,11 +119,11 @@ struct CardView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Image(systemName: "doc.fill").font(.system(size: 40)).foregroundStyle(.orange)
                 Text(item.text.components(separatedBy: "\n").compactMap { URL(string: $0)?.lastPathComponent }.joined(separator: "\n"))
-                    .font(.system(size: 15, weight: .medium)).lineLimit(4)
+                    .font(.system(size: 13, weight: .medium)).lineLimit(4)
             }.padding(13)
         } else {
             Text(item.text.isEmpty ? "\(item.payload.items.count) clipboard item(s)" : String(item.text.prefix(1600)))
-                .font(.system(size: 15)).foregroundStyle(Color(nsColor: .textColor))
+                .font(.system(size: 13)).foregroundStyle(Color(nsColor: .textColor))
                 .frame(maxWidth: .infinity, alignment: .topLeading).padding(13)
         }
     }

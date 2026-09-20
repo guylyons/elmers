@@ -56,8 +56,8 @@ public enum KeyboardRouter {
         let numbers: [UInt16] = [18,19,20,21,23,22,26,28,25]
         if let number = numbers.firstIndex(of: key), modifiers == settings.quickPasteModifier || modifiers == settings.quickPasteModifier.union(settings.plainTextModifier) { return .quickPaste(number, plain: plain) }
         if key == 53 && modifiers.isEmpty { return .escape }
-        if key == 48 && (modifiers.isEmpty || modifiers == .shift) { return context == .search ? .focusResults : .focusSearch }
-        // Return pastes the selection even while the search field has focus, as in Paste; Tab moves between the two.
+        if key == 48 && (modifiers.isEmpty || modifiers == .shift) { return .move(modifiers == .shift ? -1 : 1, extend: false) }
+        // Return pastes the selection even while the search field has focus.
         if [36,76].contains(key), modifiers.isEmpty || modifiers == settings.plainTextModifier { return .paste(plain: plain) }
         if modifiers == .command {
             switch key {

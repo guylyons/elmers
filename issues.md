@@ -13,8 +13,10 @@
 - [open 2026-09-16] drag and drop does not work
   (reported by the user on the built app; card drag-out and pinboard pill reordering are implemented in DragSupport.swift / HistoryView.swift but were only verified through the in-process interaction check, never with a real pointer drag across apps. Reproduce with a real drag from a card into another app, and a pill drag in the toolbar; the mouse-down card selection in CardMouseObserver may be swallowing the drag start)
 
-- [open 2026-09-16] update the About popup to use the About png
-  (Resources/AboutElmers.png is committed but unused; the overflow menu's "About Elmers" still calls NSApp.orderFrontStandardAboutPanel. Show the artwork in the About panel — either pass it as the credits/icon of the standard panel or build a custom About window — and copy the PNG into the bundle in scripts/build-app.sh)
+- [implemented 2026-09-19; visual check pending] update the About popup to use the About png
+  (AboutPanel.swift supplies Resources/AboutElmers.png as the standard About panel's application icon.
+  scripts/build-app.sh now bundles the artwork; bundled bytes verified against the source.
+  Manual About-window appearance check remains pending.)
 
 - [open 2026-09-17] capture OS screenshots into the history as their own "Screenshot" category
   (requested by the user: when macOS takes a screenshot it should land in Elmers' history like a copied
@@ -25,13 +27,10 @@
   encoded, so a screenshot needs a stored marker on `ClipboardItem`. Note `SearchQuery` already maps the
   word "screenshot" to the Image filter; that mapping moves to the new category.)
 
-- [open 2026-09-17] match Paste's card font sizes
-  (reverses the September 16 request for bigger history text: parity wins. Paste 6.3.11 measured
-  title 15 semibold, time 12, body 13, footer 12 gray; `CardView.swift` currently uses 17/13/15/13
-  — see lines 33, 35, 58 and the body/title styles at 112/122/126. Dial each back to the measured
-  value, then re-check the card geometry that was tuned around the larger text: 235×236 card,
-  50-pt header, line limits on link/file titles, and the two-line link footer. Also confirm nothing
-  else was sized to compensate, and update the "Card typography" row in docs/paste-parity.md.)
+- [implemented 2026-09-19; reference comparison pending] match Paste's card font sizes
+  (Restored the recorded Paste 6.3.11 measurements: title 15 semibold, time 12, body/link/file
+  text 13, footer 12. Kept the 235×236 card and 50-pt header; inspected the synthetic panel render.
+  Fresh same-state comparison with Paste remains pending because computer-use tools were unavailable.)
 
 - [decision 2026-09-17] exclude everything subscription/license related
   (standing scope exclusion, recorded in AGENTS.md › Scope exclusions: no Subscription settings pane,
@@ -39,3 +38,22 @@
   entitlement-only account sign-in. All features stay unlocked locally. Where Paste shows one of these
   surfaces, record it as observed-and-excluded rather than a parity gap. iCloud sync itself is NOT
   excluded — it is still in scope and blocked only on signing, entitlements and a second device.)
+
+- [fixed 2026-09-19; automated checks passed] Tab should move through the items in the history
+  (Tab advances one card; Shift-Tab moves back. Both focus results when used from search;
+  Command-F still opens search. Routing and AppKit dispatch checks pass.)
+
+- [duplicate; implementation above] card fonts still do not match Paste
+  (reported by the user: the September 16 increase looks bad. Already tracked by the 2026-09-17
+  "match Paste's card font sizes" entry above; see its current verification status)
+
+- [fixed 2026-09-19; automated checks passed] ⌘⇧V should always open the history scrolled to the far left
+  (Fresh activation recreates the scroll viewport even when the selected first item is unchanged.
+  Regression reproduced with a 150-pt offset before the fix and passed afterwards. Failed-paste
+  re-show still preserves state. Physical global-shortcut verification remains pending.)
+
+- [open 2026-09-19] there is a bit of latency when scrolling images, we need to get this down
+  (reported by the user: scrolling the history feels sluggish once image cards are on screen. Likely
+  full-size image decoding on the main thread during scroll rather than cached, downsampled thumbnails.
+  Measure first — instrument scroll-frame time with image-heavy history — then cache decoded
+  thumbnails at card size and decode off the main thread.)

@@ -104,3 +104,15 @@ Done: Paste's "Copied / Enable Direct Paste ›" overlay (`CopiedHUD.swift`, sho
 Checks at the stop: `scripts/test.sh` 19/19, `--check-interaction` 34 steps (new Copied HUD step; `ELMERS_CAPTURE_DIR` now also writes `panel.png` and `copied-hud.png`), `--check-status-item` pass. The user's "Show during screen sharing" setting was toggled on for captures and restored to off.
 
 Next: **drag and drop does not work on the built app (user report, September 16)**; the drag-out and pill-reorder code only passed the in-process provider check, so verify with a real pointer drag first (suspect the mouse-down selection observer swallowing the drag). Then update the About popup to show `Resources/AboutElmers.png` (committed, unused; the build script does not copy it into the bundle yet). Then the search-open toolbar state (pills collapse to icon/dot, wider field with filter icon), Paste's direct-paste feedback (unobserved), the Space preview presentation, and the earlier storage/OCR/accessibility items.
+
+## September 19 — issue triage and first fixes
+
+Current repository: `/Users/guy/github/elmers`. This checkpoint preserves the user's September 19 additions to `issues.md`, including the open image-scrolling latency report.
+
+- Tab/Shift-Tab now select the next/previous card and focus results; Command-F retains search access. Core routing regressions and actual AppKit dispatch pass.
+- Fresh activation resets the entire viewport even if the first card was already selected. A real NSScrollView regression failed before the change and passes afterwards. Failed-paste re-show (`resetState: false`) keeps the current viewport.
+- Card typography restored to recorded Paste measurements (15/12/13/12). Synthetic panel render inspected; fresh Paste comparison still needed.
+- About uses AboutElmers.png as the standard panel icon; the build script includes the PNG. Bundle bytes verified; manual About appearance check pending.
+- Rebuilt `dist/Elmers.app`; the existing daily-use process was not restarted. Core: 19/19. Final bundled synthetic interaction suite passed. Review found no blockers. No personal clipboard data used.
+
+Next: reproduce physical card drag and pinboard reorder with computer-use tools (unavailable this session). Returning the original event in CardMouseObserver means the prior “swallows mouse-down” hypothesis is not established. Provider tests only prove type/data export for the first payload item. Do not call drag fixed based on those tests. Then design screenshot-folder observation plus a persisted Screenshot marker and duplicate handling; see the September 19 section of `docs/paste-parity.md`. Afterward, finish visual/direct-paste checks and scalable payload storage. Stack remains deferred; licensing/subscription stays excluded.

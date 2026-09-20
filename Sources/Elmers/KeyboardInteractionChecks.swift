@@ -14,8 +14,8 @@ final class KeyboardInteractionChecks {
             (123, [], { model.selection.ids.count == 1 }, "Left collapses selection"),
             (124, .shift, { model.selection.ids.count == 2 }, "Shift-Right extends selection"),
             (3, .command, { model.searchIsFocused }, "Command-F focuses search"),
-            (48, [], { !model.searchIsFocused }, "Tab focuses results"),
-            (48, .shift, { model.searchIsFocused }, "Shift-Tab returns to search"),
+            (48, [], { !model.searchIsFocused && model.selectedID == ids.last && model.selectedItems.count == 1 }, "Tab advances and focuses results"),
+            (48, .shift, { !model.searchIsFocused && model.selectedID == ids.first }, "Shift-Tab selects previous card"),
             (125, .command, { model.selectedID == ids.last && !model.searchIsFocused }, "Command-Down selects last and focuses results"),
             (126, .command, { model.selectedID == ids.first }, "Command-Up selects first"),
             (124, [], { model.selectedID == ids.last }, "Right selects next item"),
@@ -24,7 +24,7 @@ final class KeyboardInteractionChecks {
             (123, [], { model.selectedID == ids[ids.count - 2] && model.searchIsFocused }, "Left moves the selection while search keeps focus"),
             (124, [], { model.selectedID == ids.last && model.searchIsFocused }, "Right moves the selection while search keeps focus"),
             (36, [], { deliveries == [false] }, "Return from search delivers with a single press"),
-            (48, [], { !model.searchIsFocused }, "Tab focuses results"),
+            (48, [], { !model.searchIsFocused && model.selectedID == ids.last && model.selectedItems.count == 1 }, "Tab advances and focuses results"),
             (36, [], { deliveries == [false, false] }, "Return delivers selection"),
             (36, .shift, { deliveries == [false, false, true] }, "Shift-Return delivers plain text"),
             (18, .command, { deliveries == [false, false, true, false] }, "Command-1 quick pastes"),
@@ -117,6 +117,34 @@ final class KeyboardInteractionChecks {
                     print("FAIL: reopening left search consuming navigation keys"); exit(1)
                 }
                 print("PASS: reopening restores results keyboard focus")
+                checkScrollReset(model: model, controller: controller)
+            }
+        }
+    }
+    /// Reopening must reset the actual viewport even when selection has not changed.
+    static func checkScrollReset(model: AppModel, controller: PanelController) {
+        for index in 0..<24 { model.newText("Scroll fixture \(index)") }
+        controller.show()
+        func scrollView(in view: NSView) -> NSScrollView? {
+            if let scroll = view as? NSScrollView, scroll.documentView?.bounds.width ?? 0 > scroll.contentSize.width { return scroll }
+            return view.subviews.lazy.compactMap { scrollView(in: $0) }.first
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            guard let root = controller.panel.contentView, let scroll = scrollView(in: root) else {
+                print("FAIL: history scroll view not found"); exit(1)
+            }
+            scroll.contentView.scroll(to: NSPoint(x: 150, y: 0))
+            scroll.reflectScrolledClipView(scroll.contentView)
+            guard scroll.contentView.bounds.minX > 100 else { print("FAIL: scroll fixture did not move"); exit(1) }
+            let selected = model.selectedID
+            controller.hide(restoreFocus: false)
+            controller.show()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                guard let current = scrollView(in: root), abs(current.contentView.bounds.minX) < 0.5,
+                      model.selectedID == selected else {
+                    print("FAIL: reopening did not reset unchanged selection to the left edge"); exit(1)
+                }
+                print("PASS: reopening resets the actual viewport with unchanged selection")
                 checkRecorder(controller: controller)
             }
         }

@@ -19,6 +19,8 @@ final class AppModel: ObservableObject {
     @Published var sourceFilter: String? { didSet { refreshVisibleItems() } }
     @Published var afterDate: Date? { didSet { refreshVisibleItems() } }
     @Published var searchIsFocused = false
+    /// A fresh presentation discards the previous viewport, even if selection is unchanged.
+    @Published private(set) var activationGeneration = 0
     @Published var shortcuts = ShortcutSettings() {
         didSet {
             if let error = shortcuts.validationError { shortcuts = oldValue; shortcutValidationError = error; return }
@@ -206,6 +208,7 @@ final class AppModel: ObservableObject {
         absorbingTypedFilter = false
         sourceFilter = nil; afterDate = nil; boardID = nil
         selectedID = visibleItems.first?.id
+        activationGeneration += 1
     }
     func select(_ id: UUID, modifiers: NSEvent.ModifierFlags = [], rightClick: Bool = false) {
         if rightClick, selection.ids.contains(id) { return }

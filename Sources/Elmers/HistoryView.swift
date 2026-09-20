@@ -46,6 +46,7 @@ struct HistoryView: View {
                         if let id { withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo(id) } }
                     }
                 }
+                .id(model.activationGeneration)
             }
             Spacer(minLength: 0)
         }
@@ -136,7 +137,7 @@ struct HistoryView: View {
                 if model.paused { Label("Paused", systemImage: "pause.fill").font(.caption).padding(.leading, 24) }
                 Spacer()
                 Menu {
-                    Button("About Elmers") { NSApp.orderFrontStandardAboutPanel(nil); NSApp.activate(ignoringOtherApps: true) }
+                    Button("About Elmers") { AboutPanel.show() }
                     Divider()
                     Button("New Text Item") { model.openEditor?(nil) }.keyboardShortcut("n").disabled(!model.canEdit)
                     Button("Settings…") { model.showSettings?() }.keyboardShortcut(",")
@@ -243,10 +244,10 @@ extension Notification.Name {
 struct KeyboardHelp: View {
     @Environment(\.dismiss) private var dismiss
     private let rows: [(String, String)] = [
-        ("Show or hide Elmers", "⇧⌘V"), ("Move between items", "← →  ·  ⇧ extends"), ("First / last item", "⌘↑ / ⌘↓"),
+        ("Show or hide Elmers", "⇧⌘V"), ("Move between items", "⇥ / ⇧⇥  ·  ← →"), ("Extend selection", "⇧← / ⇧→"), ("First / last item", "⌘↑ / ⌘↓"),
         ("Paste selected items", "↩"), ("Paste as plain text", "⇧↩"), ("Quick paste", "⌘1…⌘9"), ("Copy", "⌘C"),
         ("Preview", "Space"), ("Open link", "⌘O"), ("Edit / Rename", "⌘E / ⌘R"), ("Delete", "⌫"), ("Undo / Redo", "⌘Z / ⇧⌘Z"),
-        ("Search / Filters", "⌘F  ·  ⇥ switches focus"), ("New text item", "⌘N"), ("New pinboard", "⇧⌘N"),
+        ("Search / Filters", "⌘F"), ("New text item", "⌘N"), ("New pinboard", "⇧⌘N"),
         ("Next / previous pinboard", "⌘→ / ⌘←"), ("Pause capture", "⌘T"), ("Settings", "⌘,")
     ]
     var body: some View {

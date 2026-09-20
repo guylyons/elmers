@@ -180,7 +180,9 @@ final class PanelController: NSObject, NSWindowDelegate {
         if context == .search, stroke == KeyStroke(51), model.removeTypedFilter() { return nil }
         if let action = KeyboardRouter.command(for: stroke, context: context, settings: model.shortcuts) {
             switch action {
-            case let .move(offset, extend): model.moveSelection(offset, extend: extend)
+            case let .move(offset, extend):
+                if event.keyCode == 48 { focusResults() }
+                model.moveSelection(offset, extend: extend)
             case .first: focusResults(); model.selectedID = model.visibleItems.first?.id
             case .last: focusResults(); model.selectedID = model.visibleItems.last?.id
             case .selectAll: model.selectAll()

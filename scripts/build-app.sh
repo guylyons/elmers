@@ -7,6 +7,7 @@ app_bundle="$PWD/dist/Elmers.app"
 mkdir -p "$app_bundle/Contents/MacOS" "$app_bundle/Contents/Resources"
 cp ".build/$configuration/Elmers" "$app_bundle/Contents/MacOS/Elmers"
 cp Resources/Info.plist "$app_bundle/Contents/Info.plist"
+cp Resources/AboutElmers.png "$app_bundle/Contents/Resources/AboutElmers.png"
 cp Resources/Toolbar.png "$app_bundle/Contents/Resources/Toolbar.png"
 # Build the icon from Resources/AppIcon.png whenever the artwork is newer than the compiled icon.
 icns=".build/AppIcon.icns"
