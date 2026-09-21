@@ -57,3 +57,15 @@
   full-size image decoding on the main thread during scroll rather than cached, downsampled thumbnails.
   Measure first — instrument scroll-frame time with image-heavy history — then cache decoded
   thumbnails at card size and decode off the main thread.)
+
+- [implemented 2026-09-21; listening check pending] Sound effects. Add a small set of UI sounds tied to clipboard actions:
+  a short double-click ("click-click") when an image is grabbed from the
+  clipboard, and a distinct confirmation tone on copy. Needs a decision on the
+  audio backend, where the asset files live, and a preference to mute them.
+  (Kept the existing backend: sounds are synthesized at launch with AVAudioEngine, so there are no
+  asset files; Settings › General › Sound effects mutes all of them. Images grabbed from the clipboard
+  now play two dry clicks 75 ms apart; text, link and file captures, and copies out of Elmers
+  (⌘C, clipboard-mode paste, Copy File) play a rising two-note chime; direct paste keeps the tick.
+  Screenshots picked up from the screenshot folder stay silent. `Elmers --demo --check-sounds`
+  checks routing and waveform shape; with ELMERS_CAPTURE_DIR set it writes sound-*.wav to audition.
+  Note: Paste itself plays one Copy sound for every capture; the image click is a deliberate departure.)

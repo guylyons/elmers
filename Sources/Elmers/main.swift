@@ -44,6 +44,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ScreenshotInteractionChecks.run(model: model, controller: panelController)
             return
         }
+        if ProcessInfo.processInfo.arguments.contains("--check-sounds") {
+            SoundChecks.run()
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--check-status-item") {
             precondition(model.isDemo)
             StatusItemChecks.run(delegate: self)

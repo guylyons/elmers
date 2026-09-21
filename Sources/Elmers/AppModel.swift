@@ -201,7 +201,7 @@ final class AppModel: ObservableObject {
                     captureImage(payload, source: sourceName, sourceID: sourceID)
                 } else {
                     let item = history.capture(payload, source: sourceName, sourceBundleID: sourceID)
-                    SoundEffects.shared.play(.copy)
+                    SoundEffects.effect(forCaptured: item.kind).map(SoundEffects.shared.play)
                     if selectedID == nil { selectedID = item.id }
                     prune(); persist()
                     if item.kind == .link { fetchLinkPreviews() }
@@ -254,7 +254,7 @@ final class AppModel: ObservableObject {
                 self.pendingImageCaptures -= 1
                 guard self.captureEpoch == epoch, self.captureAllowed else { return }
                 let item = self.history.capture(payload, source: source, sourceBundleID: sourceID, at: capturedAt, imageDigest: digest)
-                if item.screenshot == nil { SoundEffects.shared.play(.copy) }
+                SoundEffects.effect(forCaptured: item.kind).map(SoundEffects.shared.play)
                 if self.selectedID == nil { self.selectedID = item.id }
                 self.prune(); self.persist(); self.recognizeImageText()
             }

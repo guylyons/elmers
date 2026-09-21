@@ -87,8 +87,8 @@ final class PanelController: NSObject, NSWindowDelegate {
     }
     private func paste(_ item: ClipboardItem, plainText: Bool) {
         guard model.copy(item, plainText: plainText) else { return }
-        SoundEffects.shared.play(.paste)
         guard model.directPaste else { hide(); showCopied(); return }
+        SoundEffects.shared.play(.paste)
         guard AXIsProcessTrusted() else {
             model.message = "Copied. Press ⌘V in your app, or enable Accessibility in Elmers Settings for direct paste."
             return
@@ -106,6 +106,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     }
     /// Paste confirms a copy with a HUD near the bottom of the screen instead of a message in the panel.
     func showCopied() {
+        SoundEffects.shared.play(.copy)
         copiedHUD.show(on: panel.screen, offerDirectPaste: !model.directPaste)
     }
     private func attemptPaste(to target: NSRunningApplication, generation: Int, expectedChange: Int, attempts: Int) {
