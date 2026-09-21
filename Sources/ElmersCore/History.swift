@@ -5,21 +5,37 @@ public struct History: Codable, Sendable {
     public private(set) var boards: [Pinboard] = []
     public init() {}
 
-    @discardableResult public mutating func capture(_ payload: ClipboardPayload, source: String, sourceBundleID: String? = nil, at date: Date = Date()) -> ClipboardItem {
+    @discardableResult public mutating func capture(_ payload: ClipboardPayload, source: String, sourceBundleID: String? = nil, at date: Date = Date(), screenshot: ScreenshotOrigin? = nil, imageDigest: String? = nil) -> ClipboardItem {
         let fingerprint = payload.fingerprint
         var item: ClipboardItem
-        if let index = items.firstIndex(where: { $0.fingerprint == fingerprint }) {
+        if let index = items.firstIndex(where: { $0.fingerprint == fingerprint ||
+            (imageDigest != nil && $0.imageDigest == imageDigest &&
+             ($0.screenshot != nil) != (screenshot != nil) && abs($0.copiedAt.timeIntervalSince(date)) <= 10 &&
+             $0.kind.isImage && payload.kind.isImage) }) {
             item = items.remove(at: index)
-            item.copiedAt = date; item.source = source; item.sourceBundleID = sourceBundleID
+            if item.fingerprint != fingerprint, var representations = item.payload.items.first, let incoming = payload.items.first {
+                let origin = item.screenshot
+                let recognized = item.recognizedText
+                // Prefer clipboard formats on conflicts and retain other useful encodings if within the capture bound.
+                representations.merge(incoming) { old, new in screenshot == nil ? new : old }
+                let merged = ClipboardPayload(items: [representations])
+                item.payload = merged.byteCount <= ScreenshotImage.maximumBytes ? merged : (screenshot == nil ? payload : item.payload)
+                item.screenshot = origin; item.recognizedText = recognized
+            }
+            item.copiedAt = max(item.copiedAt, date); item.source = source; item.sourceBundleID = sourceBundleID
         } else { item = ClipboardItem(payload: payload, source: source, sourceBundleID: sourceBundleID, at: date) }
-        items.insert(item, at: 0)
+        if let screenshot { item.screenshot = screenshot }
+        if let imageDigest { item.imageDigest = imageDigest }
+        // Background image decoding can complete after a newer text capture.
+        let insertion = items.firstIndex { $0.copiedAt <= item.copiedAt } ?? items.endIndex
+        items.insert(item, at: insertion)
         return item
     }
     public func filtered(query: String = "", kind: ContentKind? = nil, boardID: UUID? = nil) -> [ClipboardItem] {
         // Type words are consumed by the search field before the query reaches here (see SearchQuery).
         let tokens = query.split(whereSeparator: \.isWhitespace).map(String.init)
         return items.filter { item in
-            (kind == nil || item.kind == kind) && (boardID == nil || item.boardIDs.contains(boardID!)) &&
+            (kind == nil || item.kind == kind || (kind == .image && item.kind.isImage)) && (boardID == nil || item.boardIDs.contains(boardID!)) &&
             tokens.allSatisfy { token in
                 [item.text, item.source, item.title ?? "", item.recognizedText ?? "", item.linkPreview?.title ?? ""].contains {
                     $0.range(of: token, options: [.caseInsensitive, .diacriticInsensitive]) != nil

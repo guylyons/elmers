@@ -42,7 +42,11 @@ final class AppModel: ObservableObject {
     @Published var message: String?
     /// Name of the app that will receive a paste, shown in the card context menu as "Paste to …".
     @Published var destinationApp: String?
-    @Published var paused = false
+    @Published var paused = false { didSet { captureEpoch += 1; refreshScreenshotMonitoring() } }
+    @Published var captureScreenshots: Bool { didSet { defaults.set(captureScreenshots, forKey: "captureScreenshots"); refreshScreenshotMonitoring(force: true) } }
+    @Published private(set) var screenshotFolder: URL?
+    @Published private(set) var screenshotStatus: String?
+    @Published private(set) var screenshotNeedsAccess = false
     @Published var retentionDays: Int { didSet { defaults.set(retentionDays, forKey: "retentionDays"); prune(); persist() } }
     @Published var directPaste: Bool { didSet { defaults.set(directPaste, forKey: "directPaste") } }
     @Published var soundEffects: Bool { didSet { defaults.set(soundEffects, forKey: "soundEffects"); SoundEffects.shared.enabled = soundEffects } }
@@ -61,7 +65,7 @@ final class AppModel: ObservableObject {
     var sharingChanged: (() -> Void)?
     @Published var ignoreConfidential: Bool { didSet { defaults.set(ignoreConfidential, forKey: "ignoreConfidential") } }
     @Published var ignoreTransient: Bool { didSet { defaults.set(ignoreTransient, forKey: "ignoreTransient") } }
-    @Published var excludedApps: String { didSet { defaults.set(excludedApps, forKey: "excludedApps") } }
+    @Published var excludedApps: String { didSet { defaults.set(excludedApps, forKey: "excludedApps"); captureEpoch += 1; refreshScreenshotMonitoring(force: true) } }
     var showSettings: (() -> Void)?
     var deliver: ((ClipboardItem, Bool) -> Void)?
     var dismiss: (() -> Void)?
@@ -84,6 +88,13 @@ final class AppModel: ObservableObject {
     private let previewFetcher = LinkPreviewFetcher()
     private var previewsInFlight = Set<UUID>()
     private var recognitionInFlight = Set<UUID>()
+    private var captureEpoch = 0
+    private var screenshotGeneration = 0
+    private var lastScreenshotAllowed: Bool?
+    private var lastCaptureAllowed: Bool?
+    private let imageCaptureQueue = DispatchQueue(label: "app.elmers.image-identity", qos: .utility)
+    private var pendingImageCaptures = 0
+    private lazy var screenshotMonitor = ScreenshotMonitor { [weak self] update in self?.receiveScreenshots(update) }
     var canEdit: Bool { archiveReadable }
 
     var selectedItems: [ClipboardItem] { visibleItems.filter { selection.ids.contains($0.id) } }
@@ -122,7 +133,8 @@ final class AppModel: ObservableObject {
         defaults = demo ? UserDefaults(suiteName: "app.elmers.demo")! : .standard
         defaults.register(defaults: ["retentionDays": 30, "directPaste": false, "ignoreConfidential": true, "ignoreTransient": true,
                                       "excludedApps": "com.apple.keychainaccess\ncom.apple.Passwords", "soundEffects": true,
-                                      "alwaysPlainText": false, "runInBackground": true, "showDuringScreenSharing": true, "linkPreviews": false])
+                                      "alwaysPlainText": false, "runInBackground": true, "showDuringScreenSharing": true, "linkPreviews": false, "captureScreenshots": true])
+        captureScreenshots = defaults.bool(forKey: "captureScreenshots")
         retentionDays = defaults.integer(forKey: "retentionDays")
         directPaste = defaults.bool(forKey: "directPaste")
         soundEffects = defaults.bool(forKey: "soundEffects")
@@ -154,12 +166,14 @@ final class AppModel: ObservableObject {
 
     func start() {
         guard !isDemo else { return }
+        refreshScreenshotMonitoring()
         activationObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] notification in
             MainActor.assumeIsolated {
                 guard let self else { return }
                 let source = (notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.bundleIdentifier
                 self.poll()
                 self.capturePolicy.transitioned(to: source)
+                self.refreshScreenshotMonitoring()
             }
         }
         timer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { [weak self] _ in
@@ -168,6 +182,7 @@ final class AppModel: ObservableObject {
     }
     func poll() {
         if let until = pauseUntil, Date() >= until { paused = false; pauseUntil = nil }
+        refreshScreenshotMonitoring()
         if Date().timeIntervalSince(lastPrune) > 60 { prune(); persist(); lastPrune = Date() }
         let board = NSPasteboard.general
         guard board.changeCount != lastChange else { return }
@@ -182,12 +197,15 @@ final class AppModel: ObservableObject {
         let sourceName = sourceID.flatMap { id in NSWorkspace.shared.urlForApplication(withBundleIdentifier: id)?.deletingPathExtension().lastPathComponent } ?? (sourceChanged ? "Unknown App" : app?.localizedName ?? "Unknown App")
         do {
             if let payload = try PasteboardCodec.read(from: board, ignoreConfidential: ignoreConfidential, ignoreTransient: ignoreTransient) {
-                let item = history.capture(payload, source: sourceName, sourceBundleID: sourceID)
-                SoundEffects.shared.play(.copy)
-                if selectedID == nil { selectedID = item.id }
-                prune(); persist()
-                if item.kind == .link { fetchLinkPreviews() }
-                if item.kind == .image { recognizeImageText() }
+                if payload.kind.isImage {
+                    captureImage(payload, source: sourceName, sourceID: sourceID)
+                } else {
+                    let item = history.capture(payload, source: sourceName, sourceBundleID: sourceID)
+                    SoundEffects.shared.play(.copy)
+                    if selectedID == nil { selectedID = item.id }
+                    prune(); persist()
+                    if item.kind == .link { fetchLinkPreviews() }
+                }
             }
             lastChange = currentChange
         } catch PasteboardCodec.CaptureError.changedDuringRead {
@@ -199,6 +217,75 @@ final class AppModel: ObservableObject {
         pauseUntil = minutes.map { Date().addingTimeInterval(Double($0) * 60) }
     }
     func resume() { paused = false; pauseUntil = nil }
+    private var captureAllowed: Bool {
+        !paused && archiveReadable && !excludedBundleIDs.contains(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "")
+    }
+    private func refreshScreenshotMonitoring(force: Bool = false) {
+        guard !isDemo else { return }
+        let allowed = captureAllowed
+        if lastCaptureAllowed != allowed { captureEpoch += 1; lastCaptureAllowed = allowed }
+        let enabled = captureScreenshots && allowed
+        guard force || enabled != lastScreenshotAllowed else { return }
+        lastScreenshotAllowed = enabled; screenshotGeneration += 1
+        screenshotMonitor.configure(enabled: enabled, generation: screenshotGeneration, bookmark: defaults.data(forKey: "screenshotFolderAccess"))
+    }
+    private func receiveScreenshots(_ update: ScreenshotMonitor.Update) {
+        guard update.generation == screenshotGeneration else { return }
+        screenshotFolder = update.folder; screenshotStatus = update.status; screenshotNeedsAccess = update.needsAccess
+        guard captureScreenshots, captureAllowed else { return }
+        for capture in update.captures { ingestScreenshot(capture) }
+    }
+    /// Shared by live observation and synthetic interaction checks; never writes or removes the source file.
+    func ingestScreenshot(_ capture: ScreenshotCapture) {
+        guard captureScreenshots, captureAllowed else { return }
+        let item = history.capture(capture.payload, source: "Screenshot", at: capture.date,
+                                   screenshot: capture.origin, imageDigest: capture.imageDigest)
+        if selectedID == nil { selectedID = item.id }
+        prune(); persist(); recognizeImageText()
+    }
+    private func captureImage(_ payload: ClipboardPayload, source: String, sourceID: String?) {
+        guard pendingImageCaptures < 4 else { message = "Image capture is busy. Please copy this image again in a moment."; return }
+        pendingImageCaptures += 1
+        let epoch = captureEpoch, capturedAt = Date()
+        imageCaptureQueue.async { [weak self] in
+            let digest = ScreenshotImage.digest(of: payload)
+            Task { @MainActor in
+                guard let self else { return }
+                self.pendingImageCaptures -= 1
+                guard self.captureEpoch == epoch, self.captureAllowed else { return }
+                let item = self.history.capture(payload, source: source, sourceBundleID: sourceID, at: capturedAt, imageDigest: digest)
+                if item.screenshot == nil { SoundEffects.shared.play(.copy) }
+                if self.selectedID == nil { self.selectedID = item.id }
+                self.prune(); self.persist(); self.recognizeImageText()
+            }
+        }
+    }
+    func allowScreenshotFolderAccess() {
+        guard let folder = screenshotFolder else { return }
+        let chooser = NSOpenPanel()
+        chooser.canChooseDirectories = true; chooser.canChooseFiles = false; chooser.allowsMultipleSelection = false
+        chooser.directoryURL = folder; chooser.prompt = "Allow Access"
+        chooser.message = "Choose your current macOS screenshot folder. Elmers will read new screenshots without changing where macOS saves them."
+        guard chooser.runModal() == .OK, let chosen = chooser.url else { return }
+        guard chosen.standardizedFileURL == folder.standardizedFileURL else {
+            screenshotStatus = "Choose the folder configured in macOS Screenshot’s Options. Elmers does not change that destination."; return
+        }
+        do {
+            let bookmark = try chosen.bookmarkData(options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess], includingResourceValuesForKeys: nil, relativeTo: nil)
+            defaults.set(bookmark, forKey: "screenshotFolderAccess"); refreshScreenshotMonitoring(force: true)
+        } catch { screenshotStatus = "Folder access could not be saved. \(error.localizedDescription)" }
+    }
+    func useScreenshotOriginal(_ item: ClipboardItem, copyFile: Bool) {
+        guard let origin = item.screenshot else { return }
+        ScreenshotActions.resolve(origin) { [weak self] url in
+            guard let self else { return }
+            guard let url else { self.message = "The original screenshot file can’t be found. You can still copy or paste the image saved in Elmers."; return }
+            if copyFile {
+                let file = ClipboardItem(payload: .init(items: [["public.file-url": Data(url.absoluteString.utf8)]]), source: "Elmers")
+                if self.copy(file) { self.showCopied?() }
+            } else { NSWorkspace.shared.activateFileViewerSelecting([url]); self.dismiss?() }
+        }
+    }
     func reconcileSelection() { selection.reconcile(in: visibleItems.map(\.id)) }
     /// Opening the history starts from a known state, as Paste does: no search, no filters, the All pinboard,
     /// and the most recent item selected so Return pastes it straight away.
@@ -262,7 +349,7 @@ final class AppModel: ObservableObject {
     /// Runs on-device text recognition for image items that have not been processed yet.
     func recognizeImageText() {
         guard canEdit else { return }
-        let pending = history.items.filter { $0.kind == .image && $0.recognizedText == nil && !recognitionInFlight.contains($0.id) }.prefix(2)
+        let pending = history.items.filter { $0.kind.isImage && $0.recognizedText == nil && !recognitionInFlight.contains($0.id) }.prefix(2)
         for item in pending {
             recognitionInFlight.insert(item.id)
             ImageTextRecognizer.recognize(item) { [weak self] text in

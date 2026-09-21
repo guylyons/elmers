@@ -39,6 +39,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let editItem = NSMenuItem(); editItem.submenu = edit; menu.addItem(editItem)
         NSApp.mainMenu = menu
         #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--check-screenshots") {
+            precondition(model.isDemo, "Screenshot checks require --demo")
+            ScreenshotInteractionChecks.run(model: model, controller: panelController)
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--check-status-item") {
             precondition(model.isDemo)
             StatusItemChecks.run(delegate: self)

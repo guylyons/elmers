@@ -204,6 +204,11 @@ struct HistoryView: View {
             Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting(urls); model.dismiss?() }
             Divider()
         }
+        if item.screenshot != nil {
+            Button("Show in Finder") { model.useScreenshotOriginal(item, copyFile: false) }
+            Button("Copy File") { model.useScreenshotOriginal(item, copyFile: true) }
+            Divider()
+        }
         Button(model.directPaste ? "Paste to \(model.destinationApp ?? "current app")" : "Paste") { model.activate() }.keyboardShortcut(.return, modifiers: [])
         Button("Copy") { if let aggregate = model.selectedAggregate(), model.copy(aggregate) { model.showCopied?() } }.keyboardShortcut("c")
         Divider()
@@ -224,7 +229,7 @@ struct HistoryView: View {
         if let board = model.boardID { Button("Unpin") { model.selectedItems.forEach { model.unpin($0, from: board) } } }
         Divider()
         Button("Preview") { model.preview?(item) }.keyboardShortcut(.space, modifiers: [])
-        if item.kind == .image, let image = imagePreview(item) { ShareLink("Share…", item: Image(nsImage: image), preview: SharePreview(item.title ?? "Image", image: Image(nsImage: image))) }
+        if item.kind.isImage, let image = imagePreview(item) { ShareLink("Share…", item: Image(nsImage: image), preview: SharePreview(item.title ?? item.kind.rawValue, image: Image(nsImage: image))) }
         else if let url = urls.first, item.kind == .link { ShareLink("Share…", item: url) }
         else if !item.text.isEmpty { ShareLink("Share…", item: item.text) }
     }

@@ -17,7 +17,7 @@ struct CardView: View {
            let color = CardImageCache.shared.color(for: id, url: url) { return color }
         switch item.kind {
         case .link: return Color(red: 0.19, green: 0.52, blue: 0.77)
-        case .image: return Color(red: 0.57, green: 0.32, blue: 0.65)
+        case .image, .screenshot: return Color(red: 0.57, green: 0.32, blue: 0.65)
         case .file: return Color(red: 0.77, green: 0.48, blue: 0.2)
         default: return Color(red: 0.08, green: 0.18, blue: 0.43)
         }
@@ -99,7 +99,7 @@ struct CardView: View {
         }
     }
     @ViewBuilder private var preview: some View {
-        if item.kind == .image, let image = imagePreview(item) {
+        if item.kind.isImage, let image = imagePreview(item) {
             GeometryReader { geometry in
                 Image(nsImage: image).resizable().scaledToFit().frame(width: geometry.size.width, height: geometry.size.height)
             }
@@ -206,7 +206,7 @@ private final class CardImageCache {
 extension ContentKind {
     /// SF Symbol used for this type on cards and in the search field's type filter.
     var symbolName: String {
-        switch self { case .text: return "text.alignleft"; case .link: return "link"; case .image: return "photo"; case .file: return "doc"; case .other: return "doc.on.clipboard" }
+        switch self { case .text: return "text.alignleft"; case .link: return "link"; case .image: return "photo"; case .screenshot: return "viewfinder"; case .file: return "doc"; case .other: return "doc.on.clipboard" }
     }
     /// Lowercase plural for the search placeholder: "Search images".
     var searchNoun: String {

@@ -23,7 +23,14 @@ if CommandLine.arguments.contains("--live-capture") {
 let interaction = InteractionModelTests()
 let history = HistoryTests()
 let pasteboard = PasteboardTests()
+let screenshots = ScreenshotTests()
 let checks: [(String, () throws -> Void)] = [
+    ("screenshot classification and legacy decode", screenshots.testScreenshotClassificationAndLegacyDecode),
+    ("Images includes screenshots", screenshots.testImageFilterIncludesScreenshots),
+    ("screenshot duplicate arrival orders and persistence", screenshots.testScreenshotDuplicatesInEitherOrderPreservePins),
+    ("screenshot stable file observation", screenshots.testScannerIgnoresOldFilesAndWaitsForStableMarkedBytes),
+    ("screenshot retry and original file identity", screenshots.testRejectedFilesCanFinishLaterAndOriginalIdentityIsChecked),
+    ("screenshot invalid and oversized files", screenshots.testOversizedUnmarkedAndNonImageFilesDoNotCapture),
     ("custom shortcut persistence, routing, and conflicts", interaction.testCustomShortcutsRoundTripAndConflicts),
     ("Paste default shortcuts", interaction.testPasteDefaultGlobalAndModifierBindings),
     ("Paste keyboard command routing", interaction.testPasteKeyboardMap),

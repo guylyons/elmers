@@ -116,3 +116,7 @@ Current repository: `/Users/guy/github/elmers`. This checkpoint preserves the us
 - Rebuilt `dist/Elmers.app`; the existing daily-use process was not restarted. Core: 19/19. Final bundled synthetic interaction suite passed. Review found no blockers. No personal clipboard data used.
 
 Next: reproduce physical card drag and pinboard reorder with computer-use tools (unavailable this session). Returning the original event in CardMouseObserver means the prior “swallows mouse-down” hypothesis is not established. Provider tests only prove type/data export for the first payload item. Do not call drag fixed based on those tests. Then design screenshot-folder observation plus a persisted Screenshot marker and duplicate handling; see the September 19 section of `docs/paste-parity.md`. Afterward, finish visual/direct-paste checks and scalable payload storage. Stack remains deferred; licensing/subscription stays excluded.
+
+## September 21 — screenshot capture
+
+Branch `feat/screenshot-capture`. New screenshots saved by macOS go into history as a Screenshot type. They are observed in the configured screenshot folder, deduplicated against clipboard copies, and have Show in Finder and Copy File actions. Details and evidence are in the September 21 section of `docs/paste-parity.md`. Checks: `scripts/test.sh` (25/0) and `dist/Elmers.app/Contents/MacOS/Elmers --demo --check-screenshots`. Next: take a real screenshot with the built app running, test a protected custom folder, and compare with Paste. Then return to the physical drag reproduction.

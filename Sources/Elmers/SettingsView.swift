@@ -135,6 +135,20 @@ private struct PrivacySettings: View {
     @State private var selectedApp: String?
     var body: some View {
         Form {
+            Section("Screenshots") {
+                row("Add saved screenshots to history", "Screenshots stay in your macOS save location. Elmers keeps a copy for searching and pasting.", $model.captureScreenshots)
+                if let folder = model.screenshotFolder {
+                    HStack {
+                        Label(folder.lastPathComponent, systemImage: "folder").lineLimit(1).truncationMode(.middle).help(folder.path)
+                        Spacer()
+                        Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([folder]) }.buttonStyle(.link)
+                    }.font(.system(size: 12))
+                }
+                if model.captureScreenshots, let status = model.screenshotStatus {
+                    Text(status).font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    if model.screenshotNeedsAccess { Button("Allow Folder Access…") { model.allowScreenshotFolderAccess() } }
+                }
+            }
             Section {
                 row("Show during screen sharing", "Allow Elmers to appear to others when you share your screen.", $model.showDuringScreenSharing)
                 row("Generate link previews", "Download web content for previews; may activate one-time or analytics-sensitive links.", $model.linkPreviews)
