@@ -44,6 +44,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ScreenshotInteractionChecks.run(model: model, controller: panelController)
             return
         }
+        if ProcessInfo.processInfo.arguments.contains("--check-scroll-performance") {
+            precondition(model.isDemo, "Scroll checks require --demo")
+            ScrollPerformanceChecks.run(model: model, controller: panelController)
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--check-sounds") {
             SoundChecks.run()
             return

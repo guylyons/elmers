@@ -212,6 +212,13 @@ final class AppModel: ObservableObject {
             // Retry the current clipboard generation on the next poll.
         } catch { lastChange = currentChange; message = error.localizedDescription }
     }
+    #if DEBUG
+    /// Adds synthetic content for performance checks without going through the pasteboard.
+    func captureForChecks(_ payload: ClipboardPayload, source: String) {
+        let item = history.capture(payload, source: source)
+        if selectedID == nil { selectedID = item.id }
+    }
+    #endif
     func pause(minutes: Int?) {
         paused = true
         pauseUntil = minutes.map { Date().addingTimeInterval(Double($0) * 60) }

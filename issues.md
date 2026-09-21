@@ -52,11 +52,19 @@
   Regression reproduced with a 150-pt offset before the fix and passed afterwards. Failed-paste
   re-show still preserves state. Physical global-shortcut verification remains pending.)
 
-- [open 2026-09-19] there is a bit of latency when scrolling images, we need to get this down
+- [fixed 2026-09-21; measured in a synthetic check, feel on real history pending] there is a bit of latency when scrolling images, we need to get this down
   (reported by the user: scrolling the history feels sluggish once image cards are on screen. Likely
   full-size image decoding on the main thread during scroll rather than cached, downsampled thumbnails.
   Measure first — instrument scroll-frame time with image-heavy history — then cache decoded
   thumbnails at card size and decode off the main thread.)
+  Measured with `Elmers --demo --check-scroll-performance` (40 generated 3840×2160 PNGs, ~5 MB each;
+  each step scrolls the real NSScrollView and forces layout, display and a CA commit). Before: median
+  0.8 ms but p95 ~71 ms and max ~99 ms, 30 of 161 steps over 16.7 ms — one hitch per image card
+  scrolling in, from decoding the full PNG on the main thread. Fix: `ThumbnailCache` downsamples to
+  512 px with ImageIO on a background queue, caches by fingerprint (128 MB limit), and prewarms the
+  first 40 items on activation. After: p95 ~9 ms, max ~13 ms, none over 16.7 ms; with 80 images (half
+  not prewarmed) p95 7.4 ms, max 11.8 ms. Cards not yet decoded show an empty image area for a moment
+  before the thumbnail appears. The Space preview, sharing and drags still use the full image.
 
 - [implemented 2026-09-21; listening check pending] Sound effects. Add a small set of UI sounds tied to clipboard actions:
   a short double-click ("click-click") when an image is grabbed from the

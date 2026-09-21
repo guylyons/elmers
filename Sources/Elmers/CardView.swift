@@ -99,10 +99,8 @@ struct CardView: View {
         }
     }
     @ViewBuilder private var preview: some View {
-        if item.kind.isImage, let image = imagePreview(item) {
-            GeometryReader { geometry in
-                Image(nsImage: image).resizable().scaledToFit().frame(width: geometry.size.width, height: geometry.size.height)
-            }
+        if item.kind.isImage, imageData(of: item) != nil {
+            CardThumbnail(item: item)
         } else if item.kind == .link, let preview = item.linkPreview, preview.title != nil || preview.image != nil {
             VStack(alignment: .leading, spacing: 0) {
                 if let data = preview.image, let image = NSImage(data: data) {
@@ -129,13 +127,35 @@ struct CardView: View {
     }
 }
 
-func imagePreview(_ item: ClipboardItem) -> NSImage? {
+/// The first image representation in the payload.
+func imageData(of item: ClipboardItem) -> Data? {
     for representations in item.payload.items {
         for type in ["public.png", "public.tiff"] {
-            if let data = representations[type], let image = NSImage(data: data) { return image }
+            if let data = representations[type] { return data }
         }
     }
     return nil
+}
+
+/// Full-resolution image for previews, sharing and drags; cards use `CardThumbnail` instead.
+func imagePreview(_ item: ClipboardItem) -> NSImage? { imageData(of: item).flatMap(NSImage.init(data:)) }
+
+/// A card's image, drawn from a downsampled thumbnail that is decoded off the main thread.
+private struct CardThumbnail: View {
+    let item: ClipboardItem
+    @State private var loaded: NSImage?
+    var body: some View {
+        GeometryReader { geometry in
+            if let image = loaded ?? ThumbnailCache.shared.cached(item) {
+                Image(nsImage: image).resizable().interpolation(.high).scaledToFit()
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+            }
+        }
+        .task(id: item.fingerprint) {
+            guard ThumbnailCache.shared.cached(item) == nil else { return }
+            loaded = await ThumbnailCache.shared.thumbnail(for: item)
+        }
+    }
 }
 
 struct ItemPreview: View {

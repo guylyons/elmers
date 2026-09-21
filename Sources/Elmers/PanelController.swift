@@ -77,6 +77,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main
         if let screen { panel.setFrame(NSRect(x: screen.frame.minX + 6, y: screen.frame.minY + 6, width: screen.frame.width - 12, height: 326), display: true) }
         if resetState { model.resetForActivation() } else { model.reconcileSelection() }
+        ThumbnailCache.shared.prewarm(model.visibleItems.prefix(40))
         panel.makeKeyAndOrderFront(nil)
         focusResults()
     }
