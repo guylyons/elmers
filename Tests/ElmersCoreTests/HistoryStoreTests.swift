@@ -545,4 +545,34 @@ final class HistoryStoreTests {
         XCTAssertTrue(reloaded.items.contains { $0.id == keeper.id })
         XCTAssertTrue(reloaded.items.contains { $0.id == secondOnly.id })
     }
+
+    func testFailedSaveKeepsItsChangesForTheNextSave() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        var history = History()
+        let first = history.capture(.text("first"), source: "Notes")
+        let store = HistoryStore(directory: directory)
+        _ = try store.load()
+        try store.save(history)
+
+        history.createBoard(name: "Ledger")
+        history.renameItem(first.id, title: "kept change")
+        let blocked = history.capture(.text("blocked"), source: "Safari")
+        history.renameItem(blocked.id, title: "boom")
+        try installAbortTrigger(at: store.databaseURL)
+        XCTAssertThrowsError(try store.save(history))
+
+        let afterFailure = try HistoryStore(directory: directory, readOnly: true).load()
+        XCTAssertTrue(afterFailure.boards.isEmpty)
+        XCTAssertEqual(afterFailure.items.map(\.id), [first.id])
+        XCTAssertNil(afterFailure.items.first?.title)
+
+        try removeAbortTrigger(at: store.databaseURL)
+        try store.save(history)
+        let reloaded = try HistoryStore(directory: directory, readOnly: true).load()
+        XCTAssertEqual(reloaded.boards.map(\.name), ["Ledger"])
+        XCTAssertEqual(reloaded.items.first { $0.id == first.id }?.title, "kept change")
+        XCTAssertEqual(reloaded.items.first { $0.id == blocked.id }?.text, "blocked")
+        XCTAssertEqual(reloaded.items.first { $0.id == blocked.id }?.title, "boom")
+    }
 }

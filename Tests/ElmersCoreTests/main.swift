@@ -54,6 +54,7 @@ let checks: [(String, () throws -> Void)] = [
     ("recovery merges items sharing a timestamp", store.testRecoveryMergesItemsThatShareATimestamp),
     ("repeated failing recovery reuses one backup", store.testRepeatedFailingRecoveryReusesOneBackupDirectory),
     ("rename keeps payload after another writer deletes the row", store.testRenameKeepsPayloadAfterAnotherWriterDeletesTheRow),
+    ("failed save keeps its changes for the next save", store.testFailedSaveKeepsItsChangesForTheNextSave),
     ("screenshot classification and legacy decode", screenshots.testScreenshotClassificationAndLegacyDecode),
     ("Images includes screenshots", screenshots.testImageFilterIncludesScreenshots),
     ("screenshot duplicate arrival orders and persistence", screenshots.testScreenshotDuplicatesInEitherOrderPreservePins),
