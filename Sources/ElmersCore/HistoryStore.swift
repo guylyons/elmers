@@ -36,6 +36,9 @@ public final class HistoryStore: @unchecked Sendable {
     private var database: SQLiteDatabase?
     private var savedItems: [UUID: StoredItem] = [:]
     private var savedBoards: [Pinboard] = []
+    /// `PRAGMA data_version` as of the last commit on this connection. It changes only when another
+    /// connection commits, which is the signal that the baseline above no longer describes the database.
+    private var dataVersion: Int?
 
     public init(directory: URL, readOnly: Bool = false) { self.directory = directory; self.readOnly = readOnly }
 
@@ -62,8 +65,9 @@ public final class HistoryStore: @unchecked Sendable {
         let database = try Self.open(databaseURL, readOnly: readOnly)
         let history = try Self.read(database)
         self.database = database
-        savedItems = Dictionary(history.items.map { ($0.id, StoredItem($0)) }, uniquingKeysWith: { first, _ in first })
+        savedItems = Self.baseline(history.items)
         savedBoards = history.boards
+        dataVersion = try? database.integer("PRAGMA data_version")
         if !readOnly { try retireLegacyArchive() }
         return history
     }
@@ -73,11 +77,27 @@ public final class HistoryStore: @unchecked Sendable {
         guard let database else { throw StoreError.notLoaded }
         var statistics = SaveStatistics()
         try database.transaction {
-            try Self.write(history, to: database, baseline: savedItems, baselineBoards: savedBoards, statistics: &statistics)
+            var baseline = savedItems
+            // Rows this process last wrote are the only ones it may delete, even after a rebuild below.
+            var deleting = Set(savedItems.keys)
+            // Another writer may have changed or removed rows since the last commit here. Diffing against
+            // the stale baseline would then update an item's metadata without rewriting the representations
+            // that went with it, so rebuild the baseline from the database inside the transaction instead.
+            if try database.integer("PRAGMA data_version") != dataVersion {
+                baseline = Self.baseline(try Self.read(database).items)
+                deleting.formIntersection(baseline.keys)
+            }
+            try Self.write(history, to: database, baseline: baseline, deleting: deleting,
+                           baselineBoards: savedBoards, statistics: &statistics)
         }
-        savedItems = Dictionary(history.items.map { ($0.id, StoredItem($0)) }, uniquingKeysWith: { first, _ in first })
+        savedItems = Self.baseline(history.items)
         savedBoards = history.boards
+        dataVersion = try? database.integer("PRAGMA data_version")
         lastSave = statistics
+    }
+
+    private static func baseline(_ items: [ClipboardItem]) -> [UUID: StoredItem] {
+        Dictionary(items.map { ($0.id, StoredItem($0)) }, uniquingKeysWith: { first, _ in first })
     }
 
     private static func open(_ url: URL, readOnly: Bool, create: Bool = false, journal: String = "WAL") throws -> SQLiteDatabase {
@@ -169,8 +189,10 @@ public final class HistoryStore: @unchecked Sendable {
         return History(items: items, boards: boards)
     }
 
+    /// `baseline` says what each row currently holds, `deleting` which rows this writer owns and may
+    /// remove when they are no longer in `history`. Rows another writer added are in neither set.
     private static func write(_ history: History, to database: SQLiteDatabase, baseline: [UUID: StoredItem],
-                              baselineBoards: [Pinboard], statistics: inout SaveStatistics) throws {
+                              deleting: Set<UUID>, baselineBoards: [Pinboard], statistics: inout SaveStatistics) throws {
         if history.boards != baselineBoards {
             try database.execute("DELETE FROM boards")
             let insert = try database.prepare("INSERT INTO boards (id, name, color_index, position) VALUES (?, ?, ?, ?)")
@@ -181,7 +203,7 @@ public final class HistoryStore: @unchecked Sendable {
         }
         let present = Set(history.items.map(\.id))
         let delete = try database.prepare("DELETE FROM items WHERE id = ?")
-        for id in baseline.keys where !present.contains(id) {
+        for id in deleting where !present.contains(id) {
             try delete.run([.text(id.uuidString)]); statistics.itemsDeleted += 1
         }
         let upsert = try database.prepare("""
@@ -235,7 +257,7 @@ public final class HistoryStore: @unchecked Sendable {
         try files.setAttributes([.posixPermissions: 0o600], ofItemAtPath: destination.path)
         var statistics = SaveStatistics()
         try database.transaction {
-            try Self.write(history, to: database, baseline: [:], baselineBoards: [], statistics: &statistics)
+            try Self.write(history, to: database, baseline: [:], deleting: [], baselineBoards: [], statistics: &statistics)
         }
     }
 
@@ -275,9 +297,9 @@ public final class HistoryStore: @unchecked Sendable {
         try database.transaction {
             let databaseHistory = try Self.read(database)
             let candidate = Self.merge(databaseHistory: databaseHistory, legacyHistory: legacyHistory)
-            let baseline = Dictionary(databaseHistory.items.map { ($0.id, StoredItem($0)) }, uniquingKeysWith: { first, _ in first })
+            let baseline = Self.baseline(databaseHistory.items)
             var statistics = SaveStatistics()
-            try Self.write(candidate, to: database, baseline: baseline,
+            try Self.write(candidate, to: database, baseline: baseline, deleting: Set(baseline.keys),
                            baselineBoards: databaseHistory.boards, statistics: &statistics)
             try Self.verify(try Self.read(database), matches: candidate)
         }

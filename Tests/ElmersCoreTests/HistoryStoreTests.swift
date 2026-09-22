@@ -517,4 +517,32 @@ final class HistoryStoreTests {
         try XCTAssertEqual(try recoveryDirectories(in: directory).count, 1)
     }
 
+
+    func testRenameKeepsPayloadAfterAnotherWriterDeletesTheRow() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        var history = History()
+        let item = history.capture(.text("payload must survive"), source: "Notes")
+        let keeper = history.capture(.text("untouched neighbour"), source: "Safari")
+        let writer = HistoryStore(directory: directory)
+        _ = try writer.load()
+        try writer.save(history)
+
+        let second = HistoryStore(directory: directory)
+        var secondHistory = try second.load()
+        secondHistory.delete(item.id)
+        let secondOnly = secondHistory.capture(.text("written by the other writer"), source: "Terminal")
+        try second.save(secondHistory)
+
+        history.renameItem(item.id, title: "Renamed after deletion")
+        try writer.save(history)
+
+        let reloaded = try HistoryStore(directory: directory, readOnly: true).load()
+        let restored = reloaded.items.first { $0.id == item.id }
+        XCTAssertEqual(restored?.title, "Renamed after deletion")
+        XCTAssertEqual(restored?.text, "payload must survive")
+        XCTAssertEqual(restored?.kind, .text)
+        XCTAssertTrue(reloaded.items.contains { $0.id == keeper.id })
+        XCTAssertTrue(reloaded.items.contains { $0.id == secondOnly.id })
+    }
 }
