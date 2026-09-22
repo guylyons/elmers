@@ -147,4 +147,47 @@ final class HistoryStoreTests {
         XCTAssertEqual(restored.boards, history.boards)
         XCTAssertEqual(restored.items.first { $0.id == receipt.id }?.boardIDs, [images.id, work.id])
     }
+
+    func testLegacyArchiveIsConvertedOnceAndKept() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let history = Self.richHistory()
+        let store = HistoryStore(directory: directory)
+        try Archive(url: store.legacyArchiveURL).save(history)
+        let original = try Data(contentsOf: store.legacyArchiveURL)
+        let converted = try store.load()
+        XCTAssertEqual(converted.items, history.items)
+        XCTAssertEqual(converted.boards, history.boards)
+        XCTAssertTrue(!FileManager.default.fileExists(atPath: store.legacyArchiveURL.path))
+        try XCTAssertEqual(try Data(contentsOf: store.migratedArchiveURL), original)
+        XCTAssertTrue(!FileManager.default.fileExists(atPath: directory.appendingPathComponent("history.sqlite.migrating").path))
+        try XCTAssertEqual(try permissions(store.databaseURL), 0o600)
+        let reopened = try HistoryStore(directory: directory).load()
+        XCTAssertEqual(reopened.items, history.items)
+        try XCTAssertEqual(try Data(contentsOf: store.migratedArchiveURL), original)
+    }
+
+    func testUnreadableLegacyArchiveIsNotConverted() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = HistoryStore(directory: directory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let corrupt = Data("not an archive".utf8)
+        try corrupt.write(to: store.legacyArchiveURL)
+        XCTAssertThrowsError(try store.load())
+        try XCTAssertEqual(try Data(contentsOf: store.legacyArchiveURL), corrupt)
+        XCTAssertTrue(!FileManager.default.fileExists(atPath: store.databaseURL.path))
+        XCTAssertTrue(!FileManager.default.fileExists(atPath: store.migratedArchiveURL.path))
+    }
+
+    func testInterruptedConversionStartsOver() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let history = Self.richHistory()
+        let store = HistoryStore(directory: directory)
+        try Archive(url: store.legacyArchiveURL).save(history)
+        try Data("half-written".utf8).write(to: directory.appendingPathComponent("history.sqlite.migrating"))
+        let converted = try store.load()
+        XCTAssertEqual(converted.items, history.items)
+    }
 }

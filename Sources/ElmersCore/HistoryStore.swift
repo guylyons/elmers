@@ -1,6 +1,9 @@
 import Foundation
 
-/// Keeps History in SQLite so each save writes only changed rows.
+/// Keeps History in an SQLite database so a save writes only the rows that changed, instead of rewriting
+/// the whole history. On first use it converts the version 1 `history.plist` archive and keeps the original
+/// as `history.plist.migrated`. Not thread-safe: load on one thread, then send every save through one
+/// serial queue.
 public final class HistoryStore: @unchecked Sendable {
     public struct SaveStatistics: Equatable, Sendable {
         public var itemsWritten = 0, payloadsWritten = 0, itemsDeleted = 0
@@ -36,12 +39,19 @@ public final class HistoryStore: @unchecked Sendable {
 
     public init(directory: URL, readOnly: Bool = false) { self.directory = directory; self.readOnly = readOnly }
 
+    /// Opens the database, creating it or converting the legacy archive when there is none yet.
+    /// Never modifies a database it cannot read or a legacy archive it cannot convert.
     public func load() throws -> History {
         let files = FileManager.default
         if !files.fileExists(atPath: databaseURL.path) {
             guard !readOnly else { throw StoreError.notLoaded }
             try files.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-            try build(History())
+            let legacy = files.fileExists(atPath: legacyArchiveURL.path) ? try Archive(url: legacyArchiveURL).load() : nil
+            try build(legacy ?? History())
+            if let legacy {
+                let converted = try Self.read(Self.open(stagingURL, readOnly: true))
+                try Self.verify(converted, matches: legacy)
+            }
             try files.moveItem(at: stagingURL, to: databaseURL)
         }
         let database = try Self.open(databaseURL, readOnly: readOnly)
@@ -49,6 +59,7 @@ public final class HistoryStore: @unchecked Sendable {
         self.database = database
         savedItems = Dictionary(history.items.map { ($0.id, StoredItem($0)) }, uniquingKeysWith: { first, _ in first })
         savedBoards = history.boards
+        if !readOnly { retireLegacyArchive() }
         return history
     }
 
@@ -215,6 +226,19 @@ public final class HistoryStore: @unchecked Sendable {
         try database.transaction {
             try Self.write(history, to: database, baseline: [:], baselineBoards: [], statistics: &statistics)
         }
+    }
+
+    private static func verify(_ converted: History, matches legacy: History) throws {
+        guard converted.boards == legacy.boards else { throw StoreError.migrationMismatch("pinboards differ") }
+        let byID = Dictionary(converted.items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        guard converted.items.count == legacy.items.count else { throw StoreError.migrationMismatch("item counts differ") }
+        guard legacy.items.allSatisfy({ byID[$0.id] == $0 }) else { throw StoreError.migrationMismatch("items differ") }
+    }
+
+    private func retireLegacyArchive() {
+        let files = FileManager.default
+        guard files.fileExists(atPath: legacyArchiveURL.path), !files.fileExists(atPath: migratedArchiveURL.path) else { return }
+        try? files.moveItem(at: legacyArchiveURL, to: migratedArchiveURL)
     }
 }
 
