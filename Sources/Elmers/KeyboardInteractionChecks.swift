@@ -224,7 +224,30 @@ final class KeyboardInteractionChecks {
         _ = provider.loadDataRepresentation(forTypeIdentifier: "public.rtf") { data, _ in loaded = data; done.signal() }
         guard done.wait(timeout: .now() + 2) == .success, loaded == Data("{\\rtf1 dragged}".utf8) else { print("FAIL: drag data did not load"); fflush(stdout); exit(1) }
         print("PASS: drag provider offers every representation")
-        checkRecognition(model: model, controller: controller)
+        model.newText("Pointer drag fixture")
+        controller.show()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            let board = NSPasteboard(name: .drag)
+            board.clearContents()
+            let start = NSPoint(x: 145, y: 130), end = NSPoint(x: 220, y: 130)
+            func mouse(_ type: NSEvent.EventType, at point: NSPoint, pressure: Float) -> NSEvent {
+                NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                   windowNumber: controller.panel.windowNumber, context: nil, eventNumber: 73,
+                                   clickCount: 1, pressure: pressure)!
+            }
+            NSApp.postEvent(mouse(.leftMouseDown, at: start, pressure: 1), atStart: false)
+            NSApp.postEvent(mouse(.leftMouseDragged, at: end, pressure: 1), atStart: false)
+            NSApp.postEvent(mouse(.leftMouseUp, at: end, pressure: 0), atStart: false)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                let types = Set((board.types ?? []).map(\.rawValue))
+                guard types.contains(NSPasteboard.PasteboardType.string.rawValue) else {
+                    print("FAIL: pointer drag did not start a card drag session; drag types: \(types.sorted())")
+                    fflush(stdout); exit(1)
+                }
+                print("PASS: pointer drag starts a card drag session")
+                checkRecognition(model: model, controller: controller)
+            }
+        }
     }
     /// The Copied HUD appears for about a second after a clipboard-mode paste or ⌘C, then fades out on its own.
     static func checkCopiedHUD(model: AppModel, controller: PanelController) {
