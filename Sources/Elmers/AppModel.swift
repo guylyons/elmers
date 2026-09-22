@@ -397,6 +397,7 @@ final class AppModel: ObservableObject {
         rememberUndo { $0.restore(items) }
         for item in items { history.delete(item.id) }
         persist()
+        SoundEffects.effect(forDeletedItemCount: items.count).map(SoundEffects.shared.play)
     }
     private func restore(_ items: [ClipboardItem]) {
         rememberUndo { $0.deleteItems(items) }; history.restoreItems(items); persist()

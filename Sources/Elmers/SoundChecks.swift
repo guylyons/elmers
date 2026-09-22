@@ -10,11 +10,13 @@ enum SoundChecks {
         var failures: [String] = []
         func expect(_ condition: Bool, _ message: String) { if !condition { failures.append(message) } }
 
-        expect(SoundEffects.effect(forCaptured: .image) == .image, "image capture should click-click")
         expect(SoundEffects.effect(forCaptured: .screenshot) == nil, "saved screenshots should stay silent")
-        for kind in [ContentKind.text, .link, .file, .other] {
-            expect(SoundEffects.effect(forCaptured: kind) == .copy, "\(kind.rawValue) capture should play the copy tone")
+        for kind in [ContentKind.text, .link, .image, .file, .other] {
+            expect(SoundEffects.effect(forCaptured: kind) == .copy, "\(kind.rawValue) capture should play the default copy click")
         }
+        expect(SoundEffects.effect(forDeletedItemCount: 0) == nil, "a no-op deletion should stay silent")
+        expect(SoundEffects.effect(forDeletedItemCount: 1) == .delete, "a successful deletion should play the chk")
+        expect(SoundEffects.effect(forDeletedItemCount: 3) == .delete, "a multi-item deletion should play one chk")
 
         let rate = 44_100.0
         var rendered: [SoundEffects.Effect: [Float]] = [:]
@@ -26,15 +28,23 @@ enum SoundChecks {
             expect(peak > 0.1 && peak < 0.95, "\(effect) peak \(peak) should be audible without clipping")
             expect(abs(samples.last ?? 1) < 0.001, "\(effect) should end at silence")
         }
-        let clickOnsets = onsets(rendered[.image] ?? [], rate: rate)
-        expect(clickOnsets.count == 2, "image effect should have two clicks, found \(clickOnsets.count)")
+        let copySamples = rendered[.copy] ?? []
+        let clickOnsets = onsets(copySamples, rate: rate)
+        expect(copySamples.count < Int(0.16 * rate), "copy effect should be the short click-click")
+        expect(clickOnsets.count == 2, "copy effect should have two clicks, found \(clickOnsets.count)")
         if clickOnsets.count == 2 {
             let gap = clickOnsets[1] - clickOnsets[0]
             expect(gap > 0.05 && gap < 0.1, "clicks should be 50–100 ms apart, were \(Int(gap * 1000)) ms")
         }
-        expect(onsets(rendered[.copy] ?? [], rate: rate).count == 2, "copy tone should have two notes")
         expect(onsets(rendered[.paste] ?? [], rate: rate).count == 1, "paste tick should be a single burst")
-        expect(rendered[.copy] != rendered[.image] && rendered[.copy] != rendered[.paste], "copy tone should be distinct")
+        let deleteSamples = rendered[.delete] ?? []
+        expect(deleteSamples.count < Int(0.08 * rate) && onsets(deleteSamples, rate: rate).count == 1,
+               "delete effect should be one short chk")
+        let confirmationSamples = rendered[.confirmation] ?? []
+        expect(confirmationSamples.count > Int(0.18 * rate) && onsets(confirmationSamples, rate: rate).count == 2,
+               "confirmation effect should preserve the old two-note chime")
+        expect(deleteSamples != rendered[.paste] && confirmationSamples != copySamples,
+               "delete, paste, confirmation, and copy feedback should remain distinct")
 
         if let directory = ProcessInfo.processInfo.environment["ELMERS_CAPTURE_DIR"] {
             for (effect, samples) in rendered {

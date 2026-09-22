@@ -2,20 +2,19 @@ import AVFoundation
 import ElmersCore
 
 /// Short, original UI sounds synthesized at launch so the app bundle needs no audio assets.
-/// `copy` is a short two-note confirmation chime played when something is copied (captured from the
-/// clipboard, or copied out of Elmers); `image` is a quick "click-click" played when an image is grabbed
-/// from the clipboard; `paste` is a brighter, shorter "tick" played when an item is pasted directly.
+/// `copy` is a quick "click-click" for every clipboard copy; `confirmation` keeps the older rising chime
+/// available for a future success event; `paste` is a bright tick; and `delete` is a short, dry "chk".
 @MainActor
 final class SoundEffects {
     static let shared = SoundEffects()
-    enum Effect: CaseIterable { case copy, image, paste }
+    enum Effect: CaseIterable { case copy, confirmation, paste, delete }
     /// The sound for a newly captured clipboard item. Screenshots saved to disk arrive silently, as before.
     static func effect(forCaptured kind: ContentKind) -> Effect? {
-        switch kind {
-        case .image: .image
-        case .screenshot: nil
-        default: .copy
-        }
+        kind == .screenshot ? nil : .copy
+    }
+    /// One deletion gesture gets one cue, regardless of how many selected items it removes.
+    static func effect(forDeletedItemCount count: Int) -> Effect? {
+        count > 0 ? .delete : nil
     }
     var enabled = true
     private let engine = AVAudioEngine()
@@ -55,14 +54,15 @@ final class SoundEffects {
     static func samples(for effect: Effect) -> [Float] {
         switch effect {
         case .copy: copySamples()
-        case .image: imageSamples()
+        case .confirmation: confirmationSamples()
         case .paste: pasteSamples()
+        case .delete: deleteSamples()
         }
     }
 
     /// A soft rising fifth (G5 → D6): two bell-like notes, the second entering 70 ms after the first,
     /// each with a quiet octave partial so it reads as a confirmation rather than a beep.
-    static func copySamples() -> [Float] {
+    static func confirmationSamples() -> [Float] {
         synthesize(duration: 0.24) { t in
             func note(_ pitch: Double, at start: Double, level: Double) -> Double {
                 let local = t - start
@@ -78,7 +78,7 @@ final class SoundEffects {
 
     /// "Click-click": two short, dry clicks 75 ms apart, the second a touch lower and softer,
     /// like a camera shutter or a mouse double-click.
-    static func imageSamples() -> [Float] {
+    static func copySamples() -> [Float] {
         synthesize(duration: 0.14, attack: 0.0005) { t in
             func click(at start: Double, pitch: Double, level: Double) -> Double {
                 let local = t - start
@@ -101,6 +101,17 @@ final class SoundEffects {
             let thump = sin(2 * .pi * 330 * t) * exp(-t / 0.03) * 0.45
             let transient = noise(t) * exp(-t / 0.0015) * 0.25
             return (tick + thump + transient) * 0.36
+        }
+    }
+
+    /// A compact, low-mid "chk": one woody impact with a very short noisy edge.
+    static func deleteSamples() -> [Float] {
+        synthesize(duration: 0.055, attack: 0.0004) { t in
+            let pitch = 920.0 - 260.0 * min(t / 0.018, 1)
+            let knock = sin(2 * .pi * pitch * t) * exp(-t / 0.011)
+            let body = sin(2 * .pi * 390 * t) * exp(-t / 0.018) * 0.42
+            let edge = noise(t + 0.173) * exp(-t / 0.0022) * 0.32
+            return (knock + body + edge) * 0.34
         }
     }
 
