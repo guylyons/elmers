@@ -87,13 +87,70 @@ public final class HistoryStore: @unchecked Sendable {
                 baseline = Self.baseline(try Self.read(database).items)
                 deleting.formIntersection(baseline.keys)
             }
-            try Self.write(history, to: database, baseline: baseline, deleting: deleting,
-                           baselineBoards: savedBoards, statistics: &statistics)
+            // Pinboards are rewritten as a set, so merge this process's pinboard edits into whatever the
+            // database holds now; otherwise saving them would undo another writer's pinboard changes.
+            var target = history
+            var storedBoards = history.boards
+            if history.boards != savedBoards {
+                storedBoards = try Self.readBoards(database)
+                target = History(items: history.items,
+                                 boards: Self.mergeBoards(local: history.boards, base: savedBoards, stored: storedBoards))
+            }
+            try Self.write(target, to: database, baseline: baseline, deleting: deleting,
+                           baselineBoards: storedBoards, statistics: &statistics)
         }
         savedItems = Self.baseline(history.items)
         savedBoards = history.boards
         dataVersion = try? database.integer("PRAGMA data_version")
         lastSave = statistics
+    }
+
+    private static func readBoards(_ database: SQLiteDatabase) throws -> [Pinboard] {
+        var boards: [Pinboard] = []
+        let boardRows = try database.prepare("SELECT id, name, color_index FROM boards ORDER BY position")
+        while try boardRows.step() {
+            guard let id = boardRows.text(0).flatMap(UUID.init(uuidString:)), let name = boardRows.text(1) else { throw StoreError.damaged("pinboard row") }
+            boards.append(Pinboard(id: id, name: name, colorIndex: boardRows.int(2)))
+        }
+        return boards
+    }
+
+    /// Three-way merge of pinboards: `local` is this process's list, `base` what it last saved, and
+    /// `stored` what the database holds now. Boards this process added, changed or deleted follow
+    /// `local`; every other board follows `stored`, so another writer's additions, edits and deletions
+    /// survive. The order follows `local` when this process reordered its boards and `stored` otherwise,
+    /// with boards only one side knows kept at their position on that side. An edit here to a board another
+    /// writer deleted brings the board back, as an edited item does.
+    static func mergeBoards(local: [Pinboard], base: [Pinboard], stored: [Pinboard]) -> [Pinboard] {
+        let baseByID = Dictionary(base.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let storedByID = Dictionary(stored.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let localIDs = Set(local.map(\.id))
+        // Boards unchanged here take the stored version, or disappear if another writer deleted them.
+        let fromLocal: [Pinboard] = local.compactMap { board in
+            guard let original = baseByID[board.id], original == board else { return board }
+            return storedByID[board.id]
+        }
+        let keptBase = base.map(\.id).filter(localIDs.contains)
+        let reordered = local.map(\.id).filter { baseByID[$0] != nil } != keptBase
+        let addedElsewhere = stored.filter { baseByID[$0.id] == nil && !localIDs.contains($0.id) }
+        if reordered {
+            var merged = fromLocal
+            for board in addedElsewhere {
+                merged.insert(board, at: min(stored.firstIndex(of: board) ?? merged.count, merged.count))
+            }
+            return merged
+        }
+        let fromLocalByID = Dictionary(fromLocal.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var merged: [Pinboard] = stored.compactMap { board in
+            if baseByID[board.id] == nil { return localIDs.contains(board.id) ? nil : board }
+            return fromLocalByID[board.id]
+        }
+        // Boards added here, and boards edited here that another writer deleted, go back at their local position.
+        for (index, board) in local.enumerated() where storedByID[board.id] == nil {
+            guard let kept = fromLocalByID[board.id] else { continue }
+            merged.insert(kept, at: min(index, merged.count))
+        }
+        return merged
     }
 
     private static func baseline(_ items: [ClipboardItem]) -> [UUID: StoredItem] {
@@ -159,12 +216,7 @@ public final class HistoryStore: @unchecked Sendable {
             guard let item = pinRows.text(0), let board = pinRows.text(1).flatMap(UUID.init(uuidString:)) else { throw StoreError.damaged("pin row") }
             pins[item, default: []].insert(board)
         }
-        var boards: [Pinboard] = []
-        let boardRows = try database.prepare("SELECT id, name, color_index FROM boards ORDER BY position")
-        while try boardRows.step() {
-            guard let id = boardRows.text(0).flatMap(UUID.init(uuidString:)), let name = boardRows.text(1) else { throw StoreError.damaged("pinboard row") }
-            boards.append(Pinboard(id: id, name: name, colorIndex: boardRows.int(2)))
-        }
+        let boards = try readBoards(database)
         var items: [ClipboardItem] = []
         let rows = try database.prepare("""
             SELECT id, copied_at, source, source_bundle_id, title, fingerprint, payload_item_count, recognized_text, image_digest,

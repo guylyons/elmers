@@ -145,3 +145,9 @@ Verification at the stop: `scripts/test.sh` 45/45; rebuilt `dist/Elmers.app` pas
 
 Next: merge `feat/sqlite-storage` into `main` (user's call), then a physical drag repro with a card on screen, direct paste with Accessibility, and the storage stage 2 design (lazy payloads, FTS5, higher limits). Paste Stack stays deferred; subscription/licensing stays excluded.
 
+
+## September 22, later — pinboard merge across writers
+
+Closed the re-review's open item. The suggested fix (rebuild the pinboard baseline from the database) was not used, because a process that had not touched its pinboards would then see them differ from the database and overwrite the other writer. Instead `HistoryStore.save` reads the stored pinboards only when this process changed its own, and `HistoryStore.mergeBoards` does a three-way merge (local, last saved, stored): boards added, edited or deleted here follow this process; all others follow the database, so another writer's additions, edits and deletions survive; an edit here brings back a board deleted elsewhere, as for items; order follows this process only when it reordered. New check "board save keeps another writer's pinboard edits". `scripts/test.sh` 46/46; `--check-interaction` passes.
+
+Next is unchanged: merging `feat/sqlite-storage` into `main` is the user's call, then physical drag repro, direct paste with Accessibility, and the storage stage 2 design.

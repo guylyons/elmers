@@ -575,4 +575,47 @@ final class HistoryStoreTests {
         XCTAssertEqual(reloaded.items.first { $0.id == blocked.id }?.text, "blocked")
         XCTAssertEqual(reloaded.items.first { $0.id == blocked.id }?.title, "boom")
     }
+
+    func testBoardSaveKeepsAnotherWritersPinboardEdits() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        var history = History()
+        let work = history.createBoard(name: "Work")
+        let home = history.createBoard(name: "Home")
+        let old = history.createBoard(name: "Old")
+        let gone = history.createBoard(name: "Gone")
+        let writer = HistoryStore(directory: directory)
+        _ = try writer.load()
+        try writer.save(history)
+
+        let second = HistoryStore(directory: directory)
+        var secondHistory = try second.load()
+        let travel = secondHistory.createBoard(name: "Travel")
+        secondHistory.recolorBoard(home.id, color: 4)
+        secondHistory.deleteBoard(old.id)
+        secondHistory.deleteBoard(gone.id)
+        try second.save(secondHistory)
+
+        history.renameBoard(work.id, to: "Jobs")
+        history.renameBoard(gone.id, to: "Kept")
+        let ideas = history.createBoard(name: "Ideas")
+        try writer.save(history)
+
+        let reloaded = try HistoryStore(directory: directory, readOnly: true).load()
+        XCTAssertEqual(reloaded.boards.map(\.id), [work.id, home.id, travel.id, gone.id, ideas.id])
+        XCTAssertEqual(reloaded.boards.first { $0.id == work.id }?.name, "Jobs")
+        XCTAssertEqual(reloaded.boards.first { $0.id == home.id }?.colorIndex, 4)
+
+        // A reorder here is kept, and another writer's board stays where it was.
+        history.moveBoard(ideas.id, before: work.id)
+        try writer.save(history)
+        let moved = try HistoryStore(directory: directory, readOnly: true).load()
+        XCTAssertEqual(moved.boards.map(\.name), ["Ideas", "Jobs", "Travel", "Home", "Kept"])
+
+        // A later edit here merges against what this process last saved, so it keeps Travel too.
+        history.renameBoard(ideas.id, to: "Notes")
+        try writer.save(history)
+        let again = try HistoryStore(directory: directory, readOnly: true).load()
+        XCTAssertEqual(again.boards.map(\.name), ["Notes", "Jobs", "Travel", "Home", "Kept"])
+    }
 }
