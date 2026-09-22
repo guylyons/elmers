@@ -120,3 +120,13 @@ Next: reproduce physical card drag and pinboard reorder with computer-use tools 
 ## September 21 — screenshot capture
 
 Branch `feat/screenshot-capture`. New screenshots saved by macOS go into history as a Screenshot type. They are observed in the configured screenshot folder, deduplicated against clipboard copies, and have Show in Finder and Copy File actions. Details and evidence are in the September 21 section of `docs/paste-parity.md`. Checks: `scripts/test.sh` (25/0) and `dist/Elmers.app/Contents/MacOS/Elmers --demo --check-screenshots`. Next: take a real screenshot with the built app running, test a protected custom folder, and compare with Paste. Then return to the physical drag reproduction.
+
+## September 21 — SQLite storage checkpoint
+
+Branch `feat/sqlite-storage`. `HistoryStore` replaces whole-plist saves with incremental SQLite transactions and verified first-launch conversion. The real Application Support directory had already diverged: four SQLite items plus two items in a plist recreated by an older build. The approved recovery path now merges both stores conservatively after copying the plist and SQLite/WAL/SHM into a private recovery directory. Real recovery produced six items; live capture added a seventh, and the 7-item identity survived quit/relaunch unchanged. `history.plist.migrated`, `history.plist.pre-sqlite`, `history.plist.recovered`, the raw recovery directory and `history.plist.post-sqlite` are intentionally retained.
+
+Current verification: `scripts/test.sh` 36/36; bundled interaction, status-item, screenshot and sound checks pass; the 40-image scroll check measured p95 9.45 ms and max 15.79 ms. Full benchmark and identity evidence are in `docs/paste-parity.md`. The harmless real-UI pin/rename/delete sequence remains pending; real capture and restart persistence are verified.
+
+Rollback to a plist-writing build: quit Elmers, keep every SQLite and recovery file, copy (do not move) `history.plist.post-sqlite` to `history.plist`, then launch the older build. Returning to this branch will merge any later plist changes back into SQLite. To undo only the recovery merge, quit Elmers and restore the SQLite triplet plus plist from the named `history-recovery-*` directory; do this only after separately preserving the current seven-item database. Never delete the retained backups until the user explicitly requests it.
+
+Next storage stage: lazy representation loading, FTS5 and a higher history limit. That requires a separate design because it touches capture, duplicate merging, thumbnails, OCR, preview, drag and paste paths. Outside storage, physical drag/drop and direct-paste verification remain the highest-priority parity gaps.

@@ -1,6 +1,8 @@
 # SQLite history storage — design
 
 Status: approved in conversation on September 21, 2026 ("can we do sqlite?" → "ok make a plan for it").
+The recovery amendment was approved the same day after the real store revealed a plist written by an older
+build alongside the converted database.
 
 ## Problem
 
@@ -31,6 +33,12 @@ migration steps and make it harder to control the stored bytes exactly.
   every item and pinboard for exact equality, then moves the staging file into place. Only after that does it
   rename the plist to `history.plist.migrated`. The plist is never deleted. An unreadable plist, or a
   conversion that does not match, leaves every file as it was.
+- If an older build recreates `history.plist` after conversion, writable startup conservatively merges it
+  with SQLite. Plist metadata wins for the same UUID, pin memberships are unioned, and unique items and
+  pinboards from both sides remain. Before replacement, the plist and SQLite/WAL/SHM files are copied into
+  a private recovery directory. The merged staging database is reloaded and compared exactly before it is
+  installed, and the reappeared plist is retained as `history.plist.recovered` (with a numeric suffix when
+  needed). An unreadable side leaves the active stores untouched.
 - `History`, `ClipboardItem` and every `AppModel` call site keep their current shape. Only `persist()` and
   launch-time loading change.
 
@@ -49,7 +57,8 @@ which touches copy, drag, preview, thumbnails, OCR and duplicate merging. They g
 
 - An older Elmers build run after conversion finds no `history.plist` and starts with an empty history. The
   converted archive stays available as `history.plist.migrated`.
-- If `history.plist` reappears after conversion (for example, written by an older build), it is renamed to
-  `.migrated` only when no `.migrated` file exists yet. Its contents are not merged.
+- A conservative merge can resurrect an entry deleted in one store but retained in the other. This favors
+  recoverability over inferring intent from two stores that have no per-item modification timestamp. Raw
+  pre-merge files remain in the private recovery directory.
 - Items copied at exactly the same instant are ordered by insertion (newest insertion first), which matches
   `History.capture`.
