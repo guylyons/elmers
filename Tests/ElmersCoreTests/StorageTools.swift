@@ -2,6 +2,29 @@ import CryptoKit
 import Foundation
 import ElmersCore
 
+private enum StorageToolError: LocalizedError {
+    case backupExists, backupMismatch
+    var errorDescription: String? {
+        switch self {
+        case .backupExists: "history.plist.post-sqlite already exists; it was not overwritten."
+        case .backupMismatch: "The rollback plist did not verify; SQLite was left unchanged."
+        }
+    }
+}
+
+@discardableResult
+func backupStorageForRollback(directory suppliedDirectory: URL? = nil) throws -> URL {
+    let directory = suppliedDirectory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("Elmers")
+    let destination = directory.appendingPathComponent("history.plist.post-sqlite")
+    guard !FileManager.default.fileExists(atPath: destination.path) else { throw StorageToolError.backupExists }
+    let history = try HistoryStore(directory: directory, readOnly: true).load()
+    try Archive(url: destination).save(history)
+    let restored = try Archive(url: destination).load()
+    guard restored.items == history.items, restored.boards == history.boards else { throw StorageToolError.backupMismatch }
+    return destination
+}
+
 func reportStorage() {
     let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Elmers")
     let store = HistoryStore(directory: directory, readOnly: true)

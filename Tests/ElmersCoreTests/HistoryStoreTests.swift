@@ -284,4 +284,22 @@ final class HistoryStoreTests {
             .filter { $0.lastPathComponent.hasPrefix("history-recovery-") }
         XCTAssertTrue(recoveryDirectories.isEmpty)
     }
+
+    func testRollbackBackupExportsMergedHistoryAndNeverOverwrites() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let expected = Self.richHistory()
+        let store = HistoryStore(directory: directory)
+        _ = try store.load()
+        try store.save(expected)
+
+        let backup = try backupStorageForRollback(directory: directory)
+        let original = try Data(contentsOf: backup)
+        let restored = try Archive(url: backup).load()
+        XCTAssertEqual(restored.items, expected.items)
+        XCTAssertEqual(restored.boards, expected.boards)
+        XCTAssertThrowsError(try backupStorageForRollback(directory: directory))
+        try XCTAssertEqual(try Data(contentsOf: backup), original)
+        try XCTAssertEqual(try permissions(backup), 0o600)
+    }
 }
