@@ -39,10 +39,15 @@ public final class HistoryStore: @unchecked Sendable {
 
     public init(directory: URL, readOnly: Bool = false) { self.directory = directory; self.readOnly = readOnly }
 
-    /// Opens the database, creating it or converting the legacy archive when there is none yet.
-    /// Never modifies a database it cannot read or a legacy archive it cannot convert.
+    /// Opens the database, creating it or converting the legacy archive when there is none yet. If an
+    /// older build recreates the plist after conversion, its history is conservatively merged back into
+    /// SQLite after both stores are backed up. Never modifies a database it cannot read or a legacy archive
+    /// it cannot convert.
     public func load() throws -> History {
         let files = FileManager.default
+        if !readOnly, files.fileExists(atPath: databaseURL.path), files.fileExists(atPath: legacyArchiveURL.path) {
+            try recoverReappearedArchive()
+        }
         if !files.fileExists(atPath: databaseURL.path) {
             guard !readOnly else { throw StoreError.notLoaded }
             try files.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
@@ -230,9 +235,85 @@ public final class HistoryStore: @unchecked Sendable {
 
     private static func verify(_ converted: History, matches legacy: History) throws {
         guard converted.boards == legacy.boards else { throw StoreError.migrationMismatch("pinboards differ") }
-        let byID = Dictionary(converted.items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         guard converted.items.count == legacy.items.count else { throw StoreError.migrationMismatch("item counts differ") }
-        guard legacy.items.allSatisfy({ byID[$0.id] == $0 }) else { throw StoreError.migrationMismatch("items differ") }
+        guard converted.items == legacy.items else { throw StoreError.migrationMismatch("items differ") }
+    }
+
+    private func recoverReappearedArchive() throws {
+        let files = FileManager.default
+        let databaseHistory = try Self.loadHistory(from: databaseURL)
+        let legacyHistory = try Archive(url: legacyArchiveURL).load()
+        let merged = Self.merge(databaseHistory: databaseHistory, legacyHistory: legacyHistory)
+        _ = try backupRecoveryFiles()
+        try build(merged)
+        try Self.verify(try Self.loadHistory(from: stagingURL), matches: merged)
+
+        // A successful checkpoint makes the main database complete without its WAL. The byte-for-byte
+        // pre-checkpoint database, WAL and shared-memory files are already in the recovery directory.
+        try Self.checkpoint(databaseURL)
+        for suffix in ["-wal", "-shm"] {
+            let url = URL(fileURLWithPath: databaseURL.path + suffix)
+            if files.fileExists(atPath: url.path) { try files.removeItem(at: url) }
+        }
+        _ = try files.replaceItemAt(databaseURL, withItemAt: stagingURL)
+        try files.setAttributes([.posixPermissions: 0o600], ofItemAtPath: databaseURL.path)
+        try Self.verify(try Self.loadHistory(from: databaseURL), matches: merged)
+        try files.moveItem(at: legacyArchiveURL, to: nextRecoveredArchiveURL())
+    }
+
+    private static func loadHistory(from url: URL) throws -> History {
+        try read(open(url, readOnly: true))
+    }
+
+    private static func checkpoint(_ url: URL) throws {
+        let database = try open(url, readOnly: false)
+        try database.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    }
+
+    /// The reappeared plist is the later whole-history writer. It wins same-ID metadata, while pin
+    /// memberships are unioned and every database-only item and pinboard is retained.
+    private static func merge(databaseHistory: History, legacyHistory: History) -> History {
+        var boards = legacyHistory.boards
+        let legacyBoardIDs = Set(boards.map(\.id))
+        boards.append(contentsOf: databaseHistory.boards.filter { !legacyBoardIDs.contains($0.id) })
+
+        var items = Dictionary(databaseHistory.items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        for legacyItem in legacyHistory.items {
+            var recovered = legacyItem
+            if let databaseItem = items[legacyItem.id] { recovered.boardIDs.formUnion(databaseItem.boardIDs) }
+            items[legacyItem.id] = recovered
+        }
+        let preferredOrder = legacyHistory.items.map(\.id) + databaseHistory.items.map(\.id).filter { id in
+            !legacyHistory.items.contains(where: { $0.id == id })
+        }
+        let rank = Dictionary(uniqueKeysWithValues: preferredOrder.enumerated().map { ($0.element, $0.offset) })
+        let mergedItems = items.values.sorted {
+            if $0.copiedAt != $1.copiedAt { return $0.copiedAt > $1.copiedAt }
+            return rank[$0.id, default: .max] < rank[$1.id, default: .max]
+        }
+        return History(items: mergedItems, boards: boards)
+    }
+
+    private func backupRecoveryFiles() throws -> URL {
+        let files = FileManager.default
+        let recovery = directory.appendingPathComponent("history-recovery-" + UUID().uuidString)
+        try files.createDirectory(at: recovery, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        for url in [legacyArchiveURL, databaseURL, URL(fileURLWithPath: databaseURL.path + "-wal"),
+                    URL(fileURLWithPath: databaseURL.path + "-shm")] where files.fileExists(atPath: url.path) {
+            let copy = recovery.appendingPathComponent(url.lastPathComponent)
+            try files.copyItem(at: url, to: copy)
+            try files.setAttributes([.posixPermissions: 0o600], ofItemAtPath: copy.path)
+        }
+        return recovery
+    }
+
+    private func nextRecoveredArchiveURL() -> URL {
+        let files = FileManager.default
+        let base = directory.appendingPathComponent("history.plist.recovered")
+        guard files.fileExists(atPath: base.path) else { return base }
+        var number = 2
+        while files.fileExists(atPath: directory.appendingPathComponent("history.plist.recovered-\(number)").path) { number += 1 }
+        return directory.appendingPathComponent("history.plist.recovered-\(number)")
     }
 
     private func retireLegacyArchive() {

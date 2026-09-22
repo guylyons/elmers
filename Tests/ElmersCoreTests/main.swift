@@ -39,6 +39,8 @@ let checks: [(String, () throws -> Void)] = [
     ("plist archive converts once and is kept", store.testLegacyArchiveIsConvertedOnceAndKept),
     ("unreadable plist archive is not converted", store.testUnreadableLegacyArchiveIsNotConverted),
     ("interrupted conversion starts over", store.testInterruptedConversionStartsOver),
+    ("reappeared plist merges without data loss", store.testReappearedLegacyArchiveMergesWithoutLosingEitherHistory),
+    ("unreadable reappeared plist leaves storage untouched", store.testUnreadableReappearedArchiveLeavesDatabaseAndArchiveUntouched),
     ("screenshot classification and legacy decode", screenshots.testScreenshotClassificationAndLegacyDecode),
     ("Images includes screenshots", screenshots.testImageFilterIncludesScreenshots),
     ("screenshot duplicate arrival orders and persistence", screenshots.testScreenshotDuplicatesInEitherOrderPreservePins),

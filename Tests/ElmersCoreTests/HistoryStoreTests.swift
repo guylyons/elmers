@@ -9,6 +9,9 @@ final class HistoryStoreTests {
     private func permissions(_ url: URL) throws -> Int {
         try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int ?? -1
     }
+    private func contentsIfPresent(_ url: URL) throws -> Data? {
+        FileManager.default.fileExists(atPath: url.path) ? try Data(contentsOf: url) : nil
+    }
     static func richHistory() -> History {
         var history = History()
         let instant = Date(timeIntervalSinceReferenceDate: 800_000_000.125)
@@ -189,5 +192,96 @@ final class HistoryStoreTests {
         try Data("half-written".utf8).write(to: directory.appendingPathComponent("history.sqlite.migrating"))
         let converted = try store.load()
         XCTAssertEqual(converted.items, history.items)
+    }
+
+    func testReappearedLegacyArchiveMergesWithoutLosingEitherHistory() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let paths = HistoryStore(directory: directory)
+
+        var common = History()
+        let shared = common.capture(.text("original payload"), source: "Notes")
+        let sharedBoard = common.createBoard(name: "Shared")
+        common.pin(shared.id, to: sharedBoard.id)
+        try Archive(url: paths.legacyArchiveURL).save(common)
+        let firstArchive = try Data(contentsOf: paths.legacyArchiveURL)
+
+        var databaseHistory = common
+        let databaseOnly = databaseHistory.capture(.text("database only"), source: "Terminal")
+        let databaseBoard = databaseHistory.createBoard(name: "Database Board")
+        databaseHistory.pin(databaseOnly.id, to: databaseBoard.id)
+        do {
+            let writer = HistoryStore(directory: directory)
+            _ = try writer.load()
+            try XCTAssertEqual(try Data(contentsOf: writer.migratedArchiveURL), firstArchive)
+            try writer.save(databaseHistory)
+        }
+
+        var legacyHistory = common
+        legacyHistory.renameBoard(sharedBoard.id, to: "Recovered Shared")
+        legacyHistory.recolorBoard(sharedBoard.id, color: 6)
+        legacyHistory.editItem(shared.id, payload: .text("legacy payload"))
+        legacyHistory.renameItem(shared.id, title: "Recovered title")
+        legacyHistory.unpin(shared.id, from: sharedBoard.id)
+        let legacyBoard = legacyHistory.createBoard(name: "Legacy Board")
+        legacyHistory.pin(shared.id, to: legacyBoard.id)
+        let legacyOnly = legacyHistory.capture(.text("legacy only"), source: "Safari")
+        legacyHistory.pin(legacyOnly.id, to: legacyBoard.id)
+        try Archive(url: paths.legacyArchiveURL).save(legacyHistory)
+
+        let reappearedArchive = try Data(contentsOf: paths.legacyArchiveURL)
+        let originalDatabase = try Data(contentsOf: paths.databaseURL)
+        let merged = try HistoryStore(directory: directory).load()
+
+        XCTAssertEqual(Set(merged.items.map(\.id)), Set([shared.id, databaseOnly.id, legacyOnly.id]))
+        let recoveredShared = merged.items.first { $0.id == shared.id }
+        XCTAssertEqual(recoveredShared?.text, "legacy payload")
+        XCTAssertEqual(recoveredShared?.title, "Recovered title")
+        XCTAssertEqual(recoveredShared?.boardIDs, Set([sharedBoard.id, legacyBoard.id]))
+        XCTAssertEqual(merged.boards.map(\.id), [sharedBoard.id, legacyBoard.id, databaseBoard.id])
+        XCTAssertEqual(merged.boards.first?.name, "Recovered Shared")
+        XCTAssertEqual(merged.boards.first?.colorIndex, 6)
+        XCTAssertTrue(!FileManager.default.fileExists(atPath: paths.legacyArchiveURL.path))
+        try XCTAssertEqual(try Data(contentsOf: paths.migratedArchiveURL), firstArchive)
+        try XCTAssertEqual(try Data(contentsOf: directory.appendingPathComponent("history.plist.recovered")), reappearedArchive)
+
+        let recoveryDirectories = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix("history-recovery-") }
+        XCTAssertEqual(recoveryDirectories.count, 1)
+        try XCTAssertEqual(try permissions(recoveryDirectories[0]), 0o700)
+        try XCTAssertEqual(try Data(contentsOf: recoveryDirectories[0].appendingPathComponent("history.sqlite")), originalDatabase)
+        try XCTAssertEqual(try Data(contentsOf: recoveryDirectories[0].appendingPathComponent("history.plist")), reappearedArchive)
+
+        let reopened = try HistoryStore(directory: directory).load()
+        XCTAssertEqual(reopened.items, merged.items)
+        XCTAssertEqual(reopened.boards, merged.boards)
+        let finalRecoveryDirectories = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix("history-recovery-") }
+        XCTAssertEqual(finalRecoveryDirectories.count, 1)
+    }
+
+    func testUnreadableReappearedArchiveLeavesDatabaseAndArchiveUntouched() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let paths = HistoryStore(directory: directory)
+        var history = History()
+        history.capture(.text("database survives"), source: "Notes")
+        do {
+            let writer = HistoryStore(directory: directory)
+            _ = try writer.load()
+            try writer.save(history)
+        }
+        let corrupt = Data("not an archive".utf8)
+        try corrupt.write(to: paths.legacyArchiveURL)
+
+        let databaseBefore = try contentsIfPresent(paths.databaseURL)
+        let walBefore = try contentsIfPresent(URL(fileURLWithPath: paths.databaseURL.path + "-wal"))
+        XCTAssertThrowsError(try HistoryStore(directory: directory).load())
+        try XCTAssertEqual(try contentsIfPresent(paths.databaseURL), databaseBefore)
+        try XCTAssertEqual(try contentsIfPresent(URL(fileURLWithPath: paths.databaseURL.path + "-wal")), walBefore)
+        try XCTAssertEqual(try Data(contentsOf: paths.legacyArchiveURL), corrupt)
+        let recoveryDirectories = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix("history-recovery-") }
+        XCTAssertTrue(recoveryDirectories.isEmpty)
     }
 }
