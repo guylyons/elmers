@@ -72,6 +72,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             InteractionChecks.run(model: model, controller: panelController)
             return
         }
+        if ProcessInfo.processInfo.arguments.contains("--check-live-storage-persistence") {
+            precondition(!model.isDemo, "Live storage checks require the real store")
+            StoragePersistenceChecks.run(model: model)
+            return
+        }
         #endif
         model.start(); panelController.show()
     }
