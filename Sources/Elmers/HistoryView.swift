@@ -31,8 +31,8 @@ struct HistoryView: View {
                                     .id(item.id)
                                     .onHover { inside in if inside { hoveredID = item.id } else if hoveredID == item.id { hoveredID = nil } }
                                     .onTapGesture(count: 2) { model.activate(item) }
-                                    .onDrag { DragSupport.itemProvider(for: item) }
-                                    .background(CardMouseObserver { event in model.select(item.id, modifiers: event.modifierFlags, rightClick: event.type == .rightMouseDown); searchFocused = false })
+                                    .background(CardMouseObserver(onMouseDown: { event in model.select(item.id, modifiers: event.modifierFlags, rightClick: event.type == .rightMouseDown); searchFocused = false },
+                                                                  dragItems: { frame, image in DragSupport.draggingItems(for: item, frame: frame, image: image) }))
                                     .contextMenu { itemMenu(item) }
                                     .accessibilityAddTraits(.isButton)
                                     .accessibilityLabel("\(item.kind.rawValue), \(item.source), \(String(item.text.prefix(140)))")
@@ -158,13 +158,19 @@ struct HistoryView: View {
         }
     }
     private func boardPill(_ name: String, symbol: String?, color: Color?, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                if let symbol { Image(systemName: symbol) }
-                if let color { Circle().fill(color).frame(width: 10, height: 10) }
-                Text(name).lineLimit(1)
-            }.padding(.horizontal, 10).padding(.vertical, 6).background(selected ? Color.primary.opacity(0.1) : Color.clear, in: Capsule())
-        }.buttonStyle(.plain).hoverHighlight(Capsule(), suppressed: selected)
+        // Not a Button: a button's click tracking takes the mouse-drag events, so `.draggable` on a pinboard
+        // pill never started a drag and pills could not be reordered.
+        HStack(spacing: 5) {
+            if let symbol { Image(systemName: symbol) }
+            if let color { Circle().fill(color).frame(width: 10, height: 10) }
+            Text(name).lineLimit(1)
+        }.padding(.horizontal, 10).padding(.vertical, 6).background(selected ? Color.primary.opacity(0.1) : Color.clear, in: Capsule())
+        .contentShape(Capsule())
+        .onTapGesture(perform: action)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction { action() }
+        .hoverHighlight(Capsule(), suppressed: selected)
     }
     private var filterPanel: some View {
         VStack(alignment: .leading, spacing: 16) {

@@ -10,8 +10,16 @@
 - [done 2026-09-16] I should be able to start typing by category and have it work. For instance, "Image" caps or not caps.
   (a type word — image/photo/screenshot, link/url, file, text, singular or plural, any case — turns into a pill in the search field, the field clears, and further typing searches within that type; Backspace on the empty field removes the pill and gives the word back)
 
-- [open 2026-09-16] drag and drop does not work
-  (reported by the user on the built app; card drag-out and pinboard pill reordering are implemented in DragSupport.swift / HistoryView.swift but were only verified through the in-process interaction check, never with a real pointer drag across apps. Reproduce with a real drag from a card into another app, and a pill drag in the toolbar; the mouse-down card selection in CardMouseObserver may be swallowing the drag start)
+- [fixed 2026-09-22; real-pointer drags verified on the demo build] drag and drop does not work
+  (Reproduced with physical cliclick drags against a `--demo --demo-fixtures` panel. Pinboard pills never
+  started a drag: each pill was a SwiftUI Button, whose click tracking takes the drag events, so `.draggable`
+  never fired. Pills are now tappable views with button accessibility, and Beta dragged onto Alpha reorders
+  them; clicking a pill still switches pinboards. Card drags did start, but files arrived as SwiftUI copies
+  in ~/Library/Caches and multi-file cards dragged only their first file. Cards now drag through an AppKit
+  drag session carrying every stored item with every representation: text, RTF (bold 14 pt kept in
+  TextEdit), one file and two files all arrive intact in a logging drop target, and Finder copies both files
+  while the originals stay in place. Not yet compared with the same drags in Paste, and not re-tried on the
+  daily-use /Applications build.)
 
 - [implemented 2026-09-19; visual check pending] update the About popup to use the About png
   (AboutPanel.swift supplies Resources/AboutElmers.png as the standard About panel's application icon.

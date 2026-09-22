@@ -213,17 +213,23 @@ final class KeyboardInteractionChecks {
         print("PASS: editor cancel preserves and save updates the item")
         checkDrag(model: model, controller: controller)
     }
-    /// The drag provider must hand back every stored representation under its own type.
+    /// A card drag must carry every stored item with every representation, and file URLs must be the originals.
     static func checkDrag(model: AppModel, controller: PanelController) {
-        let payload = ClipboardPayload(items: [["public.utf8-plain-text": Data("dragged".utf8), "public.rtf": Data("{\\rtf1 dragged}".utf8)]])
+        let fileURL = URL(fileURLWithPath: "/tmp/Elmers check.txt")
+        let payload = ClipboardPayload(items: [
+            ["public.utf8-plain-text": Data("dragged".utf8), "public.rtf": Data("{\\rtf1 dragged}".utf8)],
+            [NSPasteboard.PasteboardType.fileURL.rawValue: fileURL.dataRepresentation],
+        ])
         let item = ClipboardItem(payload: payload, source: "Check")
-        let provider = DragSupport.itemProvider(for: item)
-        guard Set(provider.registeredTypeIdentifiers) == ["public.utf8-plain-text", "public.rtf"] else { print("FAIL: drag types \(provider.registeredTypeIdentifiers)"); fflush(stdout); exit(1) }
-        let done = DispatchSemaphore(value: 0)
-        var loaded: Data?
-        _ = provider.loadDataRepresentation(forTypeIdentifier: "public.rtf") { data, _ in loaded = data; done.signal() }
-        guard done.wait(timeout: .now() + 2) == .success, loaded == Data("{\\rtf1 dragged}".utf8) else { print("FAIL: drag data did not load"); fflush(stdout); exit(1) }
-        print("PASS: drag provider offers every representation")
+        let dragging = DragSupport.draggingItems(for: item, frame: NSRect(x: 0, y: 0, width: 235, height: 236), image: nil)
+        let written = dragging.compactMap { $0.item as? NSPasteboardItem }
+        guard written.count == 2,
+              Set(written[0].types.map(\.rawValue)) == ["public.utf8-plain-text", "public.rtf"],
+              written[0].data(forType: .rtf) == Data("{\\rtf1 dragged}".utf8),
+              written[1].data(forType: .fileURL) == fileURL.dataRepresentation else {
+            print("FAIL: drag items \(written.map { $0.types.map(\.rawValue) })"); fflush(stdout); exit(1)
+        }
+        print("PASS: card drag carries every item and representation")
         model.newText("Pointer drag fixture")
         controller.show()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {

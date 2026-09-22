@@ -38,13 +38,17 @@ public enum PasteboardCodec {
             board.clearContents()
             return board.setString(payload.text, forType: .string)
         }
-        let items = payload.items.map { representations -> NSPasteboardItem in
+        let items = pasteboardItems(for: payload)
+        guard !items.isEmpty else { return false }
+        board.clearContents()
+        return board.writeObjects(items)
+    }
+    /// One pasteboard item per stored item, each with every stored representation. Paste and drag both write these.
+    public static func pasteboardItems(for payload: ClipboardPayload) -> [NSPasteboardItem] {
+        payload.items.map { representations in
             let item = NSPasteboardItem()
             for (type, data) in representations { item.setData(data, forType: .init(type)) }
             return item
         }
-        guard !items.isEmpty else { return false }
-        board.clearContents()
-        return board.writeObjects(items)
     }
 }

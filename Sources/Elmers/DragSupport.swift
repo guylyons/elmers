@@ -2,17 +2,18 @@ import AppKit
 import ElmersCore
 
 enum DragSupport {
-    /// Every representation of the first pasteboard item is offered under its own type, so a drop into
-    /// another app receives the same formats a paste would (RTF stays RTF, files stay file URLs).
-    static func itemProvider(for item: ClipboardItem) -> NSItemProvider {
-        let provider = NSItemProvider()
-        guard let representations = item.payload.items.first else { return provider }
-        for (type, data) in representations where !type.hasPrefix("dyn.") && type.contains(".") {
-            provider.registerDataRepresentation(forTypeIdentifier: type, visibility: .all) { completion in
-                completion(data, nil); return nil
-            }
+    /// A card drags the same pasteboard items a paste writes: every stored item, each with every
+    /// representation, so RTF stays RTF and every file of a multi-file copy arrives as its original file URL.
+    /// This goes through AppKit rather than SwiftUI's `onDrag`, which copies dragged files into a cache
+    /// folder and hands the destination that copy.
+    static func draggingItems(for item: ClipboardItem, frame: NSRect, image: NSImage?) -> [NSDraggingItem] {
+        let items = PasteboardCodec.pasteboardItems(for: item.payload)
+        return items.enumerated().map { index, pasteboardItem in
+            let dragging = NSDraggingItem(pasteboardWriter: pasteboardItem)
+            // Stack the extra items slightly offset behind the card image, as Finder does for several files.
+            let offset = CGFloat(min(index, 3)) * 4
+            dragging.setDraggingFrame(frame.offsetBy(dx: offset, dy: -offset), contents: index == 0 ? image : nil)
+            return dragging
         }
-        if let title = item.title { provider.suggestedName = title }
-        return provider
     }
 }

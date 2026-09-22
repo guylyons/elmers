@@ -152,6 +152,9 @@ final class AppModel: ObservableObject {
             do { history = try store.load(); prune() }
             catch { archiveReadable = false; message = "History could not be opened. The original archive is preserved. \(error.localizedDescription)" }
         }
+        #if DEBUG
+        if demo, ProcessInfo.processInfo.arguments.contains("--demo-fixtures") { seedDemoFixtures() }
+        #endif
         if let data = defaults.data(forKey: "shortcuts"), let stored = try? JSONDecoder().decode(ShortcutSettings.self, from: data) { shortcuts = stored }
         recognizeImageText()
         undoManager.levelsOfUndo = 30
@@ -159,6 +162,25 @@ final class AppModel: ObservableObject {
         refreshVisibleItems()
         selectedID = visibleItems.first?.id
     }
+    #if DEBUG
+    /// Synthetic cards for hand checks such as a physical drag into another app. Demo mode only, so the
+    /// real history is never read or written.
+    private func seedDemoFixtures() {
+        let files = (1...2).map { FileManager.default.temporaryDirectory.appendingPathComponent("Elmers drag fixture \($0).txt") }
+        for file in files { try? Data("Elmers drag fixture file\n".utf8).write(to: file) }
+        history.capture(.init(items: files.map { [NSPasteboard.PasteboardType.fileURL.rawValue: Data($0.absoluteString.utf8)] }), source: "Finder")
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("Elmers drag fixture.txt")
+        try? Data("Elmers drag fixture file\n".utf8).write(to: file)
+        history.capture(.init(items: [[NSPasteboard.PasteboardType.fileURL.rawValue: Data(file.absoluteString.utf8)]]), source: "Finder")
+        let rich = NSAttributedString(string: "Elmers drag fixture rich", attributes: [.font: NSFont.boldSystemFont(ofSize: 14)])
+        let rtf = rich.rtf(from: NSRange(location: 0, length: rich.length), documentAttributes: [:]) ?? Data()
+        history.capture(.init(items: [[NSPasteboard.PasteboardType.rtf.rawValue: rtf,
+                                       NSPasteboard.PasteboardType.string.rawValue: Data(rich.string.utf8)]]), source: "TextEdit")
+        history.capture(.text("Elmers drag fixture text"), source: "Notes")
+        history.createBoard(name: "Alpha")
+        history.createBoard(name: "Beta")
+    }
+    #endif
     private func saveShortcuts() {
         if let data = try? JSONEncoder().encode(shortcuts) { defaults.set(data, forKey: "shortcuts") }
         shortcutsChanged?()
