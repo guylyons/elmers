@@ -390,4 +390,131 @@ final class HistoryStoreTests {
         try XCTAssertEqual(try permissions(backup), 0o600)
         try XCTAssertEqual(try permissions(freshBackup), 0o600)
     }
+
+    // MARK: - Fixtures for order, multi-writer and failed-save checks
+
+    private struct FixtureError: LocalizedError {
+        let detail: String
+        var errorDescription: String? { "store fixture failed: \(detail)" }
+    }
+
+    /// Rewrites the archived item array in reverse, producing the kind of plist an older build left behind
+    /// when a background decode inserted an item with an older date above a newer one.
+    private func reverseArchivedItemOrder(at url: URL) throws {
+        var format = PropertyListSerialization.PropertyListFormat.binary
+        guard var root = try PropertyListSerialization.propertyList(from: Data(contentsOf: url), options: [],
+                                                                   format: &format) as? [String: Any],
+              var history = root["history"] as? [String: Any],
+              let items = history["items"] as? [Any] else { throw FixtureError(detail: "archive layout") }
+        history["items"] = Array(items.reversed())
+        root["history"] = history
+        try PropertyListSerialization.data(fromPropertyList: root, format: .binary, options: 0).write(to: url)
+    }
+
+    /// Runs one statement on a second connection to the same file, standing in for another process.
+    private func executeOnSecondConnection(_ sql: String, at url: URL) throws {
+        var handle: OpaquePointer?
+        guard sqlite3_open(url.path, &handle) == SQLITE_OK, let handle else {
+            sqlite3_close(handle); throw FixtureError(detail: "second connection")
+        }
+        defer { sqlite3_close(handle) }
+        guard sqlite3_exec(handle, sql, nil, nil, nil) == SQLITE_OK else {
+            throw FixtureError(detail: String(cString: sqlite3_errmsg(handle)))
+        }
+    }
+    private func installAbortTrigger(at url: URL) throws {
+        try executeOnSecondConnection("""
+            CREATE TRIGGER elmers_check_abort BEFORE INSERT ON items WHEN NEW.title = 'boom'
+            BEGIN SELECT RAISE(ABORT, 'injected write failure'); END
+            """, at: url)
+    }
+    private func removeAbortTrigger(at url: URL) throws {
+        try executeOnSecondConnection("DROP TRIGGER elmers_check_abort", at: url)
+    }
+    private func recoveryDirectories(in directory: URL) throws -> [URL] {
+        try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix("history-recovery-") }
+    }
+
+    func testOutOfOrderLegacyArchiveConvertsAndIsStoredNewestFirst() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let history = Self.richHistory()
+        let store = HistoryStore(directory: directory)
+        try Archive(url: store.legacyArchiveURL).save(history)
+        try reverseArchivedItemOrder(at: store.legacyArchiveURL)
+        let scrambled = try Archive(url: store.legacyArchiveURL).load()
+        XCTAssertEqual(scrambled.items.map(\.id), history.items.map(\.id).reversed())
+        XCTAssertTrue(scrambled.items.map(\.copiedAt) != scrambled.items.map(\.copiedAt).sorted(by: >))
+
+        let converted = try store.load()
+        XCTAssertEqual(converted.items.count, history.items.count)
+        XCTAssertEqual(Set(converted.items.map(\.id)), Set(history.items.map(\.id)))
+        for item in history.items { XCTAssertEqual(converted.items.first { $0.id == item.id }, item) }
+        XCTAssertEqual(converted.items.map(\.copiedAt), converted.items.map(\.copiedAt).sorted(by: >))
+        XCTAssertEqual(converted.boards, history.boards)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: store.migratedArchiveURL.path))
+        let reopened = try HistoryStore(directory: directory, readOnly: true).load()
+        XCTAssertEqual(reopened.items, converted.items)
+    }
+
+    func testRecoveryMergesItemsThatShareATimestamp() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let paths = HistoryStore(directory: directory)
+        let instant = Date(timeIntervalSinceReferenceDate: 700_000_000)
+        var common = History()
+        let shared = common.capture(.text("shared at the tie"), source: "Notes", at: instant)
+        try Archive(url: paths.legacyArchiveURL).save(common)
+
+        var databaseHistory = common
+        let databaseOnly = databaseHistory.capture(.text("database at the tie"), source: "Terminal", at: instant)
+        do {
+            let writer = HistoryStore(directory: directory)
+            _ = try writer.load()
+            try writer.save(databaseHistory)
+        }
+        var legacyHistory = common
+        legacyHistory.renameItem(shared.id, title: "Recovered tie")
+        try Archive(url: paths.legacyArchiveURL).save(legacyHistory)
+
+        let merged = try HistoryStore(directory: directory).load()
+        XCTAssertEqual(Set(merged.items.map(\.id)), Set([shared.id, databaseOnly.id]))
+        XCTAssertEqual(merged.items.first { $0.id == shared.id }?.title, "Recovered tie")
+        XCTAssertEqual(merged.items.first { $0.id == databaseOnly.id }?.text, "database at the tie")
+        XCTAssertEqual(merged.items.map(\.copiedAt), [instant, instant])
+        XCTAssertTrue(!FileManager.default.fileExists(atPath: paths.legacyArchiveURL.path))
+        try XCTAssertEqual(try recoveryDirectories(in: directory).count, 1)
+    }
+
+    func testRepeatedFailingRecoveryReusesOneBackupDirectory() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let paths = HistoryStore(directory: directory)
+        var databaseHistory = History()
+        let survivor = databaseHistory.capture(.text("database survives"), source: "Notes")
+        do {
+            let writer = HistoryStore(directory: directory)
+            _ = try writer.load()
+            try writer.save(databaseHistory)
+        }
+        var legacy = History()
+        let arriving = legacy.capture(.text("legacy arrives"), source: "Safari")
+        legacy.renameItem(arriving.id, title: "boom")
+        try Archive(url: paths.legacyArchiveURL).save(legacy)
+        let archiveBytes = try Data(contentsOf: paths.legacyArchiveURL)
+        try installAbortTrigger(at: paths.databaseURL)
+
+        for _ in 0..<2 { XCTAssertThrowsError(try HistoryStore(directory: directory).load()) }
+        try XCTAssertEqual(try recoveryDirectories(in: directory).count, 1)
+        try XCTAssertEqual(try Data(contentsOf: paths.legacyArchiveURL), archiveBytes)
+        let untouched = try HistoryStore(directory: directory, readOnly: true).load()
+        XCTAssertEqual(untouched.items.map(\.id), [survivor.id])
+
+        try removeAbortTrigger(at: paths.databaseURL)
+        let recovered = try HistoryStore(directory: directory).load()
+        XCTAssertEqual(Set(recovered.items.map(\.id)), Set([survivor.id, arriving.id]))
+        try XCTAssertEqual(try recoveryDirectories(in: directory).count, 1)
+    }
+
 }

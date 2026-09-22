@@ -51,7 +51,7 @@ public final class HistoryStore: @unchecked Sendable {
         if !files.fileExists(atPath: databaseURL.path) {
             guard !readOnly else { throw StoreError.notLoaded }
             try files.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-            let legacy = files.fileExists(atPath: legacyArchiveURL.path) ? try Archive(url: legacyArchiveURL).load() : nil
+            let legacy = files.fileExists(atPath: legacyArchiveURL.path) ? Self.canonical(try Archive(url: legacyArchiveURL).load()) : nil
             try build(legacy ?? History())
             if let legacy {
                 let converted = try Self.read(Self.open(stagingURL, readOnly: true))
@@ -239,20 +239,42 @@ public final class HistoryStore: @unchecked Sendable {
         }
     }
 
-    private static func verify(_ converted: History, matches legacy: History) throws {
-        guard converted.boards == legacy.boards else { throw StoreError.migrationMismatch("pinboards differ") }
-        guard converted.items.count == legacy.items.count else { throw StoreError.migrationMismatch("item counts differ") }
-        guard converted.items == legacy.items else { throw StoreError.migrationMismatch("items differ") }
+    /// History in the order the store keeps it: newest first, with items copied at the same instant left in
+    /// their original order. Older builds inserted every capture at the front, so a plist can arrive out of
+    /// order; conversion builds and compares against this form rather than refusing to convert.
+    private static func canonical(_ history: History) -> History {
+        let ordered = history.items.enumerated()
+            .sorted { $0.element.copiedAt == $1.element.copiedAt ? $0.offset < $1.offset : $0.element.copiedAt > $1.element.copiedAt }
+            .map(\.element)
+        return History(items: ordered, boards: history.boards)
+    }
+
+    /// Compares a conversion or merge with what it was built from. Items are matched by id rather than by
+    /// position, because rows written into an existing database keep their original rowid and so can come
+    /// back in a different order among items sharing a timestamp. The stored order is checked separately.
+    private static func verify(_ converted: History, matches expected: History) throws {
+        guard converted.boards == expected.boards else { throw StoreError.migrationMismatch("pinboards differ") }
+        guard converted.items.count == expected.items.count else { throw StoreError.migrationMismatch("item counts differ") }
+        var remaining = Dictionary(converted.items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        guard remaining.count == converted.items.count else { throw StoreError.migrationMismatch("duplicate items") }
+        for item in expected.items {
+            guard remaining.removeValue(forKey: item.id) == item else { throw StoreError.migrationMismatch("items differ") }
+        }
+        guard zip(converted.items, converted.items.dropFirst()).allSatisfy({ $0.copiedAt >= $1.copiedAt }) else {
+            throw StoreError.migrationMismatch("items are not stored newest first")
+        }
     }
 
     private func recoverReappearedArchive() throws {
         let files = FileManager.default
         let database = try Self.open(databaseURL, readOnly: false)
         let legacyHistory = try Archive(url: legacyArchiveURL).load()
+        // Back up before the merge transaction, and only when no earlier attempt already saved these exact
+        // plist bytes, so a recovery that keeps failing cannot add a full-size copy on every launch.
+        if try existingRecoveryDirectory() == nil { try backupRecoveryFiles(databaseHistory: try Self.read(database)) }
         try database.transaction {
             let databaseHistory = try Self.read(database)
             let candidate = Self.merge(databaseHistory: databaseHistory, legacyHistory: legacyHistory)
-            _ = try backupRecoveryFiles(databaseHistory: databaseHistory)
             let baseline = Dictionary(databaseHistory.items.map { ($0.id, StoredItem($0)) }, uniquingKeysWith: { first, _ in first })
             var statistics = SaveStatistics()
             try Self.write(candidate, to: database, baseline: baseline,
@@ -290,7 +312,21 @@ public final class HistoryStore: @unchecked Sendable {
         return History(items: mergedItems, boards: boards)
     }
 
-    private func backupRecoveryFiles(databaseHistory: History) throws -> URL {
+    /// A recovery directory that already holds a byte-identical copy of the plist waiting to be recovered.
+    private func existingRecoveryDirectory() throws -> URL? {
+        let files = FileManager.default
+        let current = try Data(contentsOf: legacyArchiveURL, options: .mappedIfSafe)
+        let entries = (try? files.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        for entry in entries.sorted(by: { $0.lastPathComponent < $1.lastPathComponent })
+        where entry.lastPathComponent.hasPrefix("history-recovery-") {
+            let copy = entry.appendingPathComponent(legacyArchiveURL.lastPathComponent)
+            guard let bytes = try? Data(contentsOf: copy, options: .mappedIfSafe), bytes == current else { continue }
+            return entry
+        }
+        return nil
+    }
+
+    private func backupRecoveryFiles(databaseHistory: History) throws {
         let files = FileManager.default
         let recovery = directory.appendingPathComponent("history-recovery-" + UUID().uuidString)
         try files.createDirectory(at: recovery, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
@@ -300,7 +336,6 @@ public final class HistoryStore: @unchecked Sendable {
         let databaseCopy = recovery.appendingPathComponent(databaseURL.lastPathComponent)
         try build(databaseHistory, at: databaseCopy)
         try Self.verify(try Self.loadHistory(from: databaseCopy), matches: databaseHistory)
-        return recovery
     }
 
     private func nextRecoveredArchiveURL() -> URL {
