@@ -11,6 +11,11 @@ final class SQLiteDatabase {
     private let handle: OpaquePointer
 
     init(url: URL, create: Bool, readOnly: Bool = false) throws {
+        // SQLite would create the file with the process umask, and it copies that mode onto the journal,
+        // WAL and SHM files it opens later. Create it private first so nothing is ever briefly world-readable.
+        if create, !FileManager.default.fileExists(atPath: url.path) {
+            FileManager.default.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600])
+        }
         var db: OpaquePointer?
         let access = readOnly ? SQLITE_OPEN_READONLY : SQLITE_OPEN_READWRITE | (create ? SQLITE_OPEN_CREATE : 0)
         let result = sqlite3_open_v2(url.path, &db, access | SQLITE_OPEN_NOMUTEX, nil)
