@@ -158,7 +158,7 @@ Verified on 2026-09-14:
 
 Remaining verification and differences:
 
-- Direct paste is implemented but not end-to-end verified with Accessibility access in a destination app. Clipboard mode remains the default.
+- Direct paste is implemented and was verified end to end into TextEdit on September 22 (see that section). Clipboard mode remains the default.
 - Full VoiceOver coverage, complete keyboard focus behavior, source-specific card colors, precise relative-time wording, and all reference animations remain unverified or different.
 - UI for pinboard item reordering, multi-selection, drag/drop, Paste Stack, OCR, edit transformations, login/background settings, screen-sharing exclusion, sync/accounts/devices and configurable shortcuts remains open.
 - Search currently scopes to the selected pinboard; official newer documentation describes global search. Installed-version behavior needs further inspection.
@@ -247,3 +247,10 @@ Recommended next sequence:
 - **Verified after the change:** text → `public.utf8-plain-text`; rich → plain text, RTF and UTF-16; one file → its original `$TMPDIR` path; two files → two pasteboard items with both original paths; the two-file card dropped on a Finder folder copied both files and left the originals in place. No SwiftUI cache folders were created. Rich-text drops no longer include SwiftUI's RTF file promise, so dropping rich text on Finder no longer creates an `.rtf` file; Paste's behavior there is unobserved.
 - **Checks:** `--check-interaction` "card drag carries every item and representation" (two items, RTF bytes, original file URL) and "pointer drag starts a card drag session"; 37 steps in two clean runs. `scripts/test.sh` 46/46.
 - **Open:** the same drags in Paste (pill reorder gesture, multi-selection drag, rich text onto Finder), dropping a card on a pinboard pill (Paste behavior unknown, not implemented), and a re-check on the daily-use build after it is rebuilt.
+
+### Direct paste — verified end to end into TextEdit (September 22, later)
+
+- **Setup.** The unbundled demo build (`.build/debug/Elmers --demo --demo-fixtures`), launched from a terminal that has Accessibility, so macOS trusts it to post ⌘V; `directPaste` was turned on only in the demo defaults domain `app.elmers.demo` and removed afterwards. The daily-use app and its settings were not touched. The panel was opened with the demo's own menu bar icon while an empty TextEdit document was frontmost, which is how the destination app gets recorded. Real key presses came from `cliclick kp:`/`kd:`; a compiled CGEvent HID-tap poster had no permission here and silently did nothing.
+- **Verified:** double-click on the text card pasted "Elmers drag fixture text" and returned TextEdit to the front; → then Return on the bold RTF card pasted it as HelveticaNeue-Bold 14; Shift-Return on the same card pasted it into a fresh document as Helvetica 12, with only plain-text types on the clipboard; Return on the file card inserted the file as an attachment. With TextEdit quit while the panel was open, double-clicking a card copied it and showed "Copied. The previous app is unavailable; use ⌘V in your destination."
+- **Side effect:** each paste writes the fixture text to the general clipboard, so the daily-use Elmers captured those harmless fixture strings into the user's history.
+- **Not verified:** Paste's own direct-paste feedback; destinations other than TextEdit (browsers, Electron apps, terminals); the Accessibility-denied state (needs a build without the grant); focus after the destination quits (the panel loses keyboard focus to whichever app macOS activates, so Return goes to that app. Paste's behavior here is unobserved).
