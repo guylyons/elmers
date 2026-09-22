@@ -81,6 +81,14 @@ public struct ClipboardItem: Codable, Identifiable, Equatable, Sendable {
         copiedAt = at; boardIDs = []; fingerprint = payload.fingerprint
         refreshMetadata()
     }
+    init(id: UUID, payload: ClipboardPayload, source: String, sourceBundleID: String?, copiedAt: Date, boardIDs: Set<UUID>,
+         title: String?, fingerprint: String, linkPreview: LinkPreview?, recognizedText: String?,
+         screenshot: ScreenshotOrigin?, imageDigest: String?) {
+        self.id = id; self.payload = payload; self.source = source; self.sourceBundleID = sourceBundleID
+        self.copiedAt = copiedAt; self.boardIDs = boardIDs; self.title = title; self.fingerprint = fingerprint
+        self.linkPreview = linkPreview; self.recognizedText = recognizedText; self.screenshot = screenshot; self.imageDigest = imageDigest
+        refreshMetadata()
+    }
     private mutating func refreshMetadata() {
         cachedText = payload.text
         cachedKind = payload.kind(for: cachedText)
@@ -128,6 +136,7 @@ public struct Pinboard: Codable, Identifiable, Equatable, Sendable {
     public var name: String
     public var colorIndex: Int
     public init(name: String, colorIndex: Int = 0) { id = UUID(); self.name = name; self.colorIndex = colorIndex }
+    init(id: UUID, name: String, colorIndex: Int) { self.id = id; self.name = name; self.colorIndex = colorIndex }
     /// Red, orange, yellow, green, blue, purple, pink, gray.
     public static let colorCount = 8
 }

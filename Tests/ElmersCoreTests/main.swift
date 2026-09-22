@@ -24,7 +24,13 @@ let interaction = InteractionModelTests()
 let history = HistoryTests()
 let pasteboard = PasteboardTests()
 let screenshots = ScreenshotTests()
+let store = HistoryStoreTests()
 let checks: [(String, () throws -> Void)] = [
+    ("store creates a private empty database", store.testNewDirectoryGetsPrivateEmptyDatabase),
+    ("store rejects damaged or newer databases", store.testDamagedOrNewerDatabaseIsRejectedAndLeftUntouched),
+    ("store round trip preserves every field", store.testRoundTripPreservesEveryField),
+    ("store saves only what changed", store.testSavesWriteOnlyWhatChanged),
+    ("store keeps undo restores across reload", store.testUndoRestoresSurviveReload),
     ("screenshot classification and legacy decode", screenshots.testScreenshotClassificationAndLegacyDecode),
     ("Images includes screenshots", screenshots.testImageFilterIncludesScreenshots),
     ("screenshot duplicate arrival orders and persistence", screenshots.testScreenshotDuplicatesInEitherOrderPreservePins),

@@ -4,6 +4,7 @@ public struct History: Codable, Sendable {
     public private(set) var items: [ClipboardItem] = []
     public private(set) var boards: [Pinboard] = []
     public init() {}
+    init(items: [ClipboardItem], boards: [Pinboard]) { self.items = items; self.boards = boards }
 
     @discardableResult public mutating func capture(_ payload: ClipboardPayload, source: String, sourceBundleID: String? = nil, at date: Date = Date(), screenshot: ScreenshotOrigin? = nil, imageDigest: String? = nil) -> ClipboardItem {
         let fingerprint = payload.fingerprint
