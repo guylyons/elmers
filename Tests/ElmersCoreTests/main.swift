@@ -20,6 +20,11 @@ if CommandLine.arguments.contains("--live-capture") {
     do { try verifyLiveCapture() } catch { failures += 1; print("FAIL live capture: \(error)") }
     exit(failures == 0 ? 0 : 1)
 }
+if CommandLine.arguments.contains("--storage-report") { reportStorage(); exit(0) }
+if CommandLine.arguments.contains("--storage-benchmark") {
+    do { try benchmarkStorage() } catch { print("FAIL storage benchmark: \(error)"); exit(1) }
+    exit(0)
+}
 let interaction = InteractionModelTests()
 let history = HistoryTests()
 let pasteboard = PasteboardTests()

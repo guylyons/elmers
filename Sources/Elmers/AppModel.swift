@@ -76,7 +76,7 @@ final class AppModel: ObservableObject {
     var openEditor: ((ClipboardItem?) -> Void)?
     var isDemo: Bool { ProcessInfo.processInfo.arguments.contains("--demo") }
     private let defaults: UserDefaults
-    private let archive: Archive
+    private let store: HistoryStore
     private let saveQueue = DispatchQueue(label: "app.elmers.persistence", qos: .utility)
     private var timer: Timer?
     private var lastChange = NSPasteboard.general.changeCount
@@ -147,9 +147,9 @@ final class AppModel: ObservableObject {
         ignoreTransient = defaults.bool(forKey: "ignoreTransient")
         excludedApps = defaults.string(forKey: "excludedApps") ?? ""
         let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Elmers")
-        archive = Archive(url: directory.appendingPathComponent("history.plist"))
+        store = HistoryStore(directory: directory)
         if !demo {
-            do { history = try archive.load(); prune() }
+            do { history = try store.load(); prune() }
             catch { archiveReadable = false; message = "History could not be opened. The original archive is preserved. \(error.localizedDescription)" }
         }
         if let data = defaults.data(forKey: "shortcuts"), let stored = try? JSONDecoder().decode(ShortcutSettings.self, from: data) { shortcuts = stored }
@@ -461,9 +461,9 @@ final class AppModel: ObservableObject {
     }
     private func persist() {
         guard archiveReadable, !isDemo else { return }
-        let snapshot = history, archive = archive
+        let snapshot = history, store = store
         saveQueue.async { [weak self] in
-            do { try archive.save(snapshot) }
+            do { try store.save(snapshot) }
             catch { let description = error.localizedDescription; Task { @MainActor in self?.message = "History could not be saved: \(description)" } }
         }
     }

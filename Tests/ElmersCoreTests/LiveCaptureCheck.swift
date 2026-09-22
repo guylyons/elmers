@@ -13,12 +13,12 @@ func verifyLiveCapture() throws {
             else { board.clearContents() }
         }
     }
-    let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("Elmers/history.plist")
+    let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("Elmers")
     let deadline = Date().addingTimeInterval(5)
     while Date() < deadline {
         Thread.sleep(forTimeInterval: 0.2)
-        if let history = try? Archive(url: url).load(), history.items.contains(where: { $0.text == fixture }) {
+        if let history = try? HistoryStore(directory: directory, readOnly: true).load(), history.items.contains(where: { $0.text == fixture }) {
             print("PASS running app captured and persisted synthetic clipboard text")
             return
         }
