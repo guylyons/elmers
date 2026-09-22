@@ -77,3 +77,11 @@
   Screenshots picked up from the screenshot folder stay silent. `Elmers --demo --check-sounds`
   checks routing and waveform shape; with ELMERS_CAPTURE_DIR set it writes sound-*.wav to audition.
   Note: Paste itself plays one Copy sound for every capture; the image click is a deliberate departure.)
+
+- [fixed 2026-09-22; automated checks passed] user should not be able to copy nothing.
+  (A clipboard change whose every representation is empty or whitespace-only text no longer creates a
+  card, plays a sound or changes the selection; the same rule blocks New Text / Edit from saving a
+  whitespace-only item. Anything else non-empty — images, files, private types with data, HTML with
+  an image — still counts as content. Note: Paste 6.3.11 itself records empty and whitespace-only
+  copies as cards (observed with marker content on 2026-09-22); dropping them is a deliberate
+  departure at the user's request.)

@@ -74,7 +74,8 @@ let checks: [(String, () throws -> Void)] = [
     ("corrupt archive protection", history.testCorruptArchiveIsRejectedAndNeverOverwrittenByLoad),
     ("multi-item format round trip", pasteboard.testMultiItemRoundTripPreservesEveryRepresentation),
     ("plain-text transformation", pasteboard.testPlainTextDeliveryStripsRichRepresentations),
-    ("confidential content exclusion", pasteboard.testConfidentialMarkerPreventsCapture)
+    ("confidential content exclusion", pasteboard.testConfidentialMarkerPreventsCapture),
+    ("blank text is never captured", pasteboard.testBlankTextIsNeverCaptured)
 ]
 for (name, check) in checks {
     let before = failures

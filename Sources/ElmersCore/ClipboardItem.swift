@@ -26,6 +26,37 @@ public struct ClipboardPayload: Codable, Equatable, Sendable {
         }.joined(separator: "\n")
     }
     public var kind: ContentKind { kind(for: text) }
+    /// True when pasting the payload would produce nothing visible: every representation is empty, or is
+    /// text that contains only whitespace. Any other non-empty representation counts as content.
+    /// Paste records such copies; Elmers drops them by user decision (2026-09-22).
+    public var isBlank: Bool {
+        items.allSatisfy { representations in
+            representations.allSatisfy { type, data in
+                if data.isEmpty { return true }
+                guard let text = Self.visibleText(type: type, data: data) else { return false }
+                return text.allSatisfy(\.isWhitespace)
+            }
+        }
+    }
+    /// Decodes the human-visible characters of a text-like representation; nil for every other type.
+    private static func visibleText(type: String, data: Data) -> String? {
+        switch type {
+        case "public.utf8-plain-text", "public.plain-text", "public.text", "NSStringPboardType", "com.apple.traditional-mac-plain-text":
+            return String(data: data, encoding: .utf8) ?? String(data: data, encoding: .macOSRoman)
+        case "public.utf16-plain-text", "public.utf16-external-plain-text":
+            return String(data: data, encoding: .utf16)
+        case "public.rtf":
+            return NSAttributedString(rtf: data, documentAttributes: nil)?.string
+        case "public.html":
+            guard let html = String(data: data, encoding: .utf8) else { return nil }
+            // Images, objects and embedded frames are content even when no text surrounds them.
+            if html.range(of: "<(img|object|embed|iframe|video|audio|svg|canvas)\\b", options: [.regularExpression, .caseInsensitive]) != nil { return "x" }
+            let stripped = html.replacingOccurrences(of: "<[^>]*>", with: " ", options: .regularExpression)
+            return stripped.replacingOccurrences(of: "&nbsp;", with: " ").replacingOccurrences(of: "&#160;", with: " ")
+        default:
+            return nil
+        }
+    }
     func kind(for text: String) -> ContentKind {
         let types = Set(items.flatMap { $0.keys })
         if types.contains("public.file-url") { return .file }

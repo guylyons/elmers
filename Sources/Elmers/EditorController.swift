@@ -128,13 +128,13 @@ final class EditorController: NSObject, NSTextViewDelegate {
     }
     private func refresh() {
         footer.stringValue = statistics
-        confirmButton.isEnabled = !textView.string.isEmpty
+        confirmButton.isEnabled = !textView.string.allSatisfy(\.isWhitespace)
     }
     func textDidChange(_ notification: Notification) { refresh() }
 
     /// Plain text always; RTF only when formatting was applied, so unformatted items stay plain when pasted.
     var payload: ClipboardPayload? {
-        guard let storage = textView.textStorage, !storage.string.isEmpty else { return nil }
+        guard let storage = textView.textStorage, !storage.string.allSatisfy(\.isWhitespace) else { return nil }
         var representations = [NSPasteboard.PasteboardType.string.rawValue: Data(storage.string.utf8)]
         if Self.hasFormatting(storage), let rtf = storage.rtf(from: NSRange(location: 0, length: storage.length), documentAttributes: [:]) {
             representations[NSPasteboard.PasteboardType.rtf.rawValue] = rtf

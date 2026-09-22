@@ -428,7 +428,7 @@ final class AppModel: ObservableObject {
     func reorderBoard(_ id: UUID, before target: UUID) { guard canEdit else { return }; history.moveBoard(id, before: target); persist() }
     func newText(_ text: String) { newItem(payload: .text(text)) }
     func newItem(payload: ClipboardPayload) {
-        guard canEdit, !payload.text.isEmpty else { return }
+        guard canEdit, !payload.isBlank else { return }
         let previous = history.items.first { $0.fingerprint == payload.fingerprint }
         let item = history.capture(payload, source: "Elmers", sourceBundleID: "app.elmers.clipboard")
         if let boardID { history.pin(item.id, to: boardID) }

@@ -28,8 +28,9 @@ public enum PasteboardCodec {
             return result
         }
         guard board.changeCount == changeCount else { throw CaptureError.changedDuringRead }
-        guard !items.isEmpty, items.contains(where: { !$0.isEmpty }) else { return nil }
-        return ClipboardPayload(items: items)
+        let payload = ClipboardPayload(items: items)
+        guard !items.isEmpty, !payload.isBlank else { return nil }
+        return payload
     }
     @discardableResult public static func write(_ payload: ClipboardPayload, to board: NSPasteboard, plainText: Bool = false) -> Bool {
         if plainText {
