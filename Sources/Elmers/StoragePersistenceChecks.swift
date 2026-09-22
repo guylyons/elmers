@@ -1,9 +1,16 @@
 #if DEBUG
+import AppKit
 import Foundation
 
 @MainActor
 enum StoragePersistenceChecks {
+    /// `--check-live-storage-persistence`: creates, pins, renames, deletes and reloads fixtures in the real
+    /// Application Support store, then removes them. It refuses to run beside another Elmers instance,
+    /// because two processes saving into one history is the multi-writer case this check is meant to prove.
     static func run(model: AppModel) {
+        let others = NSRunningApplication.runningApplications(withBundleIdentifier: "app.elmers.clipboard")
+            .filter { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }
+        guard others.isEmpty else { fail("another Elmers instance is running; quit it and run this again") }
         let token = UUID().uuidString
         let keptText = "Elmers storage fixture kept \(token)"
         let deletedText = "Elmers storage fixture deleted \(token)"
