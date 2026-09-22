@@ -64,7 +64,7 @@ public final class HistoryStore: @unchecked Sendable {
         self.database = database
         savedItems = Dictionary(history.items.map { ($0.id, StoredItem($0)) }, uniquingKeysWith: { first, _ in first })
         savedBoards = history.boards
-        if !readOnly { retireLegacyArchive() }
+        if !readOnly { try retireLegacyArchive() }
         return history
     }
 
@@ -122,6 +122,11 @@ public final class HistoryStore: @unchecked Sendable {
     ]
 
     private static func read(_ database: SQLiteDatabase) throws -> History {
+        if database.isInTransaction { return try readSnapshot(database) }
+        return try database.readTransaction { try readSnapshot(database) }
+    }
+
+    private static func readSnapshot(_ database: SQLiteDatabase) throws -> History {
         var payloads: [String: [Int: [String: Data]]] = [:]
         let representations = try database.prepare("SELECT item_id, item_index, type, data FROM representations")
         while try representations.step() {
@@ -222,11 +227,12 @@ public final class HistoryStore: @unchecked Sendable {
         }
     }
 
-    private func build(_ history: History) throws {
+    private func build(_ history: History, at destination: URL? = nil) throws {
         let files = FileManager.default
-        for suffix in ["", "-journal", "-wal", "-shm"] { try? files.removeItem(atPath: stagingURL.path + suffix) }
-        let database = try Self.open(stagingURL, readOnly: false, create: true, journal: "DELETE")
-        try files.setAttributes([.posixPermissions: 0o600], ofItemAtPath: stagingURL.path)
+        let destination = destination ?? stagingURL
+        for suffix in ["", "-journal", "-wal", "-shm"] { try? files.removeItem(atPath: destination.path + suffix) }
+        let database = try Self.open(destination, readOnly: false, create: true, journal: "DELETE")
+        try files.setAttributes([.posixPermissions: 0o600], ofItemAtPath: destination.path)
         var statistics = SaveStatistics()
         try database.transaction {
             try Self.write(history, to: database, baseline: [:], baselineBoards: [], statistics: &statistics)
@@ -241,33 +247,23 @@ public final class HistoryStore: @unchecked Sendable {
 
     private func recoverReappearedArchive() throws {
         let files = FileManager.default
-        let databaseHistory = try Self.loadHistory(from: databaseURL)
+        let database = try Self.open(databaseURL, readOnly: false)
         let legacyHistory = try Archive(url: legacyArchiveURL).load()
-        let merged = Self.merge(databaseHistory: databaseHistory, legacyHistory: legacyHistory)
-        _ = try backupRecoveryFiles()
-        try build(merged)
-        try Self.verify(try Self.loadHistory(from: stagingURL), matches: merged)
-
-        // A successful checkpoint makes the main database complete without its WAL. The byte-for-byte
-        // pre-checkpoint database, WAL and shared-memory files are already in the recovery directory.
-        try Self.checkpoint(databaseURL)
-        for suffix in ["-wal", "-shm"] {
-            let url = URL(fileURLWithPath: databaseURL.path + suffix)
-            if files.fileExists(atPath: url.path) { try files.removeItem(at: url) }
+        try database.transaction {
+            let databaseHistory = try Self.read(database)
+            let candidate = Self.merge(databaseHistory: databaseHistory, legacyHistory: legacyHistory)
+            _ = try backupRecoveryFiles(databaseHistory: databaseHistory)
+            let baseline = Dictionary(databaseHistory.items.map { ($0.id, StoredItem($0)) }, uniquingKeysWith: { first, _ in first })
+            var statistics = SaveStatistics()
+            try Self.write(candidate, to: database, baseline: baseline,
+                           baselineBoards: databaseHistory.boards, statistics: &statistics)
+            try Self.verify(try Self.read(database), matches: candidate)
         }
-        _ = try files.replaceItemAt(databaseURL, withItemAt: stagingURL)
-        try files.setAttributes([.posixPermissions: 0o600], ofItemAtPath: databaseURL.path)
-        try Self.verify(try Self.loadHistory(from: databaseURL), matches: merged)
         try files.moveItem(at: legacyArchiveURL, to: nextRecoveredArchiveURL())
     }
 
     private static func loadHistory(from url: URL) throws -> History {
         try read(open(url, readOnly: true))
-    }
-
-    private static func checkpoint(_ url: URL) throws {
-        let database = try open(url, readOnly: false)
-        try database.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     }
 
     /// The reappeared plist is the later whole-history writer. It wins same-ID metadata, while pin
@@ -294,32 +290,39 @@ public final class HistoryStore: @unchecked Sendable {
         return History(items: mergedItems, boards: boards)
     }
 
-    private func backupRecoveryFiles() throws -> URL {
+    private func backupRecoveryFiles(databaseHistory: History) throws -> URL {
         let files = FileManager.default
         let recovery = directory.appendingPathComponent("history-recovery-" + UUID().uuidString)
         try files.createDirectory(at: recovery, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
-        for url in [legacyArchiveURL, databaseURL, URL(fileURLWithPath: databaseURL.path + "-wal"),
-                    URL(fileURLWithPath: databaseURL.path + "-shm")] where files.fileExists(atPath: url.path) {
-            let copy = recovery.appendingPathComponent(url.lastPathComponent)
-            try files.copyItem(at: url, to: copy)
-            try files.setAttributes([.posixPermissions: 0o600], ofItemAtPath: copy.path)
-        }
+        let archiveCopy = recovery.appendingPathComponent(legacyArchiveURL.lastPathComponent)
+        try files.copyItem(at: legacyArchiveURL, to: archiveCopy)
+        try files.setAttributes([.posixPermissions: 0o600], ofItemAtPath: archiveCopy.path)
+        let databaseCopy = recovery.appendingPathComponent(databaseURL.lastPathComponent)
+        try build(databaseHistory, at: databaseCopy)
+        try Self.verify(try Self.loadHistory(from: databaseCopy), matches: databaseHistory)
         return recovery
     }
 
     private func nextRecoveredArchiveURL() -> URL {
-        let files = FileManager.default
-        let base = directory.appendingPathComponent("history.plist.recovered")
-        guard files.fileExists(atPath: base.path) else { return base }
-        var number = 2
-        while files.fileExists(atPath: directory.appendingPathComponent("history.plist.recovered-\(number)").path) { number += 1 }
-        return directory.appendingPathComponent("history.plist.recovered-\(number)")
+        nextAvailableArchiveURL(base: directory.appendingPathComponent("history.plist.recovered"))
     }
 
-    private func retireLegacyArchive() {
+    private func nextMigratedArchiveURL() -> URL {
+        nextAvailableArchiveURL(base: migratedArchiveURL)
+    }
+
+    private func nextAvailableArchiveURL(base: URL) -> URL {
         let files = FileManager.default
-        guard files.fileExists(atPath: legacyArchiveURL.path), !files.fileExists(atPath: migratedArchiveURL.path) else { return }
-        try? files.moveItem(at: legacyArchiveURL, to: migratedArchiveURL)
+        guard files.fileExists(atPath: base.path) else { return base }
+        var number = 2
+        while files.fileExists(atPath: URL(fileURLWithPath: base.path + "-\(number)").path) { number += 1 }
+        return URL(fileURLWithPath: base.path + "-\(number)")
+    }
+
+    private func retireLegacyArchive() throws {
+        let files = FileManager.default
+        guard files.fileExists(atPath: legacyArchiveURL.path) else { return }
+        try files.moveItem(at: legacyArchiveURL, to: nextMigratedArchiveURL())
     }
 }
 

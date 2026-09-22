@@ -230,7 +230,6 @@ final class HistoryStoreTests {
         try Archive(url: paths.legacyArchiveURL).save(legacyHistory)
 
         let reappearedArchive = try Data(contentsOf: paths.legacyArchiveURL)
-        let originalDatabase = try Data(contentsOf: paths.databaseURL)
         let merged = try HistoryStore(directory: directory).load()
 
         XCTAssertEqual(Set(merged.items.map(\.id)), Set([shared.id, databaseOnly.id, legacyOnly.id]))
@@ -249,8 +248,10 @@ final class HistoryStoreTests {
             .filter { $0.lastPathComponent.hasPrefix("history-recovery-") }
         XCTAssertEqual(recoveryDirectories.count, 1)
         try XCTAssertEqual(try permissions(recoveryDirectories[0]), 0o700)
-        try XCTAssertEqual(try Data(contentsOf: recoveryDirectories[0].appendingPathComponent("history.sqlite")), originalDatabase)
         try XCTAssertEqual(try Data(contentsOf: recoveryDirectories[0].appendingPathComponent("history.plist")), reappearedArchive)
+        let backedUpDatabase = try HistoryStore(directory: recoveryDirectories[0], readOnly: true).load()
+        XCTAssertEqual(backedUpDatabase.items, databaseHistory.items)
+        XCTAssertEqual(backedUpDatabase.boards, databaseHistory.boards)
 
         let reopened = try HistoryStore(directory: directory).load()
         XCTAssertEqual(reopened.items, merged.items)
@@ -285,7 +286,86 @@ final class HistoryStoreTests {
         XCTAssertTrue(recoveryDirectories.isEmpty)
     }
 
-    func testRollbackBackupExportsMergedHistoryAndNeverOverwrites() throws {
+    func testRecoveryDoesNotInvalidateAnAlreadyOpenWriter() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let paths = HistoryStore(directory: directory)
+        var writerHistory = History()
+        writerHistory.capture(.text("database item"), source: "Notes")
+        let writer = HistoryStore(directory: directory)
+        _ = try writer.load()
+        try writer.save(writerHistory)
+
+        var legacy = History()
+        legacy.capture(.text("legacy item"), source: "Safari")
+        try Archive(url: paths.legacyArchiveURL).save(legacy)
+        _ = try HistoryStore(directory: directory).load()
+
+        let later = writerHistory.capture(.text("later writer item"), source: "Terminal")
+        try writer.save(writerHistory)
+        let reopened = try HistoryStore(directory: directory, readOnly: true).load()
+        XCTAssertTrue(reopened.items.contains(where: { $0.id == later.id }))
+        XCTAssertTrue(reopened.items.contains(where: { $0.text == "legacy item" }))
+    }
+
+    func testLoadReadsOneSnapshotDuringConcurrentSaves() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        var history = History()
+        let item = history.capture(.text("version 0"), source: "Notes")
+        let writer = HistoryStore(directory: directory)
+        _ = try writer.load()
+        try writer.save(history)
+
+        let lock = NSLock()
+        var writerError: Error?
+        let started = DispatchSemaphore(value: 0)
+        let finished = DispatchGroup()
+        finished.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            started.signal()
+            do {
+                for version in 1...200 {
+                    history.editItem(item.id, payload: .text("version \(version)"))
+                    try writer.save(history)
+                }
+            } catch { lock.lock(); writerError = error; lock.unlock() }
+            finished.leave()
+        }
+        started.wait()
+        var inconsistent = false
+        for _ in 0..<200 {
+            let loaded = try HistoryStore(directory: directory, readOnly: true).load()
+            if loaded.items.contains(where: { $0.fingerprint != $0.payload.fingerprint }) { inconsistent = true; break }
+        }
+        finished.wait()
+        lock.lock(); let failure = writerError; lock.unlock()
+        XCTAssertNil(failure)
+        XCTAssertTrue(!inconsistent)
+    }
+
+    func testConversionRetiresLegacyWhenMigratedArchiveAlreadyExists() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let paths = HistoryStore(directory: directory)
+        var older = History(); older.capture(.text("older backup"), source: "Notes")
+        try Archive(url: paths.migratedArchiveURL).save(older)
+        var active = History()
+        let item = active.capture(.text("active item"), source: "Safari")
+        try Archive(url: paths.legacyArchiveURL).save(active)
+
+        let store = HistoryStore(directory: directory)
+        var converted = try store.load()
+        converted.renameItem(item.id, title: "must survive")
+        try store.save(converted)
+        let reopened = try HistoryStore(directory: directory).load()
+
+        XCTAssertEqual(reopened.items.first(where: { $0.id == item.id })?.title, "must survive")
+        XCTAssertTrue(!FileManager.default.fileExists(atPath: paths.legacyArchiveURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: directory.appendingPathComponent("history.plist.migrated-2").path))
+    }
+
+    func testRollbackBackupExportsFreshHistoryWithoutOverwritingPriorBackup() throws {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let expected = Self.richHistory()
@@ -298,8 +378,16 @@ final class HistoryStoreTests {
         let restored = try Archive(url: backup).load()
         XCTAssertEqual(restored.items, expected.items)
         XCTAssertEqual(restored.boards, expected.boards)
-        XCTAssertThrowsError(try backupStorageForRollback(directory: directory))
+        var later = expected
+        later.capture(.text("captured after first backup"), source: "Notes")
+        try store.save(later)
+        let freshBackup = try backupStorageForRollback(directory: directory)
+        XCTAssertTrue(freshBackup != backup)
+        let fresh = try Archive(url: freshBackup).load()
+        XCTAssertEqual(fresh.items, later.items)
+        XCTAssertEqual(fresh.boards, later.boards)
         try XCTAssertEqual(try Data(contentsOf: backup), original)
         try XCTAssertEqual(try permissions(backup), 0o600)
+        try XCTAssertEqual(try permissions(freshBackup), 0o600)
     }
 }

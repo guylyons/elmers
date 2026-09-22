@@ -39,6 +39,18 @@ final class SQLiteDatabase {
         do { try body(); try execute("COMMIT") }
         catch { try? execute("ROLLBACK"); throw error }
     }
+    func readTransaction<T>(_ body: () throws -> T) throws -> T {
+        try execute("BEGIN DEFERRED")
+        do {
+            let result = try body()
+            try execute("COMMIT")
+            return result
+        } catch {
+            try? execute("ROLLBACK")
+            throw error
+        }
+    }
+    var isInTransaction: Bool { sqlite3_get_autocommit(handle) == 0 }
     func integer(_ sql: String) throws -> Int {
         let statement = try prepare(sql)
         return try statement.step() ? statement.int(0) : 0

@@ -3,10 +3,9 @@ import Foundation
 import ElmersCore
 
 private enum StorageToolError: LocalizedError {
-    case backupExists, backupMismatch
+    case backupMismatch
     var errorDescription: String? {
         switch self {
-        case .backupExists: "history.plist.post-sqlite already exists; it was not overwritten."
         case .backupMismatch: "The rollback plist did not verify; SQLite was left unchanged."
         }
     }
@@ -16,8 +15,14 @@ private enum StorageToolError: LocalizedError {
 func backupStorageForRollback(directory suppliedDirectory: URL? = nil) throws -> URL {
     let directory = suppliedDirectory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("Elmers")
-    let destination = directory.appendingPathComponent("history.plist.post-sqlite")
-    guard !FileManager.default.fileExists(atPath: destination.path) else { throw StorageToolError.backupExists }
+    let files = FileManager.default
+    let base = directory.appendingPathComponent("history.plist.post-sqlite")
+    var destination = base
+    var number = 2
+    while files.fileExists(atPath: destination.path) {
+        destination = URL(fileURLWithPath: base.path + "-\(number)")
+        number += 1
+    }
     let history = try HistoryStore(directory: directory, readOnly: true).load()
     try Archive(url: destination).save(history)
     let restored = try Archive(url: destination).load()

@@ -35,10 +35,11 @@ migration steps and make it harder to control the stored bytes exactly.
   conversion that does not match, leaves every file as it was.
 - If an older build recreates `history.plist` after conversion, writable startup conservatively merges it
   with SQLite. Plist metadata wins for the same UUID, pin memberships are unioned, and unique items and
-  pinboards from both sides remain. Before replacement, the plist and SQLite/WAL/SHM files are copied into
-  a private recovery directory. The merged staging database is reloaded and compared exactly before it is
-  installed, and the reappeared plist is retained as `history.plist.recovered` (with a numeric suffix when
-  needed). An unreadable side leaves the active stores untouched.
+  pinboards from both sides remain. Recovery takes an immediate transaction on the existing database, writes
+  the union in place, and never replaces the database or unlinks live WAL/SHM files. Before writing, a private
+  recovery directory receives the original plist plus a separately built and exactly verified SQLite snapshot
+  of the pre-merge history. The reappeared plist is retained as `history.plist.recovered` (with a numeric suffix
+  when needed). An unreadable side leaves the active stores untouched.
 - `History`, `ClipboardItem` and every `AppModel` call site keep their current shape. Only `persist()` and
   launch-time loading change.
 
@@ -59,6 +60,6 @@ which touches copy, drag, preview, thumbnails, OCR and duplicate merging. They g
   converted archive stays available as `history.plist.migrated`.
 - A conservative merge can resurrect an entry deleted in one store but retained in the other. This favors
   recoverability over inferring intent from two stores that have no per-item modification timestamp. Raw
-  pre-merge files remain in the private recovery directory.
+  legacy bytes and an exact logical database snapshot remain in the private recovery directory.
 - Items copied at exactly the same instant are ordered by insertion (newest insertion first), which matches
   `History.capture`.
