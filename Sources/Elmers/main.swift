@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import WebKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -85,6 +86,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             LinkPreviewChecks.run(url: ProcessInfo.processInfo.arguments[index + 1])
             return
         }
+        if let index = ProcessInfo.processInfo.arguments.firstIndex(of: "--check-link-browser") {
+            // Opens the Space preview of a link item and prints the loaded page's title.
+            precondition(model.isDemo, "Link browser checks require --demo")
+            let url = ProcessInfo.processInfo.arguments[index + 1]
+            model.start(); model.newText(url)
+            guard let item = model.history.items.first(where: { $0.text == url }) else { print("FAIL: no link item"); exit(1) }
+            panelController.openPreview(item)
+            func poll(_ attempt: Int) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    let web = NSApp.windows.compactMap { $0.contentView }.flatMap { [$0] + $0.allSubviews }.compactMap { $0 as? WKWebView }.first
+                    guard let web, !web.isLoading, let title = web.title, !title.isEmpty else {
+                        if attempt < 20 { poll(attempt + 1) } else { print("FAIL: page did not load"); exit(1) }
+                        return
+                    }
+                    print("PASS: link preview loaded “\(title)”"); exit(0)
+                }
+            }
+            poll(0)
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--show-panel"), let directory = ProcessInfo.processInfo.environment["ELMERS_CAPTURE_DIR"] {
             // Writes the demo panel as panel.png and quits, e.g. to check a translation. Requires --demo.
             precondition(model.isDemo, "Panel captures require --demo")
@@ -163,3 +184,9 @@ MainActor.assumeIsolated {
     app.delegate = delegate
     withExtendedLifetime(delegate) { app.run() }
 }
+
+#if DEBUG
+extension NSView {
+    var allSubviews: [NSView] { subviews + subviews.flatMap(\.allSubviews) }
+}
+#endif

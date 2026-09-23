@@ -91,6 +91,8 @@ public enum KeyboardRouter {
             if key == 123 { return .move(-1, extend: modifiers == .shift) }
             if key == 124 { return .move(1, extend: modifiers == .shift) }
         }
+        // Paste: "Navigate search results using the Right Arrow or Down Arrow keys." Down leaves the field for the results.
+        if context == .search, key == 125, modifiers.isEmpty { return .focusResults }
         guard context == .results else { return nil }
         if modifiers == .command {
             switch key {

@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import WebKit
 import ElmersCore
 
 struct CardView: View {
@@ -200,7 +201,9 @@ struct ItemPreview: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack { Text(item.title ?? item.kind.title).font(.title2.bold()); Spacer(); Text(item.source).foregroundStyle(.secondary) }
             Divider()
-            if let image = imagePreview(item) {
+            if item.kind == .link, let url = URL(string: item.text.trimmingCharacters(in: .whitespacesAndNewlines)) {
+                LinkBrowser(url: url).frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let image = imagePreview(item) {
                 Image(nsImage: image).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: .infinity)
                 if let text = item.recognizedText, !text.isEmpty {
                     Text("Recognized text").font(.caption.bold()).foregroundStyle(.secondary)
@@ -231,6 +234,22 @@ private struct TitleField: View {
             .onChange(of: focused) { _, isFocused in if !isFocused { commit(text.trimmingCharacters(in: .whitespacesAndNewlines)) } }
             .accessibilityLabel(String(localized: "Title"))
     }
+}
+
+/// The Space preview of a link: Paste opens links "in a built-in browser, so you can preview them without leaving
+/// Paste". The page loads only when the preview opens, with a private, non-persistent store, so no cookies or site data
+/// outlive the preview.
+struct LinkBrowser: NSViewRepresentable {
+    let url: URL
+    func makeNSView(context: Context) -> WKWebView {
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let view = WKWebView(frame: .zero, configuration: configuration)
+        view.setAccessibilityLabel(url.absoluteString)
+        if ["http", "https"].contains(url.scheme?.lowercased() ?? "") { view.load(URLRequest(url: url)) }
+        return view
+    }
+    func updateNSView(_ view: WKWebView, context: Context) {}
 }
 
 /// Paste 6.3.11's wording for content it keeps but cannot draw: "Preview unavailable" / "Preview can't be shown, but the

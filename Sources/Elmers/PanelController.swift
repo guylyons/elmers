@@ -297,10 +297,14 @@ final class PanelController: NSObject, NSWindowDelegate {
         openEditor(item)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in self?.editor.showWritingToolsForAllText() }
     }
+    /// A closed preview drops its content, so a link's page stops loading and playing.
+    func windowWillClose(_ notification: Notification) {
+        if let window = notification.object as? NSWindow, window == previewWindow { window.contentView = nil }
+    }
     func openPreview(_ item: ClipboardItem) {
         if previewWindow == nil {
             let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 640, height: 460), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
-            window.isReleasedWhenClosed = false; window.level = .floating; previewWindow = window
+            window.isReleasedWhenClosed = false; window.level = .floating; window.delegate = self; previewWindow = window
             applySharing()
         }
         previewWindow?.title = "\(item.kind.title) — \(item.source)"
@@ -313,7 +317,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         panel.makeFirstResponder(nil)
     }
     private func handle(_ event: NSEvent) -> NSEvent? {
-        if event.window == previewWindow && event.keyCode == 53 { previewWindow?.orderOut(nil); return nil }
+        if event.window == previewWindow && event.keyCode == 53 { previewWindow?.close(); return nil }
         if event.window == editor.panel {
             let stroke = KeyStroke(event.keyCode, KeyModifiers(event.modifierFlags))
             switch stroke {

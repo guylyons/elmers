@@ -66,6 +66,8 @@ final class InteractionModelTests {
         XCTAssertEqual(KeyboardRouter.command(for: .init(48), context: .search), .move(1, extend: false))
         XCTAssertEqual(KeyboardRouter.command(for: .init(48, .shift), context: .search), .move(-1, extend: false))
         XCTAssertNil(KeyboardRouter.command(for: .init(48), context: .editor))
+        XCTAssertEqual(KeyboardRouter.command(for: .init(125), context: .search), .focusResults)
+        XCTAssertNil(KeyboardRouter.command(for: .init(125), context: .results))
         XCTAssertEqual(KeyboardRouter.command(for: .init(3, .command), context: .search), .filters)
         XCTAssertEqual(KeyboardRouter.command(for: .init(123), context: .search), .move(-1, extend: false))
         XCTAssertEqual(KeyboardRouter.command(for: .init(124, .shift), context: .search), .move(1, extend: true))

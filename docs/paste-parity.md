@@ -1,5 +1,12 @@
 # Paste parity inventory
 
+## September 23 — from Paste's Help Center: search keys and link previews
+
+- **Down arrow from search.** Paste's help: "Navigate search results using the Right Arrow or Down Arrow keys." Down in the search field now moves focus to the results (`KeyboardRouter`, checked in core). Return in search still pastes at once and Tab still moves the selection; both are the user's earlier decisions, not Paste's documented Return and Tab behavior.
+- **Links in a built-in browser.** Paste's help: "Links open in a built-in browser, so you can preview them without leaving Paste." The Space preview of a link now shows the page in a web view with a private, non-persistent data store, loaded only when the preview opens and torn down when it closes. `--demo --check-link-browser <url>` loads a local fixture page and passes. Paste's preview window itself has not been compared.
+- **Documented but not in the installed 6.3.11:** Paste MCP (a Settings › "MCP & AI Tools" pane) and Intelligent Clipboard (a sparkle Suggestions button, macOS 26 with Apple Intelligence). Neither appears in the installed version's Settings or toolbar, so they are recorded as newer and are not parity targets for this reference.
+- **Documented, still to observe:** a resizable panel (drag the top edge) with a Compact Mode at small heights; "Paste as Plain Text" in the context menu (probably a Shift alternate); a "Show in" item on search results; highlighted matches in results; first-launch setup.
+
 ## September 23 — renaming in place
 
 Paste's Help Center ("Edit and label items"): "Press Command-R to rename", or "click the item's title and type a new one". Elmers used a Rename dialog. Now ⌘R, the menu's Rename, or a click on the selected card's title turns the title into a field in the header (white text, the type name as a dim placeholder). Keys go to the field; Return saves, Escape cancels, clicking elsewhere saves, and an empty title returns the card to its type name. The step "⌘R renames the card title in place; Return saves, Escape cancels" in `--check-interaction` passes. Paste's own rename field was not observed, so its look is unverified.
