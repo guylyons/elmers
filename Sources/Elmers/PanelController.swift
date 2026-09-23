@@ -192,10 +192,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         guard model.copy(item, plainText: plainText) else { return }
         guard model.directPaste else { hide(); showCopied(); return }
         SoundEffects.shared.play(.paste)
-        guard AXIsProcessTrusted() else {
-            model.message = "Copied. Press ⌘V in your app, or enable Accessibility in Elmers Settings for direct paste."
-            return
-        }
+        guard AXIsProcessTrusted() else { askForAccessibility(); return }
         guard let target = previousApp, !target.isTerminated else {
             model.message = "Copied. The previous app is unavailable; use ⌘V in your destination."
             return
@@ -206,6 +203,23 @@ final class PanelController: NSObject, NSWindowDelegate {
         guard target.activate(options: []) else { model.message = "Copied, but the destination could not be activated."; show(resetState: false); return }
         let expectedChange = NSPasteboard.general.changeCount
         attemptPaste(to: target, generation: generation, expectedChange: expectedChange, attempts: 12)
+    }
+    /// Paste 6.3.11's prompt when "To active app" is chosen without Accessibility access (wording from its strings
+    /// table; its presentation was not observed). The item is already on the clipboard either way.
+    private func askForAccessibility() {
+        let alert = NSAlert()
+        alert.messageText = "Do you want to paste directly to \(previousApp?.localizedName ?? "the current app")?"
+        alert.informativeText = "Elmers needs accessibility access to paste directly to other apps."
+        alert.addButton(withTitle: "Enable Accessibility Access")
+        alert.addButton(withTitle: "Not Now, Copy to Clipboard")
+        alert.beginSheetModal(for: panel) { [weak self] response in
+            guard let self else { return }
+            self.hide()
+            if response == .alertFirstButtonReturn {
+                _ = AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary)
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") { NSWorkspace.shared.open(url) }
+            } else { self.showCopied() }
+        }
     }
     /// Paste confirms a copy with a HUD near the bottom of the screen instead of a message in the panel.
     func showCopied() {
