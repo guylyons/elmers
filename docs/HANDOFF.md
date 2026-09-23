@@ -171,3 +171,26 @@ On a private copy of the live store, `ElmersCoreChecks --storage-report <dir>` s
 Link previews no longer send or keep cookies. `LinkPreviewFetcher` passes a `URLRequest` with `httpShouldHandleCookies = false` to LinkPresentation, and afterwards clears Elmers' own cookie storage and URL cache (`purgeWebState`, also run at launch). Verification: `Elmers --check-link-preview-privacy http://localtest.me:8765/page`, run against a local server that sets `tracker=…` and logs each request's Cookie header. Without the change, the second fetch sent the cookie back. With it, no request sent a cookie and none was kept. A bare IP address is not a valid test, because cookies from IP hosts are dropped anyway.
 
 Not done by decision: encryption beyond FileVault.
+
+## September 23 — checkpoint
+
+All work is on `main`, pushed to `github`. The `origin` (sourcehut) push failed with "Permission denied (publickey)", so `origin` is behind until the SSH key works there.
+
+Done today (details in `docs/paste-parity.md`, newest sections first):
+
+- **Search mode** as Paste: a quarter-width field with tokens, collapsed pinboards, a chip popover (Type/App/Date/Device, OR within a section, AND across), and Escape one layer at a time. Down arrow leaves the field.
+- **Color type** (six hex digits), card and filter chip.
+- **Paste's strings table as an inventory**: wording fixes, Writing Tools ⇧⌘E, the Preview unavailable state, the first-use Accessibility prompt, recorder labels and errors (system-wide, menu item, Option-only), and in-place renaming.
+- **Image rotate** in the editor; the editor's text area layout fixed.
+- **Long histories**: no 2,000-item cap; representations over 64 KB load from SQLite on use; 20,000 items load in about 280 ms and 25 MB; search takes about 3 ms.
+- **Pinboards as Paste documents them**: one pinboard per item, deleting a pinboard removes its items, pinned items outlive history, hand ordering and pin by drag. Schema version 2, migrated on the live store with its identity unchanged.
+- **17 languages** (`Resources/Localization`). Paste-worded strings use Paste's translation, with the brand swapped; see CLAUDE.md › Localization.
+- **Paused menu bar icon**, **link previews in a private web view**, **first-run setup** with a Useful Links pinboard, **Paste Stack** (working; look provisional).
+
+Verification: core 69/69; `--check-interaction` passes in full on an idle Mac; `--check-editor`, `--check-stack`, `--check-link-browser`, `--check-screenshots` and `--check-status-item` pass.
+
+Next, needing Paste on screen (run only while the Mac is idle, with `obs.sh`-style guards; see the memory note on guarding clicks):
+1. Paste Stack window: layout, empty state, position, whether entries survive closing.
+2. Resizable panel and Compact Mode (Paste saves `NSWindow Frame PasteAppMainWindow` with a 332-pt height).
+3. The context menu with Shift held (Paste as Plain Text), search highlighting, the "≡ 1" card marker, the Nothing found layout, image card footers, the Space preview, and the "Delete selected items?" confirmation. Deleting the test items left in Paste's history on September 23 (`#123456`, `FF8800`, `rgb(…)` and similar) cleans them up at the same time.
+4. Popover horizontal offset; dark appearance; Hebrew right-to-left.
