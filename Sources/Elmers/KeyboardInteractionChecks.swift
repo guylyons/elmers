@@ -35,11 +35,17 @@ final class KeyboardInteractionChecks {
             let (code, flags, verify, description) = steps[index]
             let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: controller.panel.windowNumber, context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: code)!
             NSApp.postEvent(event, atStart: false)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-                guard verify() else { print("FAIL: \(description) [debug editor=\(controller.panel.firstResponder is NSTextView) focused=\(model.searchIsFocused) open=\(model.searchOpen) selIndex=\(model.selectedID.flatMap { ids.firstIndex(of: $0) } ?? -1) count=\(model.selection.ids.count)]"); fflush(stdout); exit(1) }
-                print("PASS: \(description)")
-                step(index + 1)
+            // Give the event 80 ms, then keep checking for up to 1.5 s: a fixed delay failed whenever the machine
+            // was busy, although every step eventually reached its state.
+            let deadline = Date().addingTimeInterval(1.5)
+            func check() {
+                if verify() { print("PASS: \(description)"); step(index + 1); return }
+                guard Date() < deadline else {
+                    print("FAIL: \(description) [editor=\(controller.panel.firstResponder is NSTextView) focused=\(model.searchIsFocused) open=\(model.searchOpen) selIndex=\(model.selectedID.flatMap { ids.firstIndex(of: $0) } ?? -1) count=\(model.selection.ids.count)]"); fflush(stdout); exit(1)
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.02, execute: check)
             }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08, execute: check)
         }
         step(0)
     }
@@ -232,12 +238,17 @@ final class KeyboardInteractionChecks {
         checkEditor(controller: controller)
     }
     /// Exercises the floating editor with real text storage: counters, bold on a range, RTF-only-when-formatted, cancel.
+    /// Set by `--check-editor`: run only the editor checks, which need no keyboard focus.
+    static var editorOnly = false
     static func checkEditor(controller: PanelController) {
         let model = controller.model, editor = controller.editor
         let countBefore = model.history.items.count
         controller.openEditor(nil)
         guard editor.panel.isVisible, !controller.isShown else { print("FAIL: editor did not replace the panel"); fflush(stdout); exit(1) }
         editor.textView.insertText("Hello editor\nsecond line", replacementRange: NSRange(location: 0, length: 0))
+        if let directory = ProcessInfo.processInfo.environment["ELMERS_CAPTURE_DIR"], let view = editor.panel.contentView, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+            view.cacheDisplay(in: view.bounds, to: rep); try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: directory).appendingPathComponent("editor-text.png"))
+        }
         guard editor.statistics == "24 characters · 4 words · 2 lines" else { print("FAIL: editor statistics: \(editor.statistics)"); fflush(stdout); exit(1) }
         editor.textView.setSelectedRange(NSRange(location: 0, length: 5))
         editor.toggleBold()
@@ -266,6 +277,21 @@ final class KeyboardInteractionChecks {
         editor.confirm()
         guard model.history.items.first(where: { $0.id == created.id })?.text == "CHANGED editor\nsecond line" else { print("FAIL: save did not update the item"); fflush(stdout); exit(1) }
         print("PASS: editor cancel preserves and save updates the item")
+        let square = NSImage(size: NSSize(width: 160, height: 100), flipped: false) { rect in NSColor.systemTeal.setFill(); rect.fill(); return true }
+        guard let squareTIFF = square.tiffRepresentation, let squarePNG = NSBitmapImageRep(data: squareTIFF)?.representation(using: .png, properties: [:]) else { print("FAIL: rotation fixture"); fflush(stdout); exit(1) }
+        model.newItem(payload: ClipboardPayload(items: [["public.png": squarePNG]]))
+        let picture = model.history.items[0]
+        controller.openEditor(picture)
+        guard editor.panel.isVisible, !editor.imageView.isHidden, editor.imageView.image != nil, editor.textView.isHidden else { print("FAIL: an image item should open in the editor's image mode"); fflush(stdout); exit(1) }
+        if let directory = ProcessInfo.processInfo.environment["ELMERS_CAPTURE_DIR"], let view = editor.panel.contentView, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+            view.cacheDisplay(in: view.bounds, to: rep); try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: directory).appendingPathComponent("editor-image.png"))
+        }
+        editor.rotateLeft(); editor.rotateLeft(); editor.rotateRight()
+        editor.confirm()
+        guard let rotated = model.history.items.first(where: { $0.id == picture.id }).flatMap(imagePreview), let rep = rotated.representations.first,
+              rep.pixelsWide == 100, rep.pixelsHigh == 160 else { print("FAIL: Rotate left twice and right once should save the image turned a quarter"); fflush(stdout); exit(1) }
+        print("PASS: image editor rotates and saves the turned image")
+        if editorOnly { print("PASS: editor checks"); fflush(stdout); exit(0) }
         checkDrag(model: model, controller: controller)
     }
     /// A card drag must carry every stored item with every representation, and file URLs must be the originals.

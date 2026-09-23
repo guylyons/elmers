@@ -67,6 +67,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 15) { print("FAIL: global shortcut timed out"); fflush(stdout); exit(1) }
             return
         }
+        if ProcessInfo.processInfo.arguments.contains("--check-editor") {
+            precondition(model.isDemo, "Editor checks require --demo")
+            KeyboardInteractionChecks.editorOnly = true
+            KeyboardInteractionChecks.checkEditor(controller: panelController)
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--check-interaction") {
             precondition(model.isDemo, "Interaction checks require --demo")
             InteractionChecks.run(model: model, controller: panelController)

@@ -66,7 +66,7 @@ struct HistoryView: View {
         .onReceive(NotificationCenter.default.publisher(for: .elmersResults)) { _ in searchFocused = false; model.filtersOpen = false }
         .onReceive(NotificationCenter.default.publisher(for: .elmersFilters)) { _ in model.searchOpen = true; model.filtersOpen.toggle() }
         .onReceive(NotificationCenter.default.publisher(for: .elmersEdit)) { _ in
-            if let item = model.selected, !item.text.isEmpty, model.canEdit { model.openEditor?(item) }
+            if let item = model.selected, !item.text.isEmpty || item.kind.isImage, model.canEdit { model.openEditor?(item) }
         }
         .onReceive(NotificationCenter.default.publisher(for: .elmersRename)) { _ in
             if let item = model.selected, model.canEdit { renamingItem = item; boardName = item.title ?? ""; boardDialog = true }
@@ -205,7 +205,7 @@ struct HistoryView: View {
         Button(model.directPaste ? "Paste to \(model.destinationApp ?? "current app")" : "Paste") { model.activate() }.keyboardShortcut(.return, modifiers: [])
         Button("Copy") { if let aggregate = model.selectedAggregate(), model.copy(aggregate) { model.showCopied?() } }.keyboardShortcut("c")
         Divider()
-        Button("Edit") { model.openEditor?(item) }.keyboardShortcut("e").disabled(item.text.isEmpty || !model.canEdit)
+        Button("Edit") { model.openEditor?(item) }.keyboardShortcut("e").disabled((item.text.isEmpty && !item.kind.isImage) || !model.canEdit)
         if #available(macOS 15.2, *) {
             Button("Writing Tools") { model.openWritingTools?(item) }.keyboardShortcut("e", modifiers: [.command, .shift]).disabled(item.text.isEmpty || !model.canEdit)
         }

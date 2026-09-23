@@ -16,6 +16,7 @@ SwiftPM only (Swift 5.9, macOS 14+, no Xcode project, no third-party deps).
 - Lint: `./scripts/lint.sh [paths]` (swift-format rules in `.swift-format`; layout diagnostics are filtered out). Never run `swift-format format`; it would rewrite the deliberately dense style (4-space indent, `;`-joined statements, long lines).
 - Core tests: `./scripts/test.sh`. This is a hand-rolled runner (`ElmersCoreChecks`), not XCTest: there is no single-test filter, and a new check must be registered in the `checks` array in `Tests/ElmersCoreTests/main.swift`.
 - UI self-checks are DEBUG flags in `Sources/Elmers/main.swift`, for example `.build/debug/Elmers --demo --check-interaction`. Others: `--check-status-item`, `--check-screenshots`, `--check-scroll-performance`, `--check-global-shortcut`, `--check-sounds`, `--show-settings`. `--demo` uses a separate defaults suite and in-memory content. Set `ELMERS_CAPTURE_DIR=<scratch dir>` to get window-bound PNGs; that is the safe way to look at the UI without exposing real history.
+- `--demo --check-editor` runs only the editor checks. They need no keyboard focus, so they are reliable while someone is using the Mac; `--check-interaction` is not, because real input steals the demo panel's focus.
 - `--check-live-storage-persistence` writes to the **real** store (run without `--demo`, never with another Elmers process running).
 - Known flake: the "typing into a fresh search" step of `--check-interaction` can fail right after a build; rerun before debugging.
 

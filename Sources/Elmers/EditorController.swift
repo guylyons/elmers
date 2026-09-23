@@ -14,7 +14,8 @@ final class EditorTextView: NSTextView {
 
 /// Floating rich-text editor modeled on Paste's "New Text Item" and "Edit" windows:
 /// Cancel · Bold Italic Underline Strikethrough · Writing Tools · Create/Save, then the text,
-/// then "N characters · N words · N lines".
+/// then "N characters · N words · N lines". Image items get Paste's Rotate left and Rotate right instead of the
+/// text tools and show the image in place of the text.
 @MainActor
 final class EditorController: NSObject, NSTextViewDelegate {
     let panel: EditorPanel
@@ -23,6 +24,13 @@ final class EditorController: NSObject, NSTextViewDelegate {
     private let confirmButton = NSButton(title: "Create", target: nil, action: nil)
     private var completion: ((ClipboardPayload?) -> Void)?
     private(set) var editingItem: ClipboardItem?
+    private var formatting: NSStackView!
+    private var rotation: NSStackView!
+    private var scroll: NSScrollView!
+    let imageView = NSImageView()
+    /// The image being edited and the quarter turns applied to it (positive is counterclockwise).
+    private var originalImage: Data?
+    private(set) var quarterTurns = 0
 
     override init() {
         panel = EditorPanel(contentRect: .init(x: 0, y: 0, width: 500, height: 360), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -53,7 +61,7 @@ final class EditorController: NSObject, NSTextViewDelegate {
         confirmButton.keyEquivalent = "\r"; confirmButton.keyEquivalentModifierMask = .command
         confirmButton.bezelColor = .controlAccentColor
 
-        let formatting = NSStackView(views: [
+        formatting = NSStackView(views: [
             formatButton("B", weight: .bold, action: #selector(toggleBold), tip: "Bold (⌘B)"),
             formatButton("I", italic: true, action: #selector(toggleItalic), tip: "Italic (⌘I)"),
             formatButton("U", underline: true, action: #selector(toggleUnderline), tip: "Underline (⌘U)"),
@@ -67,13 +75,19 @@ final class EditorController: NSObject, NSTextViewDelegate {
             tools.isBordered = false; tools.toolTip = "Writing Tools"; tools.setAccessibilityLabel("Writing Tools")
             formatting.addArrangedSubview(tools); formatting.setCustomSpacing(34, after: formatting.arrangedSubviews[3])
         }
+        rotation = NSStackView(views: [
+            symbolButton("rotate.left", tip: "Rotate left", action: #selector(rotateLeft)),
+            symbolButton("rotate.right", tip: "Rotate right", action: #selector(rotateRight))
+        ])
+        rotation.spacing = 22; rotation.isHidden = true
         let leftSpacer = NSView(), rightSpacer = NSView()
-        let toolbar = NSStackView(views: [cancel, leftSpacer, formatting, rightSpacer, confirmButton])
+        let toolbar = NSStackView(views: [cancel, leftSpacer, formatting, rotation, rightSpacer, confirmButton])
         toolbar.orientation = .horizontal; toolbar.distribution = .fill; toolbar.alignment = .centerY
         // Equal spacers keep the formatting group centered between Cancel and Create/Save, as in Paste.
         leftSpacer.widthAnchor.constraint(equalTo: rightSpacer.widthAnchor).isActive = true
         for spacer in [leftSpacer, rightSpacer] { spacer.setContentHuggingPriority(.defaultLow, for: .horizontal) }
         toolbar.edgeInsets = .init(top: 8, left: 10, bottom: 6, right: 10)
+        toolbar.setHuggingPriority(.required, for: .vertical)
 
         textView.isRichText = true; textView.allowsUndo = true; textView.font = .systemFont(ofSize: 13)
         textView.textContainerInset = NSSize(width: 6, height: 8); textView.delegate = self
@@ -82,9 +96,16 @@ final class EditorController: NSObject, NSTextViewDelegate {
         scroll.borderType = .noBorder; scroll.drawsBackground = true; scroll.backgroundColor = .textBackgroundColor
         scroll.wantsLayer = true; scroll.layer?.cornerRadius = 8; scroll.layer?.masksToBounds = true
         scroll.translatesAutoresizingMaskIntoConstraints = false
+        scroll.setContentHuggingPriority(.defaultLow, for: .vertical)
 
         footer.font = .systemFont(ofSize: 12); footer.textColor = .secondaryLabelColor
         footer.setAccessibilityLabel("Statistics")
+        imageView.imageScaling = .scaleProportionallyDown; imageView.isHidden = true
+        for orientation in [NSLayoutConstraint.Orientation.horizontal, .vertical] {
+            imageView.setContentHuggingPriority(.defaultLow, for: orientation); imageView.setContentCompressionResistancePriority(.defaultLow, for: orientation)
+        }
+        imageView.translatesAutoresizingMaskIntoConstraints = false; imageView.setAccessibilityLabel("Image")
+        self.scroll = scroll
         let column = NSStackView(views: [toolbar, scroll, footer])
         column.orientation = .vertical; column.alignment = .leading; column.spacing = 6
         column.edgeInsets = .init(top: 0, left: 0, bottom: 10, right: 0)
@@ -95,7 +116,17 @@ final class EditorController: NSObject, NSTextViewDelegate {
             column.topAnchor.constraint(equalTo: material.topAnchor), column.bottomAnchor.constraint(equalTo: material.bottomAnchor),
             toolbar.widthAnchor.constraint(equalTo: column.widthAnchor),
             scroll.leadingAnchor.constraint(equalTo: column.leadingAnchor, constant: 8), scroll.trailingAnchor.constraint(equalTo: column.trailingAnchor, constant: -8),
-            footer.leadingAnchor.constraint(equalTo: column.leadingAnchor, constant: 14)
+            footer.leadingAnchor.constraint(equalTo: column.leadingAnchor, constant: 14),
+            // The footer sits on the bottom edge and the text area takes the height between it and the toolbar;
+            // left to the stack's gravity, both packed at the top and the text area was a single line tall.
+            footer.bottomAnchor.constraint(equalTo: material.bottomAnchor, constant: -10),
+            scroll.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -6)
+        ])
+        // The image takes the text area's place: pinned over the scroll view, whose text is hidden meanwhile.
+        material.addSubview(imageView)
+        NSLayoutConstraint.activate([
+            imageView.leadingAnchor.constraint(equalTo: scroll.leadingAnchor, constant: 8), imageView.trailingAnchor.constraint(equalTo: scroll.trailingAnchor, constant: -8),
+            imageView.topAnchor.constraint(equalTo: scroll.topAnchor, constant: 8), imageView.bottomAnchor.constraint(equalTo: scroll.bottomAnchor, constant: -8)
         ])
     }
 
@@ -105,6 +136,11 @@ final class EditorController: NSObject, NSTextViewDelegate {
         editingItem = item; self.completion = completion
         confirmButton.title = item == nil ? "Create" : "Save"
         textView.string = ""
+        originalImage = item.flatMap { $0.kind.isImage ? imageData(of: $0) : nil }; quarterTurns = 0
+        let editsImage = originalImage != nil
+        formatting.isHidden = editsImage; rotation.isHidden = !editsImage
+        textView.isHidden = editsImage; scroll.hasVerticalScroller = !editsImage; imageView.isHidden = !editsImage; footer.alphaValue = editsImage ? 0 : 1
+        imageView.image = originalImage.flatMap(NSImage.init(data:))
         if let item {
             if let rtf = item.payload.items.first?[NSPasteboard.PasteboardType.rtf.rawValue], let text = NSAttributedString(rtf: rtf, documentAttributes: nil) {
                 textView.textStorage?.setAttributedString(text)
@@ -117,7 +153,7 @@ final class EditorController: NSObject, NSTextViewDelegate {
         let screen = (NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main)?.visibleFrame ?? .zero
         panel.setFrame(NSRect(x: screen.midX - size.width / 2, y: screen.midY - size.height / 2 + 120, width: size.width, height: size.height), display: true)
         panel.makeKeyAndOrderFront(nil)
-        panel.makeFirstResponder(textView)
+        panel.makeFirstResponder(editsImage ? nil : textView)
     }
 
     var statistics: String {
@@ -128,12 +164,16 @@ final class EditorController: NSObject, NSTextViewDelegate {
     }
     private func refresh() {
         footer.stringValue = statistics
-        confirmButton.isEnabled = !textView.string.allSatisfy(\.isWhitespace)
+        confirmButton.isEnabled = originalImage != nil ? quarterTurns % 4 != 0 : !textView.string.allSatisfy(\.isWhitespace)
     }
     func textDidChange(_ notification: Notification) { refresh() }
 
     /// Plain text always; RTF only when formatting was applied, so unformatted items stay plain when pasted.
     var payload: ClipboardPayload? {
+        if let originalImage {
+            guard quarterTurns % 4 != 0, let rotated = ImageRotation.rotate(originalImage, quarterTurns: quarterTurns) else { return nil }
+            return ClipboardPayload(items: [["public.png": rotated]])
+        }
         guard let storage = textView.textStorage, !storage.string.allSatisfy(\.isWhitespace) else { return nil }
         var representations = [NSPasteboard.PasteboardType.string.rawValue: Data(storage.string.utf8)]
         if Self.hasFormatting(storage), let rtf = storage.rtf(from: NSRange(location: 0, length: storage.length), documentAttributes: [:]) {
@@ -155,9 +195,26 @@ final class EditorController: NSObject, NSTextViewDelegate {
     @objc func cancel() { finish(nil) }
     private func finish(_ payload: ClipboardPayload?) {
         panel.orderOut(nil)
+        originalImage = nil; imageView.image = nil
         let completion = self.completion
         self.completion = nil; editingItem = nil
         completion?(payload)
+    }
+
+    // MARK: - Image
+
+    @objc func rotateLeft() { turn(1) }
+    @objc func rotateRight() { turn(-1) }
+    private func turn(_ quarters: Int) {
+        guard let originalImage else { return }
+        quarterTurns = (quarterTurns + quarters) % 4
+        imageView.image = (quarterTurns == 0 ? originalImage : ImageRotation.rotate(originalImage, quarterTurns: quarterTurns)).flatMap(NSImage.init(data:))
+        refresh()
+    }
+    private func symbolButton(_ symbol: String, tip: String, action: Selector) -> NSButton {
+        let button = NSButton(image: NSImage(systemSymbolName: symbol, accessibilityDescription: tip)!, target: self, action: action)
+        button.isBordered = false; button.toolTip = tip; button.setAccessibilityLabel(tip)
+        return button
     }
 
     // MARK: - Formatting
