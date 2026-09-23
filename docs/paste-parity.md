@@ -32,7 +32,7 @@ Source: `Paste.app/Contents/Resources/PastePackages_PasteLocalization.bundle` (6
 | Pause | "Pause Paste", "Pause for %@", "Paused until %@", "Paste Paused" / "Paste Resumed" | partly: the Pause menu and timers exist; the "Paused until" label and the paused/resumed notices are unobserved |
 | Preview unavailable | "Preview unavailable" / "Preview can't be shown, but the content is saved, and you're able to paste it" | **open** |
 | Diagnostics | Start Diagnostic, Stop & Copy Logs, Reset Search Index | not applicable: Elmers has no remote support channel or separate search index |
-| Shortcut recorder | Errors for Option-only shortcuts before macOS 15.2, shortcuts used by a menu item, and system-wide shortcuts | **open**: compare with Elmers' conflict messages |
+| Shortcut recorder | Errors for Option-only shortcuts before macOS 15.2, shortcuts used by a menu item, and system-wide shortcuts; labels "Recording" and "None" | **implemented with Paste's wording**: menu-item conflicts name the item (New Text Item, Settings…, Pause, Quit Elmers); system-wide combinations are refused after reading macOS's symbolic hot key table (on this Mac ⌘Space and ⇧⌘3 are reserved, ⇧⌘V is not); Option-only shortcuts show Paste's note before macOS 15.2; the recorder reads "Recording" and "None". Paste's recorder was not driven, so the error's position and styling are unverified |
 | Show in Menu Bar | A General setting | not shown in the observed General pane (layout matched to 0.5 pt without it); probably conditional |
 | Check for Updates | Updater menu item | not applicable to a locally built app |
 

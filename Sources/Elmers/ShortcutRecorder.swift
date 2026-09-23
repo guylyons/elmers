@@ -32,7 +32,8 @@ struct ShortcutRecorder: NSViewRepresentable {
         }
         required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
         func refreshTitle() {
-            let text = recording ? "Type shortcut…" : binding?.label ?? "Record Shortcut"
+            // Paste 6.3.11's recorder reads "Recording" while it listens and "None" when no shortcut is set.
+            let text = recording ? "Recording" : binding?.label ?? "None"
             let paragraph = NSMutableParagraphStyle(); paragraph.alignment = .center
             attributedTitle = NSAttributedString(string: text, attributes: [.font: NSFont.systemFont(ofSize: 13), .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph])
         }

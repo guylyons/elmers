@@ -36,6 +36,9 @@ final class InteractionModelTests {
         settings.nextBoard = nil
         settings.activation = KeyStroke(18, settings.quickPasteModifier)
         XCTAssertNotNil(settings.validationError)
+        // A menu item's key equivalent is named, in Paste's wording.
+        settings.activation = KeyStroke(43, .command)
+        XCTAssertEqual(settings.validationError, "This shortcut cannot be used because it is already used by the menu item ‘Settings…’.")
     }
     func testPasteKeyboardMap() {
         let cases: [(KeyStroke, KeyboardCommand)] = [

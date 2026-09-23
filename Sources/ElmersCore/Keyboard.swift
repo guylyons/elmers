@@ -34,10 +34,23 @@ public struct ShortcutSettings: Codable, Equatable, Sendable {
         if Set(bindings).count != bindings.count { return "Choose a different shortcut for each action." }
         var reserved = self
         reserved.activation = nil; reserved.nextBoard = nil; reserved.previousBoard = nil
-        if bindings.contains(where: { KeyboardRouter.command(for: $0, context: .results, settings: reserved) != nil }) {
+        for binding in bindings {
+            guard let command = KeyboardRouter.command(for: binding, context: .results, settings: reserved) else { continue }
+            // Paste 6.3.11's wording when the menu already owns the combination.
+            if let item = Self.menuItemTitle(command) { return "This shortcut cannot be used because it is already used by the menu item ‘\(item)’." }
             return "This shortcut is already used by a clipboard command. Choose another combination."
         }
         return nil
+    }
+    /// The app menu's items that carry a key equivalent (`AppMenu`), by the command they run.
+    static func menuItemTitle(_ command: KeyboardCommand) -> String? {
+        switch command {
+        case .newText: return "New Text Item"
+        case .settings: return "Settings…"
+        case .pause: return "Pause"
+        case .quit: return "Quit Elmers"
+        default: return nil
+        }
     }
 }
 public enum KeyboardContext { case results, search, editor }

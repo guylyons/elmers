@@ -28,7 +28,10 @@ final class AppModel: ObservableObject {
     @Published var shortcuts = ShortcutSettings() {
         didSet {
             if let error = shortcuts.validationError { shortcuts = oldValue; shortcutValidationError = error; return }
-            shortcutValidationError = nil
+            let changed = [(shortcuts.activation, oldValue.activation), (shortcuts.nextBoard, oldValue.nextBoard), (shortcuts.previousBoard, oldValue.previousBoard)]
+                .compactMap { new, old in new != old ? new : nil }
+            if changed.contains(where: SystemShortcuts.isReserved) { shortcuts = oldValue; shortcutValidationError = SystemShortcuts.usedMessage; return }
+            shortcutValidationError = changed.contains(where: SystemShortcuts.needsOptionWarning) ? SystemShortcuts.optionMessage : nil
             saveShortcuts()
         }
     }
