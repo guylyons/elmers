@@ -63,6 +63,10 @@ public final class HistoryStore: @unchecked Sendable {
             try files.moveItem(at: stagingURL, to: databaseURL)
         }
         let database = try Self.open(databaseURL, readOnly: readOnly)
+        if !readOnly {
+            Self.scrub(database)
+            excludeFromBackups()
+        }
         let history = try Self.read(database)
         self.database = database
         savedItems = Self.baseline(history.items)
@@ -72,10 +76,19 @@ public final class HistoryStore: @unchecked Sendable {
         return history
     }
 
+    /// Keeps clipboard history, and every backup kept beside it, out of Time Machine so deleted items do not
+    /// live on in old backups. The flag is stored on the folder itself, so the next launch finds it already set.
+    private func excludeFromBackups() {
+        var values = URLResourceValues(); values.isExcludedFromBackup = true
+        var folder = directory
+        try? folder.setResourceValues(values)
+    }
+
     public func save(_ history: History) throws {
         guard !readOnly else { throw StoreError.readOnly }
         guard let database else { throw StoreError.notLoaded }
         var statistics = SaveStatistics()
+        var replacedContent = false
         try database.transaction {
             var baseline = savedItems
             // Rows this process last wrote are the only ones it may delete, even after a rebuild below.
@@ -97,12 +110,21 @@ public final class HistoryStore: @unchecked Sendable {
                                  boards: Self.mergeBoards(local: history.boards, base: savedBoards, stored: storedBoards))
             }
             try Self.write(target, to: database, baseline: baseline, deleting: deleting,
-                           baselineBoards: storedBoards, statistics: &statistics)
+                           baselineBoards: storedBoards, statistics: &statistics, replacedContent: &replacedContent)
         }
+        if replacedContent { Self.scrub(database) }
         savedItems = Self.baseline(history.items)
         savedBoards = history.boards
         dataVersion = try? database.integer("PRAGMA data_version")
         lastSave = statistics
+    }
+
+    /// After a save removed or replaced content: return the (already zeroed) free pages to the file system and
+    /// empty the WAL, whose older frames still hold the rows as they were before. Best effort; a busy reader
+    /// in another process only postpones this to the next such save.
+    private static func scrub(_ database: SQLiteDatabase) {
+        try? database.execute("PRAGMA incremental_vacuum")
+        try? database.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     }
 
     private static func readBoards(_ database: SQLiteDatabase) throws -> [Pinboard] {
@@ -164,6 +186,19 @@ public final class HistoryStore: @unchecked Sendable {
         guard version <= schemaVersion else { throw StoreError.unsupportedVersion(version) }
         guard (try? database.text("PRAGMA quick_check")) == "ok" else { throw StoreError.damaged("integrity check failed") }
         guard !readOnly else { return database }
+        // Clipboard history is private: zero the bytes of every deleted row, freed page and overwritten value
+        // instead of leaving them readable in the file, and keep SQLite's temporary files (VACUUM's copy of the
+        // database included) in memory rather than in the temporary directory.
+        try database.execute("PRAGMA secure_delete = ON")
+        try database.execute("PRAGMA temp_store = MEMORY")
+        // Incremental auto-vacuum lets saves give freed pages back so the file shrinks. Earlier builds created
+        // databases without it and with fast secure delete, which left deleted content in whole free pages;
+        // switching modes needs one VACUUM, and that rewrite also drops those pages. VACUUM fails while another
+        // process has the database open; history still loads, and the rewrite is tried again on the next open.
+        if try database.integer("PRAGMA auto_vacuum") != 2 {
+            try database.execute("PRAGMA auto_vacuum = INCREMENTAL")
+            try? database.execute("VACUUM")
+        }
         try database.execute("PRAGMA journal_mode = \(journal)")
         try database.execute("PRAGMA foreign_keys = ON")
         if version < schemaVersion {
@@ -175,7 +210,8 @@ public final class HistoryStore: @unchecked Sendable {
         return database
     }
 
-    static let migrations: [Int: String] = [
+    /// Schema steps by version. Public so storage checks can build a database as an earlier build left it.
+    public static let migrations: [Int: String] = [
         1: """
         CREATE TABLE items (
             id TEXT PRIMARY KEY, copied_at REAL NOT NULL, source TEXT NOT NULL, source_bundle_id TEXT,
@@ -244,8 +280,10 @@ public final class HistoryStore: @unchecked Sendable {
     /// `baseline` says what each row currently holds, `deleting` which rows this writer owns and may
     /// remove when they are no longer in `history`. Rows another writer added are in neither set.
     private static func write(_ history: History, to database: SQLiteDatabase, baseline: [UUID: StoredItem],
-                              deleting: Set<UUID>, baselineBoards: [Pinboard], statistics: inout SaveStatistics) throws {
+                              deleting: Set<UUID>, baselineBoards: [Pinboard], statistics: inout SaveStatistics,
+                              replacedContent: inout Bool) throws {
         if history.boards != baselineBoards {
+            replacedContent = replacedContent || !baselineBoards.isEmpty
             try database.execute("DELETE FROM boards")
             let insert = try database.prepare("INSERT INTO boards (id, name, color_index, position) VALUES (?, ?, ?, ?)")
             for (position, board) in history.boards.enumerated() {
@@ -257,6 +295,7 @@ public final class HistoryStore: @unchecked Sendable {
         let delete = try database.prepare("DELETE FROM items WHERE id = ?")
         for id in deleting where !present.contains(id) {
             try delete.run([.text(id.uuidString)]); statistics.itemsDeleted += 1
+            replacedContent = true
         }
         let upsert = try database.prepare("""
             INSERT INTO items (id, copied_at, source, source_bundle_id, title, fingerprint, payload_item_count, recognized_text,
@@ -276,6 +315,7 @@ public final class HistoryStore: @unchecked Sendable {
         for item in history.items.reversed() {
             let previous = baseline[item.id]
             guard StoredItem(item) != previous else { continue }
+            if previous != nil { replacedContent = true }
             let key = SQLiteDatabase.Value.text(item.id.uuidString)
             func optional(_ text: String?) -> SQLiteDatabase.Value { text.map { .text($0) } ?? .null }
             func optional(_ data: Data?) -> SQLiteDatabase.Value { data.map { .blob($0) } ?? .null }
@@ -309,7 +349,9 @@ public final class HistoryStore: @unchecked Sendable {
         try files.setAttributes([.posixPermissions: 0o600], ofItemAtPath: destination.path)
         var statistics = SaveStatistics()
         try database.transaction {
-            try Self.write(history, to: database, baseline: [:], deleting: [], baselineBoards: [], statistics: &statistics)
+            var replacedContent = false
+            try Self.write(history, to: database, baseline: [:], deleting: [], baselineBoards: [], statistics: &statistics,
+                           replacedContent: &replacedContent)
         }
     }
 
@@ -351,8 +393,9 @@ public final class HistoryStore: @unchecked Sendable {
             let candidate = Self.merge(databaseHistory: databaseHistory, legacyHistory: legacyHistory)
             let baseline = Self.baseline(databaseHistory.items)
             var statistics = SaveStatistics()
+            var replacedContent = false
             try Self.write(candidate, to: database, baseline: baseline, deleting: Set(baseline.keys),
-                           baselineBoards: databaseHistory.boards, statistics: &statistics)
+                           baselineBoards: databaseHistory.boards, statistics: &statistics, replacedContent: &replacedContent)
             try Self.verify(try Self.read(database), matches: candidate)
         }
         try files.moveItem(at: legacyArchiveURL, to: nextRecoveredArchiveURL())

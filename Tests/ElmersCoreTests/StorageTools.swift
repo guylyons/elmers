@@ -30,9 +30,11 @@ func backupStorageForRollback(directory suppliedDirectory: URL? = nil) throws ->
     return destination
 }
 
-func reportStorage() {
-    let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Elmers")
-    let store = HistoryStore(directory: directory, readOnly: true)
+/// Summarises the real store read-only, or, given a directory (for example a private copy of the store), opens
+/// that one read-write so the storage hygiene applied on open can be measured without touching live history.
+func reportStorage(directory override: URL? = nil) {
+    let directory = override ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Elmers")
+    let store = HistoryStore(directory: directory, readOnly: override == nil)
     for url in [store.legacyArchiveURL, store.migratedArchiveURL] where FileManager.default.fileExists(atPath: url.path) {
         do { print("\(url.lastPathComponent): \(summary(try Archive(url: url).load()))") }
         catch { print("\(url.lastPathComponent): unreadable (\(error.localizedDescription))") }

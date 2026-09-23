@@ -20,7 +20,11 @@ if CommandLine.arguments.contains("--live-capture") {
     do { try verifyLiveCapture() } catch { failures += 1; print("FAIL live capture: \(error)") }
     exit(failures == 0 ? 0 : 1)
 }
-if CommandLine.arguments.contains("--storage-report") { reportStorage(); exit(0) }
+if let index = CommandLine.arguments.firstIndex(of: "--storage-report") {
+    let arguments = CommandLine.arguments
+    reportStorage(directory: arguments.indices.contains(index + 1) ? URL(fileURLWithPath: arguments[index + 1]) : nil)
+    exit(0)
+}
 if CommandLine.arguments.contains("--storage-backup-plist") {
     do { print("Created \(try backupStorageForRollback().lastPathComponent)") }
     catch { print("FAIL storage backup: \(error.localizedDescription)"); exit(1) }
@@ -36,8 +40,13 @@ let pasteboard = PasteboardTests()
 let screenshots = ScreenshotTests()
 let store = HistoryStoreTests()
 let motion = MotionTests()
+let security = StorageSecurityTests()
 let checks: [(String, () throws -> Void)] = [
     ("panel timing curves match Paste's recorded motion", motion.testPanelCurvesMatchPasteRecordings),
+    ("deleted and replaced content leaves no trace on disk", security.testDeletedAndReplacedContentLeavesNoTraceOnDisk),
+    ("an existing database is scrubbed when opened", security.testExistingDatabaseIsScrubbedWhenOpened),
+    ("the history folder is excluded from backups", security.testHistoryFolderIsExcludedFromBackups),
+    ("the scrub waits for exclusive access without blocking load", security.testScrubWaitsForExclusiveAccessWithoutBlockingLoad),
     ("store creates a private empty database", store.testNewDirectoryGetsPrivateEmptyDatabase),
     ("store rejects damaged or newer databases", store.testDamagedOrNewerDatabaseIsRejectedAndLeftUntouched),
     ("store round trip preserves every field", store.testRoundTripPreservesEveryField),

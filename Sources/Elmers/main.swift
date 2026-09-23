@@ -72,6 +72,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             InteractionChecks.run(model: model, controller: panelController)
             return
         }
+        if let index = ProcessInfo.processInfo.arguments.firstIndex(of: "--check-link-preview-privacy") {
+            LinkPreviewChecks.run(url: ProcessInfo.processInfo.arguments[index + 1])
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--show-settings") {
             // For side-by-side captures: opens Settings on the pane named by ELMERS_SETTINGS_SECTION (General by default).
             model.start(); panelController.openSettings()

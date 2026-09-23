@@ -188,6 +188,8 @@ final class AppModel: ObservableObject {
 
     func start() {
         guard !isDemo else { return }
+        // Clears cookies earlier builds let link previews keep.
+        LinkPreviewFetcher.purgeWebState()
         refreshScreenshotMonitoring()
         activationObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] notification in
             MainActor.assumeIsolated {

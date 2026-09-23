@@ -151,3 +151,23 @@ Next: merge `feat/sqlite-storage` into `main` (user's call), then a physical dra
 Closed the re-review's open item. The suggested fix (rebuild the pinboard baseline from the database) was not used, because a process that had not touched its pinboards would then see them differ from the database and overwrite the other writer. Instead `HistoryStore.save` reads the stored pinboards only when this process changed its own, and `HistoryStore.mergeBoards` does a three-way merge (local, last saved, stored): boards added, edited or deleted here follow this process; all others follow the database, so another writer's additions, edits and deletions survive; an edit here brings back a board deleted elsewhere, as for items; order follows this process only when it reordered. New check "board save keeps another writer's pinboard edits". `scripts/test.sh` 46/46; `--check-interaction` passes.
 
 Next is unchanged: merging `feat/sqlite-storage` into `main` is the user's call, then physical drag repro, direct paste with Accessibility, and the storage stage 2 design.
+
+## September 23 — storage security
+
+Deleted clips were still readable on disk. The live `history.sqlite` held 2–3 items but was 32 MB: 7,841 free pages, all non-zero. The cause was SQLite's default fast secure-delete, which never wipes whole freed pages. The WAL also kept pre-deletion row images. Fixes in `HistoryStore`:
+
+- Every read-write open sets `secure_delete = ON` and `temp_store = MEMORY`. A database without incremental auto-vacuum is switched and rewritten once with `VACUUM`, which also drops pages left by earlier builds. The VACUUM is best-effort: if another process holds a write lock, history still loads and the rewrite runs on a later open.
+- A save that deletes or replaces content (item deletion, edits, renames, OCR/link updates, pinboard changes) runs `incremental_vacuum` and `wal_checkpoint(TRUNCATE)`. Opening does the same.
+- The history folder is marked excluded from Time Machine, and the flag persists on the folder.
+
+Verified by `scripts/test.sh` (51/51). Four new storage-security checks:
+- markers from deleted, edited, renamed and OCR text are absent from the database, WAL and SHM bytes;
+- a database built as an earlier build left it loses its deleted row on open;
+- the folder is excluded from backups;
+- a concurrent writer does not block load. This check fails without the best-effort VACUUM.
+
+On a private copy of the live store, `ElmersCoreChecks --storage-report <dir>` shrank it from 32 MB (7,859 pages) to 86 KB (21 pages) with an empty WAL and an unchanged history identity (`f3948c892d3d`). The copy was deleted afterwards; the live store scrubs itself the first time the new build opens it.
+
+Link previews no longer send or keep cookies. `LinkPreviewFetcher` passes a `URLRequest` with `httpShouldHandleCookies = false` to LinkPresentation, and afterwards clears Elmers' own cookie storage and URL cache (`purgeWebState`, also run at launch). Verification: `Elmers --check-link-preview-privacy http://localtest.me:8765/page`, run against a local server that sets `tracker=…` and logs each request's Cookie header. Without the change, the second fetch sent the cookie back. With it, no request sent a cookie and none was kept. A bare IP address is not a valid test, because cookies from IP hosts are dropped anyway.
+
+Not done by decision: encryption beyond FileVault.

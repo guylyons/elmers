@@ -3,7 +3,9 @@ import LinkPresentation
 import ElmersCore
 
 /// Downloads a link's title and a representative image with LinkPresentation.
-/// Images are downscaled to a small PNG so the archive stays compact.
+/// Images are downscaled to a small PNG so the archive stays compact. Fetches neither send nor keep cookies, and
+/// whatever web state LinkPresentation still leaves in Elmers' own storage is cleared afterwards, so previewing a
+/// copied link cannot sign the user in, track them across fetches, or leave a record of the sites they copied.
 @MainActor
 final class LinkPreviewFetcher {
     private var providers: [LPMetadataProvider] = []
@@ -15,9 +17,12 @@ final class LinkPreviewFetcher {
         let provider = LPMetadataProvider()
         provider.timeout = 15
         providers.append(provider)
-        provider.startFetchingMetadata(for: url) { [weak self] metadata, _ in
+        var request = URLRequest(url: url, timeoutInterval: 15)
+        request.httpShouldHandleCookies = false
+        provider.startFetchingMetadata(for: request) { [weak self] metadata, _ in
             Task { @MainActor in
                 self?.providers.removeAll { $0 === provider }
+                Self.purgeWebState()
                 guard let metadata else { completion(LinkPreview()); return }
                 let title = metadata.title?.trimmingCharacters(in: .whitespacesAndNewlines)
                 Self.loadImage(metadata.imageProvider ?? metadata.iconProvider) { image in
@@ -25,6 +30,12 @@ final class LinkPreviewFetcher {
                 }
             }
         }
+    }
+
+    /// Elmers never needs cookies or cached web responses, so any in its storage came from link previews.
+    static func purgeWebState() {
+        HTTPCookieStorage.shared.removeCookies(since: .distantPast)
+        URLCache.shared.removeAllCachedResponses()
     }
 
     private static func loadImage(_ provider: NSItemProvider?, completion: @escaping @MainActor (Data?) -> Void) {
