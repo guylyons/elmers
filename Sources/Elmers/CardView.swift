@@ -8,6 +8,10 @@ struct CardView: View {
     /// Paste turns the selected card's ring gray while the pointer rests on a different card.
     var ringDimmed = false
     let index: Int
+    /// Renaming happens in place, in the title: Paste's "click the item's title and type a new one".
+    var renaming = false
+    var onRename: (String?) -> Void = { _ in }
+    var onBeginRename: () -> Void = {}
     static let width: CGFloat = 232
     static let height: CGFloat = 232
     static let cornerRadius: CGFloat = 16
@@ -34,7 +38,12 @@ struct CardView: View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: -1) {
-                    Text(item.title ?? item.kind.title).font(.system(size: 15, weight: .semibold)).lineLimit(1)
+                    if renaming {
+                        TitleField(initial: item.title ?? "", placeholder: item.kind.title, commit: onRename)
+                    } else {
+                        Text(item.title ?? item.kind.title).font(.system(size: 15, weight: .semibold)).lineLimit(1)
+                            .onTapGesture { if selected { onBeginRename() } }
+                    }
                     TimelineView(.periodic(from: .now, by: 15)) { context in
                         Text(Self.relativeTime(item.copiedAt, now: context.date)).font(.system(size: 12)).opacity(0.9).lineLimit(1)
                     }
@@ -202,6 +211,25 @@ struct ItemPreview: View {
             else { ScrollView { Text(item.text).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) } }
             Text(item.copiedAt.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
         }.padding(24).frame(minWidth: 480, minHeight: 320)
+    }
+}
+
+/// The card title while renaming: typed in place in the header, saved with Return, cancelled with Escape (routed by the
+/// panel) or by clicking elsewhere. An empty title returns the card to its type name.
+private struct TitleField: View {
+    let initial: String
+    let placeholder: String
+    let commit: (String?) -> Void
+    @State private var text = ""
+    @FocusState private var focused: Bool
+    var body: some View {
+        TextField(text: $text, prompt: Text(placeholder).foregroundStyle(.white.opacity(0.55))) { Text(placeholder) }
+            .textFieldStyle(.plain).font(.system(size: 15, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
+            .focused($focused)
+            .onAppear { text = initial; DispatchQueue.main.async { focused = true } }
+            .onSubmit { commit(text.trimmingCharacters(in: .whitespacesAndNewlines)) }
+            .onChange(of: focused) { _, isFocused in if !isFocused { commit(text.trimmingCharacters(in: .whitespacesAndNewlines)) } }
+            .accessibilityLabel(String(localized: "Title"))
     }
 }
 

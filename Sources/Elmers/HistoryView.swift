@@ -7,7 +7,6 @@ struct HistoryView: View {
     @State private var boardDialog = false
     @State private var boardName = ""
     @State private var editingBoard: Pinboard?
-    @State private var renamingItem: ClipboardItem?
     @State private var deletingBoard: Pinboard?
     @State private var helpVisible = false
     @State private var hoveredID: UUID?
@@ -26,7 +25,9 @@ struct HistoryView: View {
                     ScrollView(.horizontal) {
                         LazyHStack(spacing: 24) {
                             ForEach(Array(model.visibleItems.enumerated()), id: \.element.id) { index, item in
-                                CardView(item: item, selected: model.selection.ids.contains(item.id), ringDimmed: hoveredID != nil && hoveredID != item.id, index: index)
+                                CardView(item: item, selected: model.selection.ids.contains(item.id), ringDimmed: hoveredID != nil && hoveredID != item.id, index: index,
+                                         renaming: model.renamingID == item.id, onRename: { model.finishRenaming(item, title: $0) },
+                                         onBeginRename: { if model.canEdit { model.renamingID = item.id } })
                                     .id(item.id)
                                     .onHover { inside in if inside { hoveredID = item.id } else if hoveredID == item.id { hoveredID = nil } }
                                     .onTapGesture(count: 2) { model.activate(item) }
@@ -66,7 +67,7 @@ struct HistoryView: View {
         .onChange(of: model.filters) { _, _ in model.reconcileSelection() }
         .onChange(of: model.boardID) { _, _ in model.reconcileSelection() }
         .onReceive(NotificationCenter.default.publisher(for: .elmersSearch)) { _ in openSearch() }
-        .onReceive(NotificationCenter.default.publisher(for: .elmersNewBoard)) { _ in renamingItem = nil; editingBoard = nil; boardName = ""; boardDialog = true }
+        .onReceive(NotificationCenter.default.publisher(for: .elmersNewBoard)) { _ in editingBoard = nil; boardName = ""; boardDialog = true }
         .onReceive(NotificationCenter.default.publisher(for: .elmersNewText)) { _ in model.openEditor?(nil) }
         .onReceive(NotificationCenter.default.publisher(for: .elmersResults)) { _ in searchFocused = false; model.filtersOpen = false }
         .onReceive(NotificationCenter.default.publisher(for: .elmersFilters)) { _ in model.searchOpen = true; model.filtersOpen.toggle() }
@@ -74,13 +75,13 @@ struct HistoryView: View {
             if let item = model.selected, !item.text.isEmpty || item.kind.isImage, model.canEdit { model.openEditor?(item) }
         }
         .onReceive(NotificationCenter.default.publisher(for: .elmersRename)) { _ in
-            if let item = model.selected, model.canEdit { renamingItem = item; boardName = item.title ?? ""; boardDialog = true }
+            if let item = model.selected, model.canEdit { model.renamingID = item.id }
         }
-        .alert(renamingItem != nil ? "Rename Item" : (editingBoard == nil ? "New Pinboard" : "Rename Pinboard"), isPresented: $boardDialog) {
+        .alert(editingBoard == nil ? "New Pinboard" : "Rename Pinboard", isPresented: $boardDialog) {
             TextField("Name", text: $boardName)
             Button("Cancel", role: .cancel) {}
-            Button(renamingItem != nil || editingBoard != nil ? "Save" : "Create") {
-                if let item = renamingItem { model.renameItem(item, title: boardName) } else if let board = editingBoard { model.renameBoard(board, name: boardName) } else { model.createBoard(name: boardName) }
+            Button(editingBoard != nil ? "Save" : "Create") {
+                if let board = editingBoard { model.renameBoard(board, name: boardName) } else { model.createBoard(name: boardName) }
             }.keyboardShortcut(.defaultAction).disabled(boardName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .alert("Delete “\(deletingBoard?.name ?? "")”?", isPresented: Binding(get: { deletingBoard != nil }, set: { if !$0 { deletingBoard = nil } })) {
@@ -113,7 +114,7 @@ struct HistoryView: View {
                         Button { openSearch() } label: { Image(systemName: "magnifyingglass").font(.system(size: 17)) }
                             .buttonStyle(.plain).frame(width: 34, height: 34).contentShape(Circle()).hoverHighlight(Circle()).padding(.horizontal, 7).help("Search (⌘F)")
                         boardPills(collapsed: false)
-                        Button { renamingItem = nil; editingBoard = nil; boardName = ""; boardDialog = true } label: { Image(systemName: "plus").font(.system(size: 17)) }
+                        Button { editingBoard = nil; boardName = ""; boardDialog = true } label: { Image(systemName: "plus").font(.system(size: 17)) }
                             .buttonStyle(.plain).frame(width: 34, height: 34).contentShape(Circle()).hoverHighlight(Circle()).padding(.horizontal, 7).help("Create Pinboard (⇧⌘N)").disabled(!model.canEdit)
                     }.font(.system(size: 13)).padding(.horizontal, 60)
                 }
@@ -148,7 +149,7 @@ struct HistoryView: View {
                         || DragSupport.droppedBoardID(providers) { id in if id != board.id { model.reorderBoard(id, before: board.id) } }
                 }
                 .contextMenu {
-                    Button("Rename") { renamingItem = nil; editingBoard = board; boardName = board.name; boardDialog = true }
+                    Button("Rename") { editingBoard = board; boardName = board.name; boardDialog = true }
                     Button("Delete…") { deletingBoard = board }
                     Divider()
                     Picker("Color", selection: Binding(get: { board.colorIndex }, set: { model.recolorBoard(board, color: $0) })) {
@@ -216,7 +217,7 @@ struct HistoryView: View {
         if #available(macOS 15.2, *) {
             Button("Writing Tools") { model.openWritingTools?(item) }.keyboardShortcut("e", modifiers: [.command, .shift]).disabled(item.text.isEmpty || !model.canEdit)
         }
-        Button("Rename") { renamingItem = item; boardName = item.title ?? ""; boardDialog = true }.keyboardShortcut("r").disabled(!model.canEdit)
+        Button("Rename") { model.select(item.id); model.renamingID = item.id }.keyboardShortcut("r").disabled(!model.canEdit)
         Button("Delete") { model.deleteItems(model.selectedItems) }.keyboardShortcut(.delete, modifiers: []).disabled(!model.canEdit)
         Divider()
         Menu("Pin") {
@@ -227,7 +228,7 @@ struct HistoryView: View {
                 }
             }
             if !model.history.boards.isEmpty { Divider() }
-            Button("Create Pinboard…") { renamingItem = nil; editingBoard = nil; boardName = ""; boardDialog = true }
+            Button("Create Pinboard…") { editingBoard = nil; boardName = ""; boardDialog = true }
         }.disabled(!model.canEdit)
         if let board = model.boardID { Button("Unpin") { model.unpin(model.selectedItems, from: board) } }
         Divider()

@@ -135,7 +135,6 @@
 "Remove" = "Retirer";
 "Remove Application" = "Supprimer l’application";
 "Rename" = "Renommer";
-"Rename Item" = "Renommer l’élément";
 "Rename Pinboard" = "Renommer le tableau d’affichage";
 "Reset" = "Réinitialiser";
 "Reset shortcuts to default?" = "Réinitialiser les raccourcis ?";
@@ -213,3 +212,4 @@
 "This shortcut cannot be used because it is already used by the menu item ‘%@’." = "Ce raccourci ne peut pas être utilisé car il est déjà utilisé par l'élément de menu '%@'.";
 "This shortcut is already used by a clipboard command. Choose another combination." = "Ce raccourci est déjà utilisé par une commande du presse-papiers. Choisissez une autre combinaison.";
 "Elmers clipboard history, paused" = "Historique du presse-papiers Elmers, en pause";
+"Title" = "Titre";

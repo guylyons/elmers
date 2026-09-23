@@ -322,6 +322,11 @@ final class PanelController: NSObject, NSWindowDelegate {
         guard event.window == panel, panel.attachedSheet == nil else { return event }
         guard isShown else { return nil }
         let stroke = KeyStroke(event.keyCode, KeyModifiers(event.modifierFlags))
+        // While a title is edited in place, keys belong to the field; Escape cancels without saving.
+        if model.renamingID != nil {
+            if stroke == KeyStroke(53) { model.renamingID = nil; return nil }
+            return event
+        }
         let context: KeyboardContext = model.searchIsFocused ? .search : .results
         if context == .search, stroke == KeyStroke(51), model.removeLastFilter() { return nil }
         if let action = KeyboardRouter.command(for: stroke, context: context, settings: model.shortcuts) {

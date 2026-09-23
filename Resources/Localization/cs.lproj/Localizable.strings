@@ -135,7 +135,6 @@
 "Remove" = "Odebrat";
 "Remove Application" = "Odstranit aplikaci";
 "Rename" = "Přejmenovat";
-"Rename Item" = "Přejmenovat položku";
 "Rename Pinboard" = "Přejmenovat nástěnku";
 "Reset" = "Obnovit";
 "Reset shortcuts to default?" = "Obnovit výchozí zkratky?";
@@ -213,3 +212,4 @@
 "This shortcut cannot be used because it is already used by the menu item ‘%@’." = "Tuto klávesovou zkratku nelze použít, protože ji již používá položka nabídky '%@'.";
 "This shortcut is already used by a clipboard command. Choose another combination." = "Tuto zkratku už používá příkaz schránky. Vyberte jinou kombinaci.";
 "Elmers clipboard history, paused" = "Historie schránky Elmers, pozastaveno";
+"Title" = "Název";

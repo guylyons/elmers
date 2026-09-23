@@ -18,6 +18,8 @@ final class AppModel: ObservableObject {
     private var absorbingTypedFilter = false
     /// Paste's search mode: the field is open and the pinboard pills shrink to their icons.
     @Published var searchOpen = false
+    /// The item whose title is being edited in place, if any.
+    @Published var renamingID: UUID?
     @Published var filtersOpen = false
     @Published var boardID: UUID? { didSet { refreshVisibleItems() } }
     @Published var selection = ItemSelection()
@@ -529,6 +531,13 @@ final class AppModel: ObservableObject {
             rememberUndo { $0.restoreItem(current) }
         }
         history.replaceItem(item); persist()
+    }
+    /// Ends in-place renaming, saving `title` unless it is unchanged.
+    func finishRenaming(_ item: ClipboardItem, title: String?) {
+        guard renamingID == item.id else { return }
+        renamingID = nil
+        let title = title?.isEmpty == true ? nil : title
+        if title != item.title { renameItem(item, title: title) }
     }
     func renameItem(_ item: ClipboardItem, title: String?) {
         guard canEdit else { return }

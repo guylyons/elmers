@@ -160,7 +160,47 @@ final class KeyboardInteractionChecks {
                         after(0.2) {
                             guard !model.searchOpen, controller.isShown else { fail("third Escape should close search mode and keep the panel") }
                             print("PASS: search mode: ⌘F, filter chips as tokens, and Escape one layer at a time")
-                            checkReopening(model: model, controller: controller)
+                            checkInlineRename(model: model, controller: controller)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    /// ⌘R edits the selected card's title in place (Paste: "click the item's title and type a new one"): typed keys go
+    /// to the title, Return saves, and Escape cancels without saving.
+    static func checkInlineRename(model: AppModel, controller: PanelController) {
+        func key(_ code: UInt16, _ characters: String, _ flags: NSEvent.ModifierFlags = []) {
+            let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: controller.panel.windowNumber,
+                                         context: nil, characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code)!
+            NSApp.postEvent(event, atStart: false)
+        }
+        func fail(_ message: String) -> Never { print("FAIL: \(message)"); fflush(stdout); exit(1) }
+        func after(_ delay: Double, _ body: @escaping () -> Void) { DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: body) }
+        NotificationCenter.default.post(name: .elmersResults, object: nil)
+        guard let target = model.visibleItems.first else { fail("rename needs an item") }
+        model.selectedID = target.id
+        after(0.2) {
+            key(15, "r", .command)
+            after(0.4) {
+                guard model.renamingID == target.id, controller.panel.firstResponder is NSTextView else { fail("⌘R did not open the title for editing") }
+                for (code, character) in [(0 as UInt16, "a"), (11, "b")] { key(code, character) }
+                capturePanel(controller, name: "rename")
+                after(0.3) {
+                    key(36, "\r")
+                    after(0.3) {
+                        guard model.renamingID == nil, model.history.items.first(where: { $0.id == target.id })?.title?.hasSuffix("ab") == true else {
+                            fail("Return did not save the typed title (\(String(describing: model.history.items.first { $0.id == target.id }?.title)))")
+                        }
+                        key(15, "r", .command)
+                        after(0.4) {
+                            key(0, "a"); key(53, "\u{1B}")
+                            after(0.3) {
+                                guard model.renamingID == nil, model.history.items.first(where: { $0.id == target.id })?.title?.hasSuffix("ab") == true else { fail("Escape should cancel the rename") }
+                                model.renameItem(model.history.items.first { $0.id == target.id }!, title: target.title)
+                                print("PASS: ⌘R renames the card title in place; Return saves, Escape cancels")
+                                checkReopening(model: model, controller: controller)
+                            }
                         }
                     }
                 }

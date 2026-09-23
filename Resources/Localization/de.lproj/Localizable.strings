@@ -135,7 +135,6 @@
 "Remove" = "Entfernen";
 "Remove Application" = "App entfernen";
 "Rename" = "Umbenennen";
-"Rename Item" = "Eintrag umbenennen";
 "Rename Pinboard" = "Pinnwand umbenennen";
 "Reset" = "Zurücksetzen";
 "Reset shortcuts to default?" = "Tastenkurzbefehle zurücksetzen?";
@@ -213,3 +212,4 @@
 "This shortcut cannot be used because it is already used by the menu item ‘%@’." = "Diese Tastenkombination kann nicht verwendet werden, da sie bereits vom Menüelement '%@' verwendet wird.";
 "This shortcut is already used by a clipboard command. Choose another combination." = "Dieser Tastenkurzbefehl wird bereits von einem Befehl der Zwischenablage verwendet. Wähle eine andere Kombination.";
 "Elmers clipboard history, paused" = "Elmers – Verlauf der Zwischenablage, pausiert";
+"Title" = "Titel";

@@ -135,7 +135,6 @@
 "Remove" = "移除";
 "Remove Application" = "移除應用程式";
 "Rename" = "重命名";
-"Rename Item" = "重新命名項目";
 "Rename Pinboard" = "重新命名剪貼夾";
 "Reset" = "重設";
 "Reset shortcuts to default?" = "要將快速鍵重置為預設值嗎？";
@@ -213,3 +212,4 @@
 "This shortcut cannot be used because it is already used by the menu item ‘%@’." = "此快捷鍵無法使用，因為它已被菜單項「%@」使用。";
 "This shortcut is already used by a clipboard command. Choose another combination." = "此快速鍵已由剪貼簿指令使用。請選擇其他組合。";
 "Elmers clipboard history, paused" = "Elmers 剪貼簿記錄，已暫停";
+"Title" = "標題";

@@ -135,7 +135,6 @@
 "Remove" = "Удалить";
 "Remove Application" = "Удалить приложение";
 "Rename" = "Переименовать";
-"Rename Item" = "Переименовать элемент";
 "Rename Pinboard" = "Переименовать пинборд";
 "Reset" = "Сброс";
 "Reset shortcuts to default?" = "Сбросить сочетания клавиш?";
@@ -213,3 +212,4 @@
 "This shortcut cannot be used because it is already used by the menu item ‘%@’." = "Это сочетание клавиш нельзя использовать, так как оно уже используется пунктом меню '%@'.";
 "This shortcut is already used by a clipboard command. Choose another combination." = "Это сочетание клавиш уже используется командой буфера обмена. Выберите другое.";
 "Elmers clipboard history, paused" = "История буфера обмена Elmers, приостановлена";
+"Title" = "Название";

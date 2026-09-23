@@ -135,7 +135,6 @@
 "Remove" = "Fjern";
 "Remove Application" = "Fjern app";
 "Rename" = "Omdøb";
-"Rename Item" = "Omdøb emne";
 "Rename Pinboard" = "Omdøb pinboard";
 "Reset" = "Nulstil";
 "Reset shortcuts to default?" = "Nulstil genveje?";
@@ -213,3 +212,4 @@
 "This shortcut cannot be used because it is already used by the menu item ‘%@’." = "Denne genvej kan ikke bruges, fordi den allerede bruges af menupunktet '%@'.";
 "This shortcut is already used by a clipboard command. Choose another combination." = "Denne genvej bruges allerede af en udklipskommando. Vælg en anden kombination.";
 "Elmers clipboard history, paused" = "Elmers’ udklipshistorik, sat på pause";
+"Title" = "Titel";

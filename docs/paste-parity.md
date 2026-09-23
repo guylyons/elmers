@@ -1,5 +1,9 @@
 # Paste parity inventory
 
+## September 23 — renaming in place
+
+Paste's Help Center ("Edit and label items"): "Press Command-R to rename", or "click the item's title and type a new one". Elmers used a Rename dialog. Now ⌘R, the menu's Rename, or a click on the selected card's title turns the title into a field in the header (white text, the type name as a dim placeholder). Keys go to the field; Return saves, Escape cancels, clicking elsewhere saves, and an empty title returns the card to its type name. The step "⌘R renames the card title in place; Return saves, Escape cancels" in `--check-interaction` passes. Paste's own rename field was not observed, so its look is unverified.
+
 ## September 23 — pinboards as Paste documents them
 
 Source: Paste's Help Center, "Organize with Pinboards" (documented behavior; the Paste on this Mac was not driven for these). Quotes are from that page.

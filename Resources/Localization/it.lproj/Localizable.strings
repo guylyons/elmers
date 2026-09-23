@@ -135,7 +135,6 @@
 "Remove" = "Rimuovi";
 "Remove Application" = "Rimuovi applicazione";
 "Rename" = "Rinomina";
-"Rename Item" = "Rinomina elemento";
 "Rename Pinboard" = "Rinomina bacheca";
 "Reset" = "Ripristina";
 "Reset shortcuts to default?" = "Ripristinare le abbreviazioni?";
@@ -213,3 +212,4 @@
 "This shortcut cannot be used because it is already used by the menu item ‘%@’." = "Questa scorciatoia non può essere utilizzata perché è già utilizzata dalla voce di menu '%@'.";
 "This shortcut is already used by a clipboard command. Choose another combination." = "Questa abbreviazione è già usata da un comando degli appunti. Scegli un’altra combinazione.";
 "Elmers clipboard history, paused" = "Cronologia degli appunti di Elmers, in pausa";
+"Title" = "Titolo";

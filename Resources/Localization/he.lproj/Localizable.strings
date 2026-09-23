@@ -135,7 +135,6 @@
 "Remove" = "הסר";
 "Remove Application" = "הסר יישום";
 "Rename" = "שנה שם";
-"Rename Item" = "שנה שם לפריט";
 "Rename Pinboard" = "שנה שם ללוח הפינלים";
 "Reset" = "איפוס";
 "Reset shortcuts to default?" = "לאפס את קיצורי המקשים?";
@@ -213,3 +212,4 @@
 "This shortcut cannot be used because it is already used by the menu item ‘%@’." = "לא ניתן להשתמש בקיצור דרך זה מכיוון שהוא כבר נמצא בשימוש על ידי פריט התפריט '%@'.";
 "This shortcut is already used by a clipboard command. Choose another combination." = "קיצור המקשים הזה כבר בשימוש של פקודת לוח. בחר צירוף אחר.";
 "Elmers clipboard history, paused" = "היסטוריית הלוח של Elmers, מושהית";
+"Title" = "כותרת";

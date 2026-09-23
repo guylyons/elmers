@@ -135,7 +135,6 @@
 "Remove" = "Verwijderen";
 "Remove Application" = "Verwijder app";
 "Rename" = "Hernoem";
-"Rename Item" = "Wijzig naam van item";
 "Rename Pinboard" = "Wijzig naam van prikbord";
 "Reset" = "Herstellen";
 "Reset shortcuts to default?" = "Toetscombinaties herstellen?";
@@ -213,3 +212,4 @@
 "This shortcut cannot be used because it is already used by the menu item ‘%@’." = "Deze snelkoppeling kan niet worden gebruikt omdat deze al wordt gebruikt door het menu-item '%@'.";
 "This shortcut is already used by a clipboard command. Choose another combination." = "Deze toetscombinatie wordt al gebruikt door een klembordopdracht. Kies een andere combinatie.";
 "Elmers clipboard history, paused" = "Elmers-klembordgeschiedenis, gepauzeerd";
+"Title" = "Titel";

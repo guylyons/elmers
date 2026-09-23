@@ -135,7 +135,6 @@
 "Remove" = "Remover";
 "Remove Application" = "Remover Aplicação";
 "Rename" = "Renomear";
-"Rename Item" = "Renomear Item";
 "Rename Pinboard" = "Renomear Pinboard";
 "Reset" = "Redefinir";
 "Reset shortcuts to default?" = "Redefinir atalhos?";
@@ -213,3 +212,4 @@
 "This shortcut cannot be used because it is already used by the menu item ‘%@’." = "Este atalho não pode ser utilizado porque já é utilizado pelo item de menu ‘%@’.";
 "This shortcut is already used by a clipboard command. Choose another combination." = "Este atalho já é usado por um comando da área de transferência. Escolha outra combinação.";
 "Elmers clipboard history, paused" = "Histórico da área de transferência do Elmers, em pausa";
+"Title" = "Título";

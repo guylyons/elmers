@@ -135,7 +135,6 @@
 "Remove" = "削除";
 "Remove Application" = "アプリケーションを削除";
 "Rename" = "名前変更";
-"Rename Item" = "項目の名前を変更";
 "Rename Pinboard" = "ピンボードの名前を変更";
 "Reset" = "リセット";
 "Reset shortcuts to default?" = "ショートカットをリセットしますか?";
@@ -213,3 +212,4 @@
 "This shortcut cannot be used because it is already used by the menu item ‘%@’." = "このショートカットは、メニュー項目「%@」によってすでに使用されているため、使用することはできない。";
 "This shortcut is already used by a clipboard command. Choose another combination." = "このショートカットはクリップボードのコマンドで使用されています。別の組み合わせを選択してください。";
 "Elmers clipboard history, paused" = "Elmersのクリップボード履歴（一時停止中）";
+"Title" = "タイトル";
