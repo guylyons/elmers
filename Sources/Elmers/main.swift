@@ -139,6 +139,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return
         }
+        if ProcessInfo.processInfo.arguments.contains("--demo-search-motion") {
+            // For recording the search transition: opens search 0.8 s after the panel, closes it at 2.4 s, quits at 4 s.
+            precondition(model.isDemo, "Motion demos require --demo")
+            model.start(); panelController.show()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { NotificationCenter.default.post(name: .elmersSearch, object: nil) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.4) { self.model.clearSearch(); self.model.searchOpen = false }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { exit(0) }
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--show-panel"), let directory = ProcessInfo.processInfo.environment["ELMERS_CAPTURE_DIR"] {
             // Writes the demo panel as panel.png and quits, e.g. to check a translation. Requires --demo.
             precondition(model.isDemo, "Panel captures require --demo")

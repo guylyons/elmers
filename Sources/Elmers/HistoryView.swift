@@ -102,24 +102,17 @@ struct HistoryView: View {
     private var toolbar: some View {
         GeometryReader { geometry in
             ZStack {
-                if searching {
-                    // Paste 6.3.11: the field is a quarter of the panel wide and centered on it; the pinboards shrink to
-                    // their icons and trail it, and the + button leaves.
-                    SearchField(model: model, focused: $searchFocused, width: (geometry.size.width / 4).rounded())
-                        .overlay(alignment: .leading) {
-                            HStack(spacing: 4) { boardPills(collapsed: true) }.fixedSize()
-                                .offset(x: (geometry.size.width / 4).rounded() + 11.5)
-                        }
-                } else {
-                    // Paste 6.3.11: 7.5 pt between pills, about 15 pt between a pill and the search or + button.
-                    HStack(spacing: 7.5) {
-                        Button { openSearch() } label: { Image(systemName: "magnifyingglass").font(.system(size: 17)) }
-                            .buttonStyle(.plain).frame(width: 34, height: 34).contentShape(Circle()).hoverHighlight(Circle()).padding(.horizontal, 7).help("Search (⌘F)").accessibilityLabel("Search")
-                        boardPills(collapsed: false)
-                        Button { editingBoard = nil; boardName = ""; boardDialog = true } label: { Image(systemName: "plus").font(.system(size: 17)) }
-                            .buttonStyle(.plain).frame(width: 34, height: 34).contentShape(Circle()).hoverHighlight(Circle()).padding(.horizontal, 7).help("Create Pinboard (⇧⌘N)").accessibilityLabel("Create Pinboard").disabled(!model.canEdit)
-                    }.font(.system(size: 13)).padding(.horizontal, 60)
+                // One set of views in both states, placed by `ToolbarLayout`, so search mode morphs rather than cuts:
+                // the field grows out of the magnifier, the pills ride along and lose their names, the + fades.
+                ToolbarLayout(open: searching, fieldWidth: (geometry.size.width / 4).rounded()) {
+                    SearchField(model: model, focused: $searchFocused, expanded: searching, open: openSearch)
+                    boardPills(collapsed: searching)
+                    Button { editingBoard = nil; boardName = ""; boardDialog = true } label: { Image(systemName: "plus").font(.system(size: 17)) }
+                        .buttonStyle(.plain).frame(width: 34, height: 34).contentShape(Circle()).hoverHighlight(Circle())
+                        .help("Create Pinboard (⇧⌘N)").accessibilityLabel("Create Pinboard").disabled(!model.canEdit)
+                        .opacity(searching ? 0 : 1).allowsHitTesting(!searching)
                 }
+                .font(.system(size: 13))
                 HStack {
                     if model.paused { Label("Paused", systemImage: "pause.fill").font(.caption).padding(.leading, 24) }
                     Spacer()
@@ -132,10 +125,14 @@ struct HistoryView: View {
                     .padding(.trailing, 15).help("More").accessibilityLabel("More")
                 }
             }.frame(width: geometry.size.width, height: geometry.size.height)
+            // Paste 6.3.11's timing, fitted to recordings (`TimingCurve.searchOpen` / `.searchClose`).
+            .animation(searching ? .timingCurve(0.10, 0.40, 0.60, 0.90, duration: TimingCurve.searchOpenDuration)
+                                 : .timingCurve(0.25, 0.40, 0.60, 0.90, duration: TimingCurve.searchCloseDuration), value: searching)
         }
     }
     @ViewBuilder private func boardPills(collapsed: Bool) -> some View {
         boardPill(String(localized: "Clipboard History"), symbol: "clock.arrow.circlepath", color: nil, selected: model.boardID == nil, collapsed: collapsed) { model.boardID = nil }
+            .layoutValue(key: CollapsedWidth.self, value: 34)
             .dropDestination(for: String.self) { ids, _ in
                 // Dropping a pinboard on the history pill moves it to the front.
                 guard let id = ids.first.flatMap(UUID.init), let first = model.history.boards.first?.id else { return false }
@@ -170,15 +167,17 @@ struct HistoryView: View {
     private func boardPill(_ name: String, symbol: String?, color: Color?, selected: Bool, collapsed: Bool, action: @escaping () -> Void) -> some View {
         // Not a Button: a button's click tracking takes the mouse-drag events, so `.draggable` on a pinboard
         // pill never started a drag and pills could not be reordered.
-        // While searching, Paste 6.3.11 shows only the icon or color dot, 36 pt apart, with no selection capsule.
+        // While searching, Paste 6.3.11 shows only the icon or color dot, 36 pt apart, with no selection capsule. The
+        // pill keeps its name and is narrowed by the toolbar layout, so the name is cut off as search opens.
         HStack(spacing: 6) {
-            // Collapsed, the clock's ink is 14 pt wide in Paste; its symbol frame is wider and would push the dots right.
-            if let symbol { Image(systemName: symbol).frame(width: collapsed ? 14 : nil) }
+            // The clock's ink is 14 pt wide in Paste; its symbol frame is wider and would push the dots right.
+            if let symbol { Image(systemName: symbol).frame(width: 14) }
             if let color { Circle().fill(color).frame(width: 12, height: 12) }
-            if !collapsed { Text(name).lineLimit(1) }
+            Text(name).lineLimit(1).opacity(collapsed ? 0 : 1)
         }
-        .font(.system(size: 13))
-        .padding(.leading, 10).padding(.trailing, collapsed ? 10 : 12).padding(.vertical, 6)
+        .padding(.leading, 10).padding(.trailing, 12).padding(.vertical, 6)
+        .fixedSize()
+        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading).clipped()
         .background(selected && !collapsed ? Color.primary.opacity(0.1) : Color.clear, in: Capsule())
         .contentShape(Capsule())
         .onTapGesture(perform: action)
@@ -298,4 +297,44 @@ struct MenuAnchor: NSViewRepresentable {
     let holder: Holder
     func makeNSView(context: Context) -> NSView { let view = NSView(); holder.view = view; return view }
     func updateNSView(_ view: NSView, context: Context) { holder.view = view }
+}
+
+/// How narrow a pinboard pill becomes in search mode: the clock pill 34 pt, a color dot 32 pt (Paste: 36-pt pitch).
+private struct CollapsedWidth: LayoutValueKey { static let defaultValue: CGFloat = 32 }
+
+/// Places the search control, the pinboard pills and the + button. Closed, the group is centered with Paste's spacing
+/// (7.5 pt between items, 7 pt more around the buttons). Open, the field takes a quarter of the panel, centered, and the
+/// pills trail it as icons 36 pt apart, 11.5 pt after its edge. Changing `open` inside an animation moves every subview
+/// from one placement to the other.
+private struct ToolbarLayout: Layout {
+    var open: Bool
+    var fieldWidth: CGFloat
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize { proposal.replacingUnspecifiedDimensions() }
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count >= 2, let search = subviews.first, let plus = subviews.last else { return }
+        let pills = subviews.dropFirst().dropLast()
+        let y = bounds.midY
+        if open {
+            var x = bounds.midX - fieldWidth / 2
+            search.place(at: CGPoint(x: x, y: y), anchor: .leading, proposal: ProposedViewSize(width: fieldWidth, height: nil))
+            x += fieldWidth + 11.5
+            for pill in pills {
+                let width = pill[CollapsedWidth.self]
+                pill.place(at: CGPoint(x: x, y: y), anchor: .leading, proposal: ProposedViewSize(width: width, height: nil))
+                x += width + 4
+            }
+            plus.place(at: CGPoint(x: x + 7, y: y), anchor: .leading, proposal: ProposedViewSize(width: 34, height: 34))
+        } else {
+            let widths = pills.map { $0.sizeThatFits(.unspecified).width }
+            let total = (34 + 14) * 2 + widths.reduce(0, +) + 7.5 * CGFloat(widths.count + 1)
+            var x = bounds.midX - total / 2 + 7
+            search.place(at: CGPoint(x: x, y: y), anchor: .leading, proposal: ProposedViewSize(width: 34, height: 34))
+            x += 34 + 7 + 7.5
+            for (pill, width) in zip(pills, widths) {
+                pill.place(at: CGPoint(x: x, y: y), anchor: .leading, proposal: ProposedViewSize(width: width, height: nil))
+                x += width + 7.5
+            }
+            plus.place(at: CGPoint(x: x + 7, y: y), anchor: .leading, proposal: ProposedViewSize(width: 34, height: 34))
+        }
+    }
 }

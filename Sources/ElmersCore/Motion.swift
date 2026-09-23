@@ -9,6 +9,11 @@ public struct TimingCurve: Equatable, Sendable {
     /// distance in the first 20 ms, and leaves in 0.18 s with a gentle ease-in-out.
     public static let panelIn = TimingCurve(0.30, 0.55, 0.05, 1)
     public static let panelOut = TimingCurve(0.35, 0, 0.70, 1)
+    /// Paste 6.3.11's search mode, fitted to recordings of its toolbar: the field grows out of the magnifier and the
+    /// pinboards ride with its right edge (0.21 s), and closing reverses it (0.24 s).
+    public static let searchOpen = TimingCurve(0.10, 0.40, 0.60, 0.90)
+    public static let searchClose = TimingCurve(0.25, 0.40, 0.60, 0.90)
+    public static let searchOpenDuration = 0.21, searchCloseDuration = 0.24
 
     /// Progress at elapsed fraction `x` (clamped to 0...1).
     public func value(at x: Double) -> Double {

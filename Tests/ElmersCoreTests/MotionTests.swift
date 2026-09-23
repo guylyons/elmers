@@ -14,6 +14,16 @@ struct MotionTests {
         for (time, offset) in hidden {
             XCTAssertTrue(abs(hide.value(at: (time - 0.725) / 0.18) - offset / 332) < 0.05)
         }
+        // Search mode: the first pinboard dot's x while Paste opened (1268 → 1664 pt, from 0.795 s) and closed
+        // (1664 → 1268 pt, from 2.555 s) its search field.
+        let opening: [(Double, Double)] = [(0.855, 1467), (0.897, 1546), (0.925, 1590), (0.967, 1638), (1.008, 1662)]
+        for (time, x) in opening {
+            XCTAssertTrue(abs(TimingCurve.searchOpen.value(at: (time - 0.795) / TimingCurve.searchOpenDuration) - (x - 1268) / 396) < 0.03)
+        }
+        let closing: [(Double, Double)] = [(2.613, 1522), (2.668, 1412), (2.710, 1344), (2.752, 1295), (2.793, 1270)]
+        for (time, x) in closing {
+            XCTAssertTrue(abs(TimingCurve.searchClose.value(at: (time - 2.555) / TimingCurve.searchCloseDuration) - (1664 - x) / 396) < 0.03)
+        }
         // Monotonic, so the panel never overshoots or backs up.
         var previous = 0.0
         for step in 1...100 { let value = show.value(at: Double(step) / 100); XCTAssertTrue(value >= previous - 1e-9); previous = value }

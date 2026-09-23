@@ -1,5 +1,17 @@
 # Paste parity inventory
 
+## September 23 — search mode transitions
+
+Reference: Paste 6.3.11 at 2560×1440, light appearance. Variable-rate screen recordings of the 64-pt toolbar strip (`screencapture -v`), reduced to per-frame positions (not committed).
+
+| Motion | Paste 6.3.11 | Elmers status |
+|---|---|---|
+| Opening search | The field grows out of the magnifier, mostly to the right, to its 640-pt width. The pills ride its right edge and lose their names by clipping; the placeholder and filter glyph fade in; the + fades out. 0.21 s, fitted as cubic-bezier(0.10, 0.40, 0.60, 0.90) to within about 1% of the recorded dot positions. The focus ring fades in only at the end | **matched**: one set of views placed by `ToolbarLayout` for both states, animated with `TimingCurve.searchOpen`. The ring fades in over the last 0.08 s. Recorded on Elmers: the first dot travels 1299 → 1663 pt in about 0.20 s with no gaps |
+| Closing search | The ring vanishes at once; the field shrinks back into the magnifier while its fill fades; the pills slide left and their names reappear; the + returns. 0.24 s, cubic-bezier(0.25, 0.40, 0.60, 0.90) | **matched**: `TimingCurve.searchClose`; on Elmers the ring is gone from the first frame and the dot returns in about 0.245 s |
+| Filter popover | Grows upward out of its arrow in about 0.21 s and collapses in about 0.17 s: the standard macOS popover animation | the same system popover |
+
+Checks: the core Motion check compares both curves with Paste's recorded positions. The settled open state still measures ring 959–1600 × 11–48 and first dot 1658, identical to Paste. `--check-interaction` passes in full twice. `--demo --demo-search-motion` replays the transition for recording. A first attempt with matched-geometry crossfades showed both toolbars at once and was replaced.
+
 ## September 23 — Paste Stack (working; look provisional)
 
 Paste Stack had been deferred since September 15 ("return to the saved Stack design later"). With the instruction to continue to full parity, it is now built from the saved design and Paste's help ("Using Paste Stack").
