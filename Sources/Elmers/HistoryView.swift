@@ -36,11 +36,15 @@ struct HistoryView: View {
                                         // Paste closes an empty search when a card is clicked.
                                         if !model.hasSearch { model.searchOpen = false; model.filtersOpen = false }
                                     },
-                                                                  dragItems: { frame, image in DragSupport.draggingItems(for: item, frame: frame, image: image) }))
-                                    .onDrop(of: [DragSupport.itemIDsType.rawValue], isTargeted: nil) { providers in
+                                                                  dragItems: { frame, image in
+                                        let dragging = DragSupport.draggingItems(for: item, frame: frame, image: image)
+                                        if !dragging.isEmpty { DragSupport.draggedItemIDs = [item.id] }
+                                        return dragging
+                                    }))
+                                    .onDrop(of: [.item], isTargeted: nil) { _ in
                                         // Inside a pinboard, a card dropped on another moves in front of it.
-                                        guard let board = model.boardID, !model.hasSearch else { return false }
-                                        return DragSupport.droppedItemIDs(providers) { ids in model.movePinned(ids, before: item.id, in: board) }
+                                        guard let board = model.boardID, !model.hasSearch, let ids = DragSupport.draggedItemIDs else { return false }
+                                        model.movePinned(ids, before: item.id, in: board); return true
                                     }
                                     .contextMenu { itemMenu(item) }
                                     .accessibilityAddTraits(.isButton)
@@ -153,9 +157,9 @@ struct HistoryView: View {
                 .draggable(board.id.uuidString)
                 // A card dropped here is pinned to this pinboard (Paste: pin "by dragging it into a pinboard");
                 // another pill dropped here moves before it.
-                .onDrop(of: [DragSupport.itemIDsType.rawValue, "public.utf8-plain-text"], isTargeted: nil) { providers in
-                    DragSupport.droppedItemIDs(providers) { ids in model.pin(model.history.items.filter { ids.contains($0.id) }, to: board) }
-                        || DragSupport.droppedBoardID(providers) { id in if id != board.id { model.reorderBoard(id, before: board.id) } }
+                .onDrop(of: [.item], isTargeted: nil) { providers in
+                    if let ids = DragSupport.draggedItemIDs { model.pin(model.history.items.filter { ids.contains($0.id) }, to: board); return true }
+                    return DragSupport.droppedBoardID(providers) { id in if id != board.id { model.reorderBoard(id, before: board.id) } }
                 }
                 .contextMenu {
                     Button("Rename") { editingBoard = board; boardName = board.name; boardDialog = true }

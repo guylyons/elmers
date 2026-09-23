@@ -72,6 +72,9 @@ struct CardMouseObserver: NSViewRepresentable {
             image.addRepresentation(rep)
             return image
         }
+        func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
+            DragSupport.draggedItemIDs = nil
+        }
         func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
             context == .outsideApplication ? [.copy, .generic] : .copy
         }

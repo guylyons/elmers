@@ -20,6 +20,11 @@
   TextEdit), one file and two files all arrive intact in a logging drop target, and Finder copies both files
   while the originals stay in place. Not yet compared with the same drags in Paste, and not re-tried on the
   daily-use /Applications build.)
+  [fixed 2026-09-23] Reopened by the user: a card dropped on a pinboard pill was not pinned. A real pointer
+  drag onto the Alpha pill showed SwiftUI's drop provider offering only `public.utf8-plain-text`; the private
+  `app.elmers.item-ids` type is undeclared, so it never reached the drop handler, which accepted the drop and
+  did nothing. The panel now records the card being dragged from the start to the end of the session, and pill
+  drops (pin) and card drops inside a pinboard (reorder) read that. Re-dragged onto Alpha: the card was pinned.
 
 - [implemented 2026-09-19; visual check pending] update the About popup to use the About png
   (AboutPanel.swift supplies Resources/AboutElmers.png as the standard About panel's application icon.
