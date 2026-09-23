@@ -42,6 +42,7 @@ let screenshots = ScreenshotTests()
 let store = HistoryStoreTests()
 let motion = MotionTests()
 let security = StorageSecurityTests()
+let searchFilters = SearchFilterTests()
 let checks: [(String, () throws -> Void)] = [
     ("panel timing curves match Paste's recorded motion", motion.testPanelCurvesMatchPasteRecordings),
     ("deleted and replaced content leaves no trace on disk", security.testDeletedAndReplacedContentLeavesNoTraceOnDisk),
@@ -86,6 +87,10 @@ let checks: [(String, () throws -> Void)] = [
     ("duplicate promotion preserves pinboards", history.testDuplicateMovesToFrontAndKeepsPinboardMembership),
     ("search and type filters", history.testSearchMatchesTextAndSourceCaseInsensitivelyAndFiltersType),
     ("category keywords in search", history.testTypingCategoryKeywordsFiltersByKind),
+    ("filter chips widen within a section and narrow across sections", searchFilters.testChipsInOneSectionWidenAndSectionsNarrow),
+    ("date filter chips cover calendar ranges", searchFilters.testDateChipsCoverCalendarRanges),
+    ("filter tokens keep pick order and toggle", searchFilters.testTokensKeepPickOrderAndToggle),
+    ("Image filter chip includes screenshots", searchFilters.testImageChipIncludesScreenshots),
     ("retention protects pins", history.testRetentionPreservesPinnedItems),
     ("board deletion preserves history", history.testDeletingBoardPreservesClipboardItem),
     ("binary archive round trip", history.testArchiveRoundTripPreservesBinaryFormatsAndBoards),

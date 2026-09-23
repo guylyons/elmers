@@ -1,6 +1,7 @@
 #if DEBUG
 import AppKit
 import Combine
+import ElmersCore
 
 /// Exercises the actual panel and event dispatch, with synthetic in-memory content only.
 @MainActor
@@ -46,9 +47,9 @@ final class InteractionChecks {
             print("FAIL: context click collapsed selection"); fflush(stdout); exit(1)
         }
         print("PASS: context click preserves multiple selected items")
-        model.kind = .text; model.sourceFilter = "No such app"; model.boardID = board.id; model.afterDate = Date()
+        model.filters = SearchFilters([.kind(.text), .app("No such app"), .date(.today)]); model.boardID = board.id; model.searchOpen = true
         controller.show()
-        guard model.query.isEmpty, model.kind == nil, model.sourceFilter == nil, model.afterDate == nil, model.boardID == nil,
+        guard model.query.isEmpty, model.filters.isEmpty, !model.searchOpen, model.boardID == nil,
               !model.searchIsFocused, model.selectedID == model.history.items.first?.id, model.selectedItems.count == 1 else {
             print("FAIL: opening the history did not clear search and filters and select the most recent item"); fflush(stdout); exit(1)
         }

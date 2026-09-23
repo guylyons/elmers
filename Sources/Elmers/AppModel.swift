@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import IOKit
 import ServiceManagement
 import ElmersCore
 
@@ -7,17 +8,20 @@ import ElmersCore
 final class AppModel: ObservableObject {
     @Published private(set) var history = History() { didSet { refreshVisibleItems() } }
     @Published var query = "" { didSet { refreshVisibleItems(); if !absorbingTypedFilter { DispatchQueue.main.async { self.absorbTypedFilter() } } } }
-    @Published var kind: ContentKind? { didSet { if !absorbingTypedFilter { typedFilterWord = nil }; refreshVisibleItems() } }
-    /// The word that became the type filter, returned to the field when Backspace removes the filter.
+    /// Chips chosen in the filter popover or typed as a type word, shown as tokens in the search field.
+    @Published var filters = SearchFilters() { didSet { if !absorbingTypedFilter, typedFilter.map(filters.contains) != true { typedFilter = nil; typedFilterWord = nil }; refreshVisibleItems() } }
+    /// The type token a typed word became, and that word, returned to the field when Backspace removes the token.
+    private var typedFilter: SearchFilter?
     private var typedFilterWord: String?
     /// The word just put back by Backspace; it is not absorbed again until the user changes it.
     private var restoredFilterWord: String?
     private var absorbingTypedFilter = false
+    /// Paste's search mode: the field is open and the pinboard pills shrink to their icons.
+    @Published var searchOpen = false
+    @Published var filtersOpen = false
     @Published var boardID: UUID? { didSet { refreshVisibleItems() } }
     @Published var selection = ItemSelection()
     @Published private(set) var visibleItems: [ClipboardItem] = []
-    @Published var sourceFilter: String? { didSet { refreshVisibleItems() } }
-    @Published var afterDate: Date? { didSet { refreshVisibleItems() } }
     @Published var searchIsFocused = false
     /// A fresh presentation discards the previous viewport, even if selection is unchanged.
     @Published private(set) var activationGeneration = 0
@@ -100,33 +104,51 @@ final class AppModel: ObservableObject {
     var selectedItems: [ClipboardItem] { visibleItems.filter { selection.ids.contains($0.id) } }
     private func refreshVisibleItems() {
         // A query searches all pinboards, matching Paste's global search.
-        visibleItems = history.filtered(query: query, kind: kind, boardID: query.isEmpty ? boardID : nil).filter {
-            (sourceFilter == nil || $0.source == sourceFilter) && (afterDate == nil || $0.copiedAt >= afterDate!)
-        }
+        let now = Date(), device = Self.deviceName
+        visibleItems = history.filtered(query: query, boardID: query.isEmpty ? boardID : nil).filter { filters.matches($0, now: now, localDevice: device) }
         selection.reconcile(in: visibleItems.map(\.id))
     }
     var selected: ClipboardItem? { visibleItems.first { $0.id == selectedID } }
     /// A type word in the query becomes the type filter and leaves the field, so what follows searches within that type.
     /// Runs one turn after the edit: the text field ignores a binding change made inside its own update.
     private func absorbTypedFilter() {
-        guard kind == nil, !absorbingTypedFilter, query != restoredFilterWord else { return }
+        guard !absorbingTypedFilter, query != restoredFilterWord else { return }
         restoredFilterWord = nil
         let parsed = SearchQuery(query)
-        guard let typed = parsed.kind else { return }
+        guard let typed = parsed.kind, !filters.contains(.kind(typed)) else { return }
         absorbingTypedFilter = true
-        kind = typed; typedFilterWord = parsed.kindWord
+        filters.add(.kind(typed)); typedFilter = .kind(typed); typedFilterWord = parsed.kindWord
         query = parsed.remainder
         absorbingTypedFilter = false
     }
-    /// Backspace on an empty field removes the type filter. A typed word goes back into the field so it can be edited
+    /// Backspace on an empty field removes the last token. A typed word goes back into the field so it can be edited
     /// into something longer ("link" → "linkedin"). Returns false when there is nothing to remove.
-    @discardableResult func removeTypedFilter() -> Bool {
-        guard kind != nil, query.isEmpty else { return false }
-        let word = typedFilterWord
-        kind = nil
+    @discardableResult func removeLastFilter() -> Bool {
+        guard query.isEmpty, let removed = filters.tokens.last else { return false }
+        let word = removed == typedFilter ? typedFilterWord : nil
+        filters.removeLast()
         if let word { absorbingTypedFilter = true; restoredFilterWord = word; query = word; absorbingTypedFilter = false }
         return true
     }
+    /// Clears the query and every token, as Paste's clear button and second Escape do.
+    func clearSearch() {
+        absorbingTypedFilter = true
+        query = ""; filters.removeAll(); typedFilter = nil; typedFilterWord = nil; restoredFilterWord = nil
+        absorbingTypedFilter = false
+    }
+    var hasSearch: Bool { !query.isEmpty || !filters.isEmpty }
+    /// The name Paste shows for this Mac in the Device section: its model name, such as "MacBook Pro".
+    static let deviceName: String = {
+        // Apple silicon Macs publish "MacBook Pro (14-inch, 2021)" in the device tree; Paste shows the part before the
+        // parenthesis. Intel Macs fall back to the computer name.
+        let product = IORegistryEntryFromPath(kIOMainPortDefault, "IODeviceTree:/product")
+        defer { IOObjectRelease(product) }
+        if product != 0, let data = IORegistryEntryCreateCFProperty(product, "product-name" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? Data,
+           let name = String(data: data, encoding: .utf8)?.trimmingCharacters(in: CharacterSet(charactersIn: "\0")), !name.isEmpty {
+            return name.components(separatedBy: " (").first ?? name
+        }
+        return Host.current().localizedName ?? "This Mac"
+    }()
 
     init() {
         let demo = ProcessInfo.processInfo.arguments.contains("--demo")
@@ -321,10 +343,7 @@ final class AppModel: ObservableObject {
     /// Opening the history starts from a known state, as Paste does: no search, no filters, the All pinboard,
     /// and the most recent item selected so Return pastes it straight away.
     func resetForActivation() {
-        absorbingTypedFilter = true
-        query = ""; kind = nil; typedFilterWord = nil; restoredFilterWord = nil
-        absorbingTypedFilter = false
-        sourceFilter = nil; afterDate = nil; boardID = nil
+        clearSearch(); searchOpen = false; filtersOpen = false; boardID = nil
         selectedID = visibleItems.first?.id
         activationGeneration += 1
     }
@@ -337,7 +356,7 @@ final class AppModel: ObservableObject {
     func moveBoard(_ offset: Int) {
         let boards: [UUID?] = [nil] + history.boards.map { Optional($0.id) }
         let current = boards.firstIndex(of: boardID) ?? 0
-        query = ""; kind = nil; sourceFilter = nil; afterDate = nil
+        clearSearch()
         boardID = boards[(current + offset + boards.count) % boards.count]
     }
     func selectedAggregate() -> ClipboardItem? {

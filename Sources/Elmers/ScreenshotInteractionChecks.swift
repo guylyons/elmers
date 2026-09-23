@@ -87,12 +87,12 @@ enum ScreenshotInteractionChecks {
                 require(model.selectedID == selection, "screenshot capture preserves current selection")
                 guard let screenshot = model.history.items.first(where: { $0.kind == .screenshot }) else { require(false, "screenshot inserted into app history"); return }
                 require(imagePreview(screenshot) != nil, "screenshot uses real image preview")
-                model.kind = .image
+                model.filters = SearchFilters([.kind(.image)])
                 require(model.visibleItems.contains { $0.id == screenshot.id }, "Images includes screenshot cards")
-                model.kind = nil; model.query = "SCREENSHOT"
-                await until("Screenshot query becomes dedicated type filter") { model.kind == .screenshot && model.query.isEmpty }
-                require(model.removeTypedFilter() && model.query == "SCREENSHOT", "Backspace restores screenshot query word")
-                model.query = ""; model.kind = nil
+                model.clearSearch(); model.query = "SCREENSHOT"
+                await until("Screenshot query becomes dedicated type filter") { model.filters.tokens == [.kind(.screenshot)] && model.query.isEmpty }
+                require(model.removeLastFilter() && model.query == "SCREENSHOT", "Backspace restores screenshot query word")
+                model.clearSearch()
                 let count = model.history.items.count
                 model.paused = true; model.ingestScreenshot(captures[1]); model.paused = false
                 require(model.history.items.count == count, "app pause rejects screenshot ingestion")
@@ -106,7 +106,7 @@ enum ScreenshotInteractionChecks {
                 try FileManager.default.removeItem(at: source)
                 require(oldCapture.origin.resolveOriginal() == nil && imagePreview(screenshot) != nil, "missing original leaves saved image usable")
                 controller.show()
-                model.kind = .screenshot
+                model.filters = SearchFilters([.kind(.screenshot)])
                 try? await Task.sleep(nanoseconds: 300_000_000)
                 KeyboardInteractionChecks.capturePanel(controller, name: "screenshot-panel")
                 controller.openSettings()

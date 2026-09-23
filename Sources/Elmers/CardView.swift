@@ -189,7 +189,7 @@ struct ItemPreview: View {
 }
 
 /// Source icons are independent of selection state. Avoid Launch Services/icon I/O on every redraw.
-private final class CardImageCache {
+final class CardImageCache {
     static let shared = CardImageCache()
     private let icons = NSCache<NSString, NSImage>()
     private var colors: [String: Color?] = [:]

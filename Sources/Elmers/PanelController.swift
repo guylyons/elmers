@@ -301,7 +301,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         guard isShown else { return nil }
         let stroke = KeyStroke(event.keyCode, KeyModifiers(event.modifierFlags))
         let context: KeyboardContext = model.searchIsFocused ? .search : .results
-        if context == .search, stroke == KeyStroke(51), model.removeTypedFilter() { return nil }
+        if context == .search, stroke == KeyStroke(51), model.removeLastFilter() { return nil }
         if let action = KeyboardRouter.command(for: stroke, context: context, settings: model.shortcuts) {
             switch action {
             case let .move(offset, extend):
@@ -339,14 +339,15 @@ final class PanelController: NSObject, NSWindowDelegate {
             case .settings: openSettings()
             case .quit: NSApp.terminate(nil)
             case .escape:
-                if !model.query.isEmpty || model.kind != nil || model.sourceFilter != nil || model.afterDate != nil {
-                    model.query = ""; model.kind = nil; model.sourceFilter = nil; model.afterDate = nil
-                    focusResults()
-                } else if model.selection.ids.count > 1 { model.selectedID = model.selectedID }
+                // Paste 6.3.11 steps back one layer per press: the filter popover, then the query and tokens,
+                // then search mode itself, and only then the panel.
+                if model.filtersOpen { model.filtersOpen = false }
+                else if model.hasSearch { model.clearSearch() }
+                else if model.searchOpen { model.searchOpen = false; focusResults() }
+                else if model.selection.ids.count > 1 { model.selectedID = model.selectedID }
                 else { hide() }
             case .showInHistory:
-                let id = model.selectedID; model.query = ""; model.kind = nil; model.boardID = nil
-                model.sourceFilter = nil; model.afterDate = nil; model.selectedID = id
+                let id = model.selectedID; model.clearSearch(); model.searchOpen = false; model.boardID = nil; model.selectedID = id
             }
             return nil
         }

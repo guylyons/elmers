@@ -36,7 +36,7 @@ final class KeyboardInteractionChecks {
             let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: controller.panel.windowNumber, context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: code)!
             NSApp.postEvent(event, atStart: false)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-                guard verify() else { print("FAIL: \(description)"); fflush(stdout); exit(1) }
+                guard verify() else { print("FAIL: \(description) [debug editor=\(controller.panel.firstResponder is NSTextView) focused=\(model.searchIsFocused) open=\(model.searchOpen) selIndex=\(model.selectedID.flatMap { ids.firstIndex(of: $0) } ?? -1) count=\(model.selection.ids.count)]"); fflush(stdout); exit(1) }
                 print("PASS: \(description)")
                 step(index + 1)
             }
@@ -72,22 +72,22 @@ final class KeyboardInteractionChecks {
         func type(_ index: Int) {
             guard index < keys.count else {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    guard model.query.isEmpty, model.kind == .image, !model.visibleItems.isEmpty,
+                    guard model.query.isEmpty, model.filters.tokens == [.kind(.image)], !model.visibleItems.isEmpty,
                           model.visibleItems.allSatisfy({ $0.kind == .image }) else {
-                        print("FAIL: typing 'image' left query '\(model.query)', kind \(String(describing: model.kind)), showing \(model.visibleItems.map(\.kind))"); fflush(stdout); exit(1)
+                        print("FAIL: typing 'image' left query '\(model.query)', filters \(model.filters.tokens), showing \(model.visibleItems.map(\.kind))"); fflush(stdout); exit(1)
                     }
                     capturePanel(controller, name: "search-image-filter")
                     print("PASS: typing a type word becomes the type filter and clears the field")
                     let backspace = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: controller.panel.windowNumber, context: nil, characters: "\u{7F}", charactersIgnoringModifiers: "\u{7F}", isARepeat: false, keyCode: 51)!
                     NSApp.postEvent(backspace, atStart: false)
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                        guard model.kind == nil, model.query == "image" else {
-                            print("FAIL: Backspace left kind \(String(describing: model.kind)) and query '\(model.query)'"); fflush(stdout); exit(1)
+                        guard model.filters.isEmpty, model.query == "image" else {
+                            print("FAIL: Backspace left filters \(model.filters.tokens) and query '\(model.query)'"); fflush(stdout); exit(1)
                         }
                         capturePanel(controller, name: "search-after-backspace")
                         print("PASS: Backspace on the empty field removes the type filter and restores the word")
                         model.query = ""
-                        checkReopening(model: model, controller: controller)
+                        checkSearchMode(model: model, controller: controller)
                     }
                 }
                 return
@@ -105,6 +105,56 @@ final class KeyboardInteractionChecks {
               let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
         view.cacheDisplay(in: view.bounds, to: rep)
         try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: directory).appendingPathComponent("\(name).png"))
+    }
+    /// Paste 6.3.11's search mode: ⌘F opens the field, a second ⌘F opens the filter chips, chips combine as tokens,
+    /// and Escape steps back one layer at a time (popover, then query and tokens, then search mode).
+    static func checkSearchMode(model: AppModel, controller: PanelController) {
+        func key(_ code: UInt16, _ characters: String, _ flags: NSEvent.ModifierFlags = []) {
+            let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: controller.panel.windowNumber,
+                                         context: nil, characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code)!
+            NSApp.postEvent(event, atStart: false)
+        }
+        func fail(_ message: String) -> Never { print("FAIL: \(message)"); fflush(stdout); exit(1) }
+        func after(_ delay: Double, _ body: @escaping () -> Void) { DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: body) }
+        NotificationCenter.default.post(name: .elmersResults, object: nil)
+        model.clearSearch(); model.searchOpen = false
+        // Let SwiftUI report the field's lost focus first, or ⌘F would count as the in-search ⌘F that opens filters.
+        after(0.2) { key(3, "f", .command) }
+        after(0.45) {
+            guard model.searchOpen, model.searchIsFocused, !model.filtersOpen else { fail("⌘F did not open and focus the search field (open \(model.searchOpen), focused \(model.searchIsFocused), filters \(model.filtersOpen))") }
+            key(3, "f", .command)
+            after(0.4) {
+                guard model.filtersOpen else { fail("a second ⌘F did not open the filter chips") }
+                if let directory = ProcessInfo.processInfo.environment["ELMERS_CAPTURE_DIR"],
+                   let popover = NSApp.windows.first(where: { $0.isVisible && String(describing: type(of: $0)).contains("Popover") }), let view = popover.contentView,
+                   let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+                    view.cacheDisplay(in: view.bounds, to: rep)
+                    try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: directory).appendingPathComponent("filter-popover.png"))
+                }
+                model.newText("https://example.com/search-mode-fixture")
+                model.filters.toggle(.kind(.text)); model.filters.toggle(.kind(.link)); model.filters.toggle(.date(.today))
+                let now = Date(), start = Calendar.current.startOfDay(for: now)
+                guard model.filters.tokens == [.kind(.text), .kind(.link), .date(.today)], !model.visibleItems.isEmpty,
+                      model.visibleItems.allSatisfy({ [.text, .link].contains($0.kind) && $0.copiedAt >= start }),
+                      model.visibleItems.contains(where: { $0.kind == .link }) else { fail("Text + Link + Today did not show today's text and links: \(model.visibleItems.map(\.kind))") }
+                capturePanel(controller, name: "search-tokens")
+                key(53, "\u{1B}")
+                after(0.3) {
+                    guard !model.filtersOpen, model.filters.tokens.count == 3, model.searchOpen else { fail("first Escape should only close the filter chips") }
+                    key(53, "\u{1B}")
+                    after(0.2) {
+                        guard model.filters.isEmpty, model.query.isEmpty, model.searchOpen, controller.isShown else { fail("second Escape should clear the tokens and keep search open") }
+                        capturePanel(controller, name: "search-open")
+                        key(53, "\u{1B}")
+                        after(0.2) {
+                            guard !model.searchOpen, controller.isShown else { fail("third Escape should close search mode and keep the panel") }
+                            print("PASS: search mode: ⌘F, filter chips as tokens, and Escape one layer at a time")
+                            checkReopening(model: model, controller: controller)
+                        }
+                    }
+                }
+            }
+        }
     }
     static func checkReopening(model: AppModel, controller: PanelController) {
         NotificationCenter.default.post(name: .elmersSearch, object: nil)
@@ -257,7 +307,7 @@ final class KeyboardInteractionChecks {
     }
     /// The Copied HUD appears for about a second after a clipboard-mode paste or ⌘C, then fades out on its own.
     static func checkCopiedHUD(model: AppModel, controller: PanelController) {
-        model.query = ""; model.kind = nil; model.boardID = nil
+        model.clearSearch(); model.boardID = nil
         model.directPaste = false
         model.newText("https://pasteapp.io/help/keyboard-shortcuts")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
