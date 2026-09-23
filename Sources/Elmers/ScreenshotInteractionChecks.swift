@@ -91,7 +91,7 @@ enum ScreenshotInteractionChecks {
                 require(model.visibleItems.contains { $0.id == screenshot.id }, "Images includes screenshot cards")
                 model.clearSearch(); model.query = "SCREENSHOT"
                 await until("Screenshot query becomes dedicated type filter") { model.filters.tokens == [.kind(.screenshot)] && model.query.isEmpty }
-                require(model.removeLastFilter() && model.query == "SCREENSHOT", "Backspace restores screenshot query word")
+                require(model.removeLastFilter() && model.query.isEmpty && model.filters.isEmpty, "Backspace removes the screenshot token and its text")
                 model.clearSearch()
                 let count = model.history.items.count
                 model.paused = true; model.ingestScreenshot(captures[1]); model.paused = false

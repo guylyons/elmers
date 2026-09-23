@@ -114,7 +114,7 @@ Reference: Paste 6.3.11 on macOS 27.0 (26A428), one external display, 2560×1440
 | Tokens | Each chosen chip becomes a 16-pt gray capsule token (icon + 13-pt title) inside the field, in the order the chips were clicked, not grouped by section | implemented (`FilterToken`) |
 | Escape | 1st press closes the popover; 2nd clears the query and every token while search stays open; 3rd closes search mode. With typed text and no popover: 1st clears the text, 2nd closes search | implemented in `PanelController.handle` (`.escape`) |
 | Leaving search | Clicking a card while the field is empty closes search mode | implemented (`CardMouseObserver` callback). With a query, Paste's behavior was not captured because the panel closed during the attempt |
-| Backspace on tokens | Observed once: with one token and an empty field, the first Backspace left the token and the second removed it | **differs**: Elmers removes the last token on the first Backspace. A typed type word, such as "image", is still restored to the field |
+| Backspace on tokens | Observed once: with one token and an empty field, the first Backspace left the token and the second removed it | **differs**: Elmers removes the last token on the first Backspace. **Changed September 23 at the user's request**: a typed type word, such as "image", is no longer put back in the field; Backspace removes the token and its text entirely |
 
 Hands-on, on the rebuilt `dist/Elmers.app` with real history (only the accessibility frames of the toolbar were read):
 - The physical ⇧⌘V opens the panel.

@@ -87,11 +87,11 @@ final class KeyboardInteractionChecks {
                     let backspace = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: controller.panel.windowNumber, context: nil, characters: "\u{7F}", charactersIgnoringModifiers: "\u{7F}", isARepeat: false, keyCode: 51)!
                     NSApp.postEvent(backspace, atStart: false)
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                        guard model.filters.isEmpty, model.query == "image" else {
+                        guard model.filters.isEmpty, model.query.isEmpty else {
                             print("FAIL: Backspace left filters \(model.filters.tokens) and query '\(model.query)'"); fflush(stdout); exit(1)
                         }
                         capturePanel(controller, name: "search-after-backspace")
-                        print("PASS: Backspace on the empty field removes the type filter and restores the word")
+                        print("PASS: Backspace on the empty field removes the type filter and its text")
                         model.query = ""
                         checkSearchMode(model: model, controller: controller)
                     }

@@ -9,12 +9,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var history = History() { didSet { refreshVisibleItems() } }
     @Published var query = "" { didSet { refreshVisibleItems(); if !absorbingTypedFilter { DispatchQueue.main.async { self.absorbTypedFilter() } } } }
     /// Chips chosen in the filter popover or typed as a type word, shown as tokens in the search field.
-    @Published var filters = SearchFilters() { didSet { if !absorbingTypedFilter, typedFilter.map(filters.contains) != true { typedFilter = nil; typedFilterWord = nil }; refreshVisibleItems() } }
-    /// The type token a typed word became, and that word, returned to the field when Backspace removes the token.
-    private var typedFilter: SearchFilter?
-    private var typedFilterWord: String?
-    /// The word just put back by Backspace; it is not absorbed again until the user changes it.
-    private var restoredFilterWord: String?
+    @Published var filters = SearchFilters() { didSet { refreshVisibleItems() } }
     private var absorbingTypedFilter = false
     /// Paste's search mode: the field is open and the pinboard pills shrink to their icons.
     @Published var searchOpen = false
@@ -154,28 +149,25 @@ final class AppModel: ObservableObject {
     /// A type word in the query becomes the type filter and leaves the field, so what follows searches within that type.
     /// Runs one turn after the edit: the text field ignores a binding change made inside its own update.
     private func absorbTypedFilter() {
-        guard !absorbingTypedFilter, query != restoredFilterWord else { return }
-        restoredFilterWord = nil
+        guard !absorbingTypedFilter else { return }
         let parsed = SearchQuery(query)
         guard let typed = parsed.kind, !filters.contains(.kind(typed)) else { return }
         absorbingTypedFilter = true
-        filters.add(.kind(typed)); typedFilter = .kind(typed); typedFilterWord = parsed.kindWord
+        filters.add(.kind(typed))
         query = parsed.remainder
         absorbingTypedFilter = false
     }
-    /// Backspace on an empty field removes the last token. A typed word goes back into the field so it can be edited
-    /// into something longer ("link" → "linkedin"). Returns false when there is nothing to remove.
+    /// Backspace on an empty field removes the last token and its text entirely, typed type words included (the
+    /// user's request, September 23). Returns false when there is nothing to remove.
     @discardableResult func removeLastFilter() -> Bool {
-        guard query.isEmpty, let removed = filters.tokens.last else { return false }
-        let word = removed == typedFilter ? typedFilterWord : nil
+        guard query.isEmpty, !filters.isEmpty else { return false }
         filters.removeLast()
-        if let word { absorbingTypedFilter = true; restoredFilterWord = word; query = word; absorbingTypedFilter = false }
         return true
     }
     /// Clears the query and every token, as Paste's clear button and second Escape do.
     func clearSearch() {
         absorbingTypedFilter = true
-        query = ""; filters.removeAll(); typedFilter = nil; typedFilterWord = nil; restoredFilterWord = nil
+        query = ""; filters.removeAll()
         absorbingTypedFilter = false
     }
     var hasSearch: Bool { !query.isEmpty || !filters.isEmpty }
