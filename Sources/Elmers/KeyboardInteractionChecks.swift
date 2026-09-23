@@ -209,7 +209,8 @@ final class KeyboardInteractionChecks {
     }
     static func checkReopening(model: AppModel, controller: PanelController) {
         NotificationCenter.default.post(name: .elmersSearch, object: nil)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        // The field takes focus once it has finished growing open.
+        DispatchQueue.main.asyncAfter(deadline: .now() + TimingCurve.searchOpenDuration + 0.15) {
             guard model.searchIsFocused else { print("FAIL: reopen setup search focus"); exit(1) }
             controller.hide(restoreFocus: false)
             controller.show()

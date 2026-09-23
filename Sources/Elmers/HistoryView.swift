@@ -93,11 +93,14 @@ struct HistoryView: View {
         .sheet(isPresented: $helpVisible) { KeyboardHelp() }
     }
     private var searching: Bool { model.searchOpen || model.hasSearch }
+    /// Follows `searching` without animation: Paste drops the pill names, the selection capsule and the + on the first
+    /// frame of the change, while the frames around them animate. Kept apart from `searching` so the views still move.
+    @State private var compact = false
     /// The field only exists once search mode is on, so focus it on the next turn.
+    /// Opens search mode; the field focuses itself once it has finished growing (see `SearchField`).
     private func openSearch() {
         if searching { searchFocused = true; return }
         model.searchOpen = true
-        DispatchQueue.main.async { searchFocused = true }
     }
     private var toolbar: some View {
         GeometryReader { geometry in
@@ -106,11 +109,13 @@ struct HistoryView: View {
                 // the field grows out of the magnifier, the pills ride along and lose their names, the + fades.
                 ToolbarLayout(open: searching, fieldWidth: (geometry.size.width / 4).rounded()) {
                     SearchField(model: model, focused: $searchFocused, expanded: searching, open: openSearch)
-                    boardPills(collapsed: searching)
+                    boardPills(collapsed: compact)
                     Button { editingBoard = nil; boardName = ""; boardDialog = true } label: { Image(systemName: "plus").font(.system(size: 17)) }
                         .buttonStyle(.plain).frame(width: 34, height: 34).contentShape(Circle()).hoverHighlight(Circle())
                         .help("Create Pinboard (⇧⌘N)").accessibilityLabel("Create Pinboard").disabled(!model.canEdit)
-                        .opacity(searching ? 0 : 1).allowsHitTesting(!searching)
+                        .allowsHitTesting(!searching)
+                        // Gone the moment search opens; closing, it fades back in over Paste's first two frames.
+                        .animation(searching ? nil : .easeOut(duration: 0.06)) { $0.opacity(searching ? 0 : 1) }
                 }
                 .font(.system(size: 13))
                 HStack {
@@ -128,6 +133,11 @@ struct HistoryView: View {
             // Paste 6.3.11's timing, fitted to recordings (`TimingCurve.searchOpen` / `.searchClose`).
             .animation(searching ? .timingCurve(0.10, 0.40, 0.60, 0.90, duration: TimingCurve.searchOpenDuration)
                                  : .timingCurve(0.25, 0.40, 0.60, 0.90, duration: TimingCurve.searchCloseDuration), value: searching)
+            .onAppear { compact = searching }
+            .onChange(of: searching) { _, isSearching in
+                var instant = Transaction(); instant.disablesAnimations = true
+                withTransaction(instant) { compact = isSearching }
+            }
         }
     }
     @ViewBuilder private func boardPills(collapsed: Bool) -> some View {
@@ -173,12 +183,15 @@ struct HistoryView: View {
             // The clock's ink is 14 pt wide in Paste; its symbol frame is wider and would push the dots right.
             if let symbol { Image(systemName: symbol).frame(width: 14) }
             if let color { Circle().fill(color).frame(width: 12, height: 12) }
+            // Paste drops the names and the selection capsule on the first frame of the change; the pills' frames
+            // then animate and clip what is left.
             Text(name).lineLimit(1).opacity(collapsed ? 0 : 1)
         }
         .padding(.leading, 10).padding(.trailing, 12).padding(.vertical, 6)
+        // The selection capsule is clipped with the name while the pill narrows or widens, as in Paste's frames.
+        .background(Capsule().fill(selected && !collapsed ? Color.primary.opacity(0.1) : Color.clear))
         .fixedSize()
         .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading).clipped()
-        .background(selected && !collapsed ? Color.primary.opacity(0.1) : Color.clear, in: Capsule())
         .contentShape(Capsule())
         .onTapGesture(perform: action)
         .accessibilityElement(children: .combine)
