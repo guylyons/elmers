@@ -1,3 +1,4 @@
+// swift-format-ignore-file: AlwaysUseLowerCamelCase
 import Foundation
 
 var failures = 0
