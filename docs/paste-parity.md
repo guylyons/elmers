@@ -18,7 +18,15 @@ Reference: Paste 6.3.11 on macOS 27.0 (26A428), one external display, 2560×1440
 | Leaving search | Clicking a card while the field is empty closes search mode | implemented (`CardMouseObserver` callback). With a query, Paste's behavior was not captured because the panel closed during the attempt |
 | Backspace on tokens | Observed once: with one token and an empty field, the first Backspace left the token and the second removed it | **differs**: Elmers removes the last token on the first Backspace. A typed type word, such as "image", is still restored to the field |
 
-Not compared: dark appearance; the popover's Liquid Glass material and arrow position; chip hover and pressed states; what clicking a token does; a query plus a card click; whether Paste lists type chips for kinds absent from history (it showed Unknown and Color here, so it may list every type). An undiagnosed quirk seen during the session: Paste's panel sometimes closed by itself after a key press or popover click, so some clicks landed on the window behind it. Checks: core 55/55 (four new: widen/narrow semantics, date ranges, token order and toggling, Image including screenshots); `--check-interaction` gains "search mode: ⌘F, filter chips as tokens, and Escape one layer at a time", which passed 6 of 6 runs. On this loaded machine, alternating runs gave main 5/5 and this branch 4/5; the one failure was the existing "selection still pending" flake, which main also showed earlier. `--check-status-item` and `--check-screenshots` pass. Lint is clean.
+Hands-on, on the rebuilt `dist/Elmers.app` with real history (only the accessibility frames of the toolbar were read):
+- The physical ⇧⌘V opens the panel.
+- ⌘F gives the filter button at 1572,1121 (19×34) and a text field from x 989, the same frames as Paste's.
+- A second ⌘F opens a 466×346 popover at y 775 (Paste: 776).
+- Escape closes the popover, then search mode, then the panel.
+
+**Known difference:** SwiftUI centers the popover over the filter button (x 1352–1818). Paste's popover sits 56 pt further right (x 1408–1874), with its arrow 173 pt from its left edge.
+
+Not compared: dark appearance; the popover's Liquid Glass material; chip hover and pressed states; what clicking a token does; a query plus a card click; whether Paste lists type chips for kinds absent from history (it showed Unknown and Color here, so it may list every type). An undiagnosed quirk seen during the session: Paste's panel sometimes closed by itself after a key press or popover click, so some clicks landed on the window behind it. Checks: core 55/55 (four new: widen/narrow semantics, date ranges, token order and toggling, Image including screenshots); `--check-interaction` gains "search mode: ⌘F, filter chips as tokens, and Escape one layer at a time", which passed 6 of 6 runs. On this loaded machine, alternating runs gave main 5/5 and this branch 4/5; the one failure was the existing "selection still pending" flake, which main also showed earlier. `--check-status-item` and `--check-screenshots` pass. Lint is clean.
 
 ## September 23 — menu bar right-click menu and Settings window
 
