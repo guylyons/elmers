@@ -12,9 +12,9 @@ public struct ScreenshotImage {
         case invalid, unsupported, tooLarge
         public var errorDescription: String? {
             switch self {
-            case .invalid: return "A screenshot could not be read as a complete image. The original file is unchanged."
-            case .unsupported: return "This screenshot format is not supported yet. Use PNG, JPEG, TIFF or HEIC in macOS."
-            case .tooLarge: return "A screenshot exceeds Elmers’ 32 MB capture or decoded image size limit. The original file is unchanged."
+            case .invalid: return String(localized: "A screenshot could not be read as a complete image. The original file is unchanged.")
+            case .unsupported: return String(localized: "This screenshot format is not supported yet. Use PNG, JPEG, TIFF or HEIC in macOS.")
+            case .tooLarge: return String(localized: "A screenshot exceeds Elmers’ 32 MB capture or decoded image size limit. The original file is unchanged.")
             }
         }
     }

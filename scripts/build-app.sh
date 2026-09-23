@@ -9,6 +9,9 @@ cp ".build/$configuration/Elmers" "$app_bundle/Contents/MacOS/Elmers"
 cp Resources/Info.plist "$app_bundle/Contents/Info.plist"
 cp Resources/AboutElmers.png "$app_bundle/Contents/Resources/AboutElmers.png"
 cp Resources/Toolbar.png "$app_bundle/Contents/Resources/Toolbar.png"
+# Translations: one .lproj per language, looked up from the main bundle by SwiftUI and String(localized:).
+find "$app_bundle/Contents/Resources" -maxdepth 1 -name "*.lproj" -exec rm -rf {} +
+cp -R Resources/Localization/*.lproj "$app_bundle/Contents/Resources/"
 # Build the icon from Resources/AppIcon.png whenever the artwork is newer than the compiled icon.
 icns=".build/AppIcon.icns"
 if [[ ! -f "$icns" || Resources/AppIcon.png -nt "$icns" ]]; then

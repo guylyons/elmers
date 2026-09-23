@@ -34,7 +34,7 @@ struct CardView: View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: -1) {
-                    Text(item.title ?? item.kind.rawValue).font(.system(size: 15, weight: .semibold)).lineLimit(1)
+                    Text(item.title ?? item.kind.title).font(.system(size: 15, weight: .semibold)).lineLimit(1)
                     TimelineView(.periodic(from: .now, by: 15)) { context in
                         Text(Self.relativeTime(item.copiedAt, now: context.date)).font(.system(size: 12)).opacity(0.9).lineLimit(1)
                     }
@@ -83,14 +83,14 @@ struct CardView: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(item.kind.rawValue), \(item.source), \(String(item.text.prefix(140)))")
-        .accessibilityValue(selected ? "Selected" : "")
-        .help("\(item.source) · \(item.kind.rawValue)\(index < 9 ? " · ⌘\(index + 1) to paste" : "")")
+        .accessibilityLabel("\(item.kind.title), \(item.source), \(String(item.text.prefix(140)))")
+        .accessibilityValue(selected ? String(localized: "Selected") : "")
+        .help(index < 9 ? String(localized: "\(item.source) · \(item.kind.title) · ⌘\(index + 1) to paste") : "\(item.source) · \(item.kind.title)")
     }
     /// Paste's wording: "now", "30 seconds ago", "5 minutes ago", "3 hours ago", "yesterday", "2 weeks ago".
     static func relativeTime(_ date: Date, now: Date = Date()) -> String {
         let seconds = now.timeIntervalSince(date)
-        if seconds < 30 { return "now" }
+        if seconds < 30 { return String(localized: "now") }
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full; formatter.dateTimeStyle = .named
         return formatter.localizedString(for: date, relativeTo: now)
@@ -108,13 +108,13 @@ struct CardView: View {
     private var symbol: String { item.kind.symbolName }
     private var footer: String {
         switch item.kind {
-        case .text: return "\(item.text.count) character\(item.text.count == 1 ? "" : "s")" // Paste: "1 character", "41 characters"
+        case .text: return String(localized: "\(item.text.count) characters") // Paste: "1 character", "41 characters" (plural rules)
         case .link:
             // Paste shows the address without its scheme: "pasteapp.io/help".
             guard let url = URL(string: item.text.components(separatedBy: "\n").first ?? item.text), let host = url.host else { return "Link" }
             let path = url.path == "/" ? "" : url.path
             return host + path + (url.query.map { "?" + $0 } ?? "")
-        case .file: return "\(item.payload.items.count) file\(item.payload.items.count == 1 ? "" : "s")"
+        case .file: return String(localized: "\(item.payload.itemCount) files")
         default: return ByteCountFormatter.string(fromByteCount: Int64(item.byteCount), countStyle: .file)
         }
     }
@@ -189,7 +189,7 @@ struct ItemPreview: View {
     let item: ClipboardItem
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack { Text(item.title ?? item.kind.rawValue).font(.title2.bold()); Spacer(); Text(item.source).foregroundStyle(.secondary) }
+            HStack { Text(item.title ?? item.kind.title).font(.title2.bold()); Spacer(); Text(item.source).foregroundStyle(.secondary) }
             Divider()
             if let image = imagePreview(item) {
                 Image(nsImage: image).resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -266,6 +266,18 @@ final class CardImageCache {
 }
 
 extension ContentKind {
+    /// The type's name on cards, in filters and in menus, in the user's language.
+    var title: String {
+        switch self {
+        case .text: return String(localized: "Text")
+        case .link: return String(localized: "Link")
+        case .image: return String(localized: "Image")
+        case .screenshot: return String(localized: "Screenshot")
+        case .file: return String(localized: "File")
+        case .color: return String(localized: "Color")
+        case .other: return String(localized: "Unknown")
+        }
+    }
     /// SF Symbol used for this type on cards and in the search field's type filter.
     var symbolName: String {
         switch self { case .text: return "text.alignleft"; case .link: return "link"; case .image: return "photo"; case .screenshot: return "viewfinder"; case .file: return "doc"; case .color: return "paintpalette"; case .other: return "doc.on.clipboard" }

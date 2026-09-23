@@ -66,7 +66,7 @@ final class AppModel: ObservableObject {
         didSet {
             guard !isDemo, openAtLogin != oldValue, openAtLogin != (SMAppService.mainApp.status == .enabled) else { return }
             do { if openAtLogin { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() } }
-            catch { message = "Login item could not be changed: \(error.localizedDescription)"; openAtLogin = oldValue }
+            catch { message = String(localized: "Login item could not be changed: \(error.localizedDescription)"); openAtLogin = oldValue }
         }
     }
     var sharingChanged: (() -> Void)?
@@ -151,7 +151,7 @@ final class AppModel: ObservableObject {
            let name = String(data: data, encoding: .utf8)?.trimmingCharacters(in: CharacterSet(charactersIn: "\0")), !name.isEmpty {
             return name.components(separatedBy: " (").first ?? name
         }
-        return Host.current().localizedName ?? "This Mac"
+        return Host.current().localizedName ?? String(localized: "This Mac")
     }()
 
     init() {
@@ -176,7 +176,7 @@ final class AppModel: ObservableObject {
         store = HistoryStore(directory: directory)
         if !demo {
             do { history = try store.load(); prune() }
-            catch { archiveReadable = false; message = "History could not be opened. The original archive is preserved. \(error.localizedDescription)" }
+            catch { archiveReadable = false; message = String(localized: "History could not be opened. The original archive is preserved. \(error.localizedDescription)") }
         }
         #if DEBUG
         if demo, ProcessInfo.processInfo.arguments.contains("--demo-fixtures") { seedDemoFixtures() }
@@ -301,7 +301,7 @@ final class AppModel: ObservableObject {
         prune(); persist(); recognizeImageText()
     }
     private func captureImage(_ payload: ClipboardPayload, source: String, sourceID: String?) {
-        guard pendingImageCaptures < 4 else { message = "Image capture is busy. Please copy this image again in a moment."; return }
+        guard pendingImageCaptures < 4 else { message = String(localized: "Image capture is busy. Please copy this image again in a moment."); return }
         pendingImageCaptures += 1
         let epoch = captureEpoch, capturedAt = Date()
         imageCaptureQueue.async { [weak self] in
@@ -321,22 +321,22 @@ final class AppModel: ObservableObject {
         guard let folder = screenshotFolder else { return }
         let chooser = NSOpenPanel()
         chooser.canChooseDirectories = true; chooser.canChooseFiles = false; chooser.allowsMultipleSelection = false
-        chooser.directoryURL = folder; chooser.prompt = "Allow Access"
-        chooser.message = "Choose your current macOS screenshot folder. Elmers will read new screenshots without changing where macOS saves them."
+        chooser.directoryURL = folder; chooser.prompt = String(localized: "Allow Access")
+        chooser.message = String(localized: "Choose your current macOS screenshot folder. Elmers will read new screenshots without changing where macOS saves them.")
         guard chooser.runModal() == .OK, let chosen = chooser.url else { return }
         guard chosen.standardizedFileURL == folder.standardizedFileURL else {
-            screenshotStatus = "Choose the folder configured in macOS Screenshot’s Options. Elmers does not change that destination."; return
+            screenshotStatus = String(localized: "Choose the folder configured in macOS Screenshot’s Options. Elmers does not change that destination."); return
         }
         do {
             let bookmark = try chosen.bookmarkData(options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess], includingResourceValuesForKeys: nil, relativeTo: nil)
             defaults.set(bookmark, forKey: "screenshotFolderAccess"); refreshScreenshotMonitoring(force: true)
-        } catch { screenshotStatus = "Folder access could not be saved. \(error.localizedDescription)" }
+        } catch { screenshotStatus = String(localized: "Folder access could not be saved. \(error.localizedDescription)") }
     }
     func useScreenshotOriginal(_ item: ClipboardItem, copyFile: Bool) {
         guard let origin = item.screenshot else { return }
         ScreenshotActions.resolve(origin) { [weak self] url in
             guard let self else { return }
-            guard let url else { self.message = "The original screenshot file can’t be found. You can still copy or paste the image saved in Elmers."; return }
+            guard let url else { self.message = String(localized: "The original screenshot file can’t be found. You can still copy or paste the image saved in Elmers."); return }
             if copyFile {
                 let file = ClipboardItem(payload: .init(items: [["public.file-url": Data(url.absoluteString.utf8)]]), source: "Elmers")
                 if self.copy(file) { self.showCopied?() }
@@ -372,7 +372,7 @@ final class AppModel: ObservableObject {
     func copy(_ item: ClipboardItem, plainText: Bool = false) -> Bool {
         // Large content is read from the database here; a failed read must not put a partial item on the clipboard.
         guard let items = try? item.payload.materializedItems() else {
-            message = "This item's content could not be read. It may have been deleted in another window."
+            message = String(localized: "This item's content could not be read. It may have been deleted in another window.")
             return false
         }
         guard PasteboardCodec.write(ClipboardPayload(items: items), to: .general, plainText: plainText) else {
@@ -505,7 +505,7 @@ final class AppModel: ObservableObject {
     func editItem(_ item: ClipboardItem, payload: ClipboardPayload) {
         guard canEdit else { return }
         // Saving the edit replaces the stored content, so the undo record keeps its own copy of the old one.
-        guard (try? item.payload.retainDeferred()) != nil else { message = "The original content could not be read, so this edit was not applied."; return }
+        guard (try? item.payload.retainDeferred()) != nil else { message = String(localized: "The original content could not be read, so this edit was not applied."); return }
         rememberUndo { model in if let current = model.history.items.first(where: { $0.id == item.id }) { model.editItem(current, payload: item.payload) } }
         history.editItem(item.id, payload: payload); persist()
     }
@@ -522,7 +522,7 @@ final class AppModel: ObservableObject {
         let snapshot = history, store = store
         saveQueue.async { [weak self] in
             do { try store.save(snapshot) }
-            catch { let description = error.localizedDescription; Task { @MainActor in self?.message = "History could not be saved: \(description)" } }
+            catch { let description = error.localizedDescription; Task { @MainActor in self?.message = String(localized: "History could not be saved: \(description)") } }
         }
     }
     func flush() { saveQueue.sync {} }

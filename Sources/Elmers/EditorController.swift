@@ -21,7 +21,7 @@ final class EditorController: NSObject, NSTextViewDelegate {
     let panel: EditorPanel
     let textView: EditorTextView
     private let footer = NSTextField(labelWithString: "")
-    private let confirmButton = NSButton(title: "Create", target: nil, action: nil)
+    private let confirmButton = NSButton(title: String(localized: "Create"), target: nil, action: nil)
     private var completion: ((ClipboardPayload?) -> Void)?
     private(set) var editingItem: ClipboardItem?
     private var formatting: NSStackView!
@@ -45,7 +45,7 @@ final class EditorController: NSObject, NSTextViewDelegate {
         panel.level = .floating; panel.isMovableByWindowBackground = true; panel.isReleasedWhenClosed = false
         panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.title = "Elmers Editor"
+        panel.title = String(localized: "Elmers Editor")
 
         let material = NSVisualEffectView()
         // Paste's editor is a light, mostly opaque gray sheet in either appearance.
@@ -54,7 +54,7 @@ final class EditorController: NSObject, NSTextViewDelegate {
         material.wantsLayer = true; material.layer?.cornerRadius = 12; material.layer?.masksToBounds = true
         panel.contentView = material
 
-        let cancel = NSButton(title: "Cancel", target: self, action: #selector(cancel))
+        let cancel = NSButton(title: String(localized: "Cancel"), target: self, action: #selector(cancel))
         cancel.bezelStyle = .rounded; cancel.controlSize = .small; cancel.font = .systemFont(ofSize: 12)
         confirmButton.target = self; confirmButton.action = #selector(confirm)
         confirmButton.bezelStyle = .rounded; confirmButton.controlSize = .small; confirmButton.font = .systemFont(ofSize: 12)
@@ -62,22 +62,22 @@ final class EditorController: NSObject, NSTextViewDelegate {
         confirmButton.bezelColor = .controlAccentColor
 
         formatting = NSStackView(views: [
-            formatButton("B", weight: .bold, action: #selector(toggleBold), tip: "Bold (⌘B)"),
-            formatButton("I", italic: true, action: #selector(toggleItalic), tip: "Italic (⌘I)"),
-            formatButton("U", underline: true, action: #selector(toggleUnderline), tip: "Underline (⌘U)"),
-            formatButton("S", strike: true, action: #selector(toggleStrikethrough), tip: "Strikethrough")
+            formatButton("B", weight: .bold, action: #selector(toggleBold), tip: String(localized: "Bold (⌘B)")),
+            formatButton("I", italic: true, action: #selector(toggleItalic), tip: String(localized: "Italic (⌘I)")),
+            formatButton("U", underline: true, action: #selector(toggleUnderline), tip: String(localized: "Underline (⌘U)")),
+            formatButton("S", strike: true, action: #selector(toggleStrikethrough), tip: String(localized: "Strikethrough"))
         ])
         formatting.spacing = 22
         if #available(macOS 15.2, *) {
-            let tools = NSButton(image: NSImage(systemSymbolName: "apple.writing.tools", accessibilityDescription: "Writing Tools")
-                                    ?? NSImage(systemSymbolName: "sparkles", accessibilityDescription: "Writing Tools")!,
+            let tools = NSButton(image: NSImage(systemSymbolName: "apple.writing.tools", accessibilityDescription: String(localized: "Writing Tools"))
+                                    ?? NSImage(systemSymbolName: "sparkles", accessibilityDescription: String(localized: "Writing Tools"))!,
                                  target: self, action: #selector(showWritingTools))
-            tools.isBordered = false; tools.toolTip = "Writing Tools"; tools.setAccessibilityLabel("Writing Tools")
+            tools.isBordered = false; tools.toolTip = String(localized: "Writing Tools"); tools.setAccessibilityLabel(String(localized: "Writing Tools"))
             formatting.addArrangedSubview(tools); formatting.setCustomSpacing(34, after: formatting.arrangedSubviews[3])
         }
         rotation = NSStackView(views: [
-            symbolButton("rotate.left", tip: "Rotate left", action: #selector(rotateLeft)),
-            symbolButton("rotate.right", tip: "Rotate right", action: #selector(rotateRight))
+            symbolButton("rotate.left", tip: String(localized: "Rotate left"), action: #selector(rotateLeft)),
+            symbolButton("rotate.right", tip: String(localized: "Rotate right"), action: #selector(rotateRight))
         ])
         rotation.spacing = 22; rotation.isHidden = true
         let leftSpacer = NSView(), rightSpacer = NSView()
@@ -92,19 +92,19 @@ final class EditorController: NSObject, NSTextViewDelegate {
         textView.isRichText = true; textView.allowsUndo = true; textView.font = .systemFont(ofSize: 13)
         textView.textContainerInset = NSSize(width: 6, height: 8); textView.delegate = self
         textView.usesFindPanel = false; textView.isAutomaticQuoteSubstitutionEnabled = false
-        textView.setAccessibilityLabel("Text")
+        textView.setAccessibilityLabel(String(localized: "Text"))
         scroll.borderType = .noBorder; scroll.drawsBackground = true; scroll.backgroundColor = .textBackgroundColor
         scroll.wantsLayer = true; scroll.layer?.cornerRadius = 8; scroll.layer?.masksToBounds = true
         scroll.translatesAutoresizingMaskIntoConstraints = false
         scroll.setContentHuggingPriority(.defaultLow, for: .vertical)
 
         footer.font = .systemFont(ofSize: 12); footer.textColor = .secondaryLabelColor
-        footer.setAccessibilityLabel("Statistics")
+        footer.setAccessibilityLabel(String(localized: "Statistics"))
         imageView.imageScaling = .scaleProportionallyDown; imageView.isHidden = true
         for orientation in [NSLayoutConstraint.Orientation.horizontal, .vertical] {
             imageView.setContentHuggingPriority(.defaultLow, for: orientation); imageView.setContentCompressionResistancePriority(.defaultLow, for: orientation)
         }
-        imageView.translatesAutoresizingMaskIntoConstraints = false; imageView.setAccessibilityLabel("Image")
+        imageView.translatesAutoresizingMaskIntoConstraints = false; imageView.setAccessibilityLabel(String(localized: "Image"))
         self.scroll = scroll
         let column = NSStackView(views: [toolbar, scroll, footer])
         column.orientation = .vertical; column.alignment = .leading; column.spacing = 6
@@ -160,7 +160,7 @@ final class EditorController: NSObject, NSTextViewDelegate {
         let text = textView.string
         let words = text.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).count
         let lines = text.isEmpty ? 0 : text.components(separatedBy: .newlines).count
-        return "\(text.count) character\(text.count == 1 ? "" : "s") · \(words) word\(words == 1 ? "" : "s") · \(lines) line\(lines == 1 ? "" : "s")"
+        return [String(localized: "\(text.count) characters"), String(localized: "\(words) words"), String(localized: "\(lines) lines")].joined(separator: " · ")
     }
     private func refresh() {
         footer.stringValue = statistics

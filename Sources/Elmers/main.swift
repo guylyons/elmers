@@ -15,13 +15,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.image = StatusIcon.make()
             button.target = self; button.action = #selector(statusItemClicked)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
-            button.toolTip = "Elmers — Shift-Command-V · Right-click for more"
+            button.toolTip = String(localized: "Elmers — Shift-Command-V · Right-click for more")
         }
         panelController.statusItemFrame = { [weak self] in self?.statusItem.button?.window?.frame }
         shortcut.onActivate = { [weak self] in self?.panelController.toggle() }
         model.shortcutsChanged = { [weak self] in
             guard let self else { return }
-            self.model.shortcutConflict = self.shortcut.register(self.model.shortcuts.activation) ? nil : "The history shortcut is in use by another app. Quit Paste to use the same shortcut in Elmers."
+            self.model.shortcutConflict = self.shortcut.register(self.model.shortcuts.activation) ? nil : String(localized: "The history shortcut is in use by another app. Quit Paste to use the same shortcut in Elmers.")
         }
         model.shortcutRecordingChanged = { [weak self] recording in
             guard let self else { return }
@@ -30,12 +30,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.shortcutsChanged?()
         let menu = NSMenu()
         let applicationMenu = NSMenu()
-        applicationMenu.addItem(withTitle: "Settings…", action: #selector(settings), keyEquivalent: ",").target = self
+        applicationMenu.addItem(withTitle: String(localized: "Settings…"), action: #selector(settings), keyEquivalent: ",").target = self
         applicationMenu.addItem(.separator())
-        applicationMenu.addItem(withTitle: "Quit Elmers", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        applicationMenu.addItem(withTitle: String(localized: "Quit Elmers"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         let applicationItem = NSMenuItem(); applicationItem.submenu = applicationMenu; menu.addItem(applicationItem)
-        let edit = NSMenu(title: "Edit")
-        for (title, action, key) in [("Cut", "cut:", "x"), ("Copy", "copy:", "c"), ("Paste", "paste:", "v"), ("Select All", "selectAll:", "a")] { edit.addItem(withTitle: title, action: Selector(action), keyEquivalent: key) }
+        let edit = NSMenu(title: String(localized: "Edit"))
+        for (title, action, key) in [(String(localized: "Cut"), "cut:", "x"), (String(localized: "Copy"), "copy:", "c"), (String(localized: "Paste"), "paste:", "v"), (String(localized: "Select All"), "selectAll:", "a")] { edit.addItem(withTitle: title, action: Selector(action), keyEquivalent: key) }
         let editItem = NSMenuItem(); editItem.submenu = edit; menu.addItem(editItem)
         NSApp.mainMenu = menu
         #if DEBUG
@@ -82,9 +82,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             LinkPreviewChecks.run(url: ProcessInfo.processInfo.arguments[index + 1])
             return
         }
+        if ProcessInfo.processInfo.arguments.contains("--show-panel"), let directory = ProcessInfo.processInfo.environment["ELMERS_CAPTURE_DIR"] {
+            // Writes the demo panel as panel.png and quits, e.g. to check a translation. Requires --demo.
+            precondition(model.isDemo, "Panel captures require --demo")
+            model.start(); panelController.show()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                KeyboardInteractionChecks.capturePanel(self.panelController, name: "panel")
+                exit(0)
+            }
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--show-settings") {
             // For side-by-side captures: opens Settings on the pane named by ELMERS_SETTINGS_SECTION (General by default).
             model.start(); panelController.openSettings()
+            // With ELMERS_CAPTURE_DIR set, write the pane as settings-<Section>.png and quit, e.g. to check a translation.
+            if let directory = ProcessInfo.processInfo.environment["ELMERS_CAPTURE_DIR"] {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                    let section = ProcessInfo.processInfo.environment["ELMERS_SETTINGS_SECTION"] ?? "General"
+                    if let view = NSApp.windows.first(where: { $0.isVisible && $0.title == String(localized: "Elmers Settings") })?.contentView,
+                       let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+                        view.cacheDisplay(in: view.bounds, to: rep)
+                        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: directory).appendingPathComponent("settings-\(section).png"))
+                    }
+                    exit(0)
+                }
+            }
             return
         }
         if ProcessInfo.processInfo.arguments.contains("--check-live-storage-persistence") {

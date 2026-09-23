@@ -9,22 +9,24 @@ enum AppMenu {
     static func make(model: AppModel, showKeyboardShortcuts: @escaping () -> Void) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
-        menu.addItem(item("About Elmers") { AboutPanel.show() })
+        menu.addItem(item(String(localized: "About Elmers")) { AboutPanel.show() })
         menu.addItem(.separator())
-        menu.addItem(item("New Text Item", key: "n", enabled: model.canEdit) { model.openEditor?(nil) })
-        menu.addItem(item("Settings…", key: ",") { model.showSettings?() })
+        menu.addItem(item(String(localized: "New Text Item"), key: "n", enabled: model.canEdit) { model.openEditor?(nil) })
+        menu.addItem(item(String(localized: "Settings…"), key: ",") { model.showSettings?() })
         menu.addItem(.separator())
-        menu.addItem(submenu("Help", [item("Keyboard Shortcuts", action: showKeyboardShortcuts)]))
+        menu.addItem(submenu(String(localized: "Help"), [item(String(localized: "Keyboard Shortcuts"), action: showKeyboardShortcuts)]))
         menu.addItem(.separator())
-        if model.paused { menu.addItem(item("Resume Elmers") { model.resume() }) }
+        if model.paused { menu.addItem(item(String(localized: "Resume Elmers")) { model.resume() }) }
         else {
-            var pauses = [item("Pause", key: "t") { model.pause(minutes: nil) }, NSMenuItem.separator()]
+            var pauses = [item(String(localized: "Pause"), key: "t") { model.pause(minutes: nil) }, NSMenuItem.separator()]
             for minutes in [15, 30, 60, 180, 480] {
-                pauses.append(item("Pause for \(minutes < 60 ? "\(minutes)m" : "\(minutes / 60)h")") { model.pause(minutes: minutes) })
+                // "Pause for 15m", "Pause for 1h", as Paste shows them; the system abbreviates the duration in the user's language.
+                let duration = DateComponentsFormatter.localizedString(from: DateComponents(hour: minutes < 60 ? nil : minutes / 60, minute: minutes < 60 ? minutes : nil), unitsStyle: .abbreviated) ?? "\(minutes)"
+                pauses.append(item(String(localized: "Pause for \(duration)")) { model.pause(minutes: minutes) })
             }
-            menu.addItem(submenu("Pause Elmers", pauses))
+            menu.addItem(submenu(String(localized: "Pause Elmers"), pauses))
         }
-        menu.addItem(item("Quit Elmers", key: "q") { NSApp.terminate(nil) })
+        menu.addItem(item(String(localized: "Quit Elmers"), key: "q") { NSApp.terminate(nil) })
         return menu
     }
     private static func item(_ title: String, key: String = "", enabled: Bool = true, action: @escaping () -> Void) -> NSMenuItem {

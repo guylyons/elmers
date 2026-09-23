@@ -22,6 +22,9 @@ struct SettingsView: View {
         var symbol: String {
             switch self { case .general: return "gearshape"; case .privacy: return "hand.raised"; case .shortcuts: return "keyboard" }
         }
+        var title: LocalizedStringKey {
+            switch self { case .general: return "General"; case .privacy: return "Privacy"; case .shortcuts: return "Shortcuts" }
+        }
     }
     var body: some View {
         HStack(spacing: 0) {
@@ -32,7 +35,7 @@ struct SettingsView: View {
                             HStack(spacing: 0) {
                                 Image(systemName: item.symbol).font(.system(size: 18))
                                     .foregroundStyle(section == item ? Color.white : SettingsStyle.sidebarIcon).frame(width: 37)
-                                Text(item.rawValue).font(.system(size: 13, weight: .medium))
+                                Text(item.title).font(.system(size: 13, weight: .medium))
                                     .foregroundStyle(section == item ? Color.white : Color.primary)
                                 Spacer(minLength: 0)
                             }
@@ -47,7 +50,7 @@ struct SettingsView: View {
             }
             .frame(width: 200).background(SettingsStyle.sidebar)
             VStack(alignment: .leading, spacing: 0) {
-                Text(section.rawValue).font(.system(size: 15, weight: .semibold)).frame(height: 18).padding(.top, 17).padding(.leading, 11)
+                Text(section.title).font(.system(size: 15, weight: .semibold)).frame(height: 18).padding(.top, 17).padding(.leading, 11)
                 ScrollView {
                     Group {
                         switch section {
@@ -117,8 +120,8 @@ struct SettingsSeparator: View {
 
 /// A group heading between groups: 13-pt bold, 30 pt below the previous group and 10.5 pt above the next.
 struct SettingsHeader: View {
-    let title: String
-    var detail: String?
+    let title: LocalizedStringKey
+    var detail: LocalizedStringKey?
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(title).font(.system(size: 13, weight: .bold))
@@ -129,7 +132,7 @@ struct SettingsHeader: View {
 
 /// A single-line row: label on the left, control on the right, 12-pt insets.
 struct SettingsRow<Control: View>: View {
-    let title: String
+    let title: LocalizedStringKey
     @ViewBuilder var control: Control
     var body: some View {
         HStack { Text(title); Spacer(minLength: 8); control }
@@ -139,8 +142,8 @@ struct SettingsRow<Control: View>: View {
 
 /// A switch row with a title and a 12-pt description wrapping up to the switch, the switch aligned with the title.
 struct SettingsDetailToggle: View {
-    let title: String
-    let detail: String
+    let title: LocalizedStringKey
+    let detail: LocalizedStringKey
     @Binding var isOn: Bool
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -230,7 +233,7 @@ private struct GeneralSettings: View {
         } message: { Text("Pinned items and Pinboards won't be deleted. This action cannot be undone.") }
     }
     /// Radio rows with the indicator on the left and the description under the title, as in Paste's "Paste Items".
-    private func option(_ title: String, _ detail: String, selected: Bool, action: @escaping () -> Void) -> some View {
+    private func option(_ title: LocalizedStringKey, _ detail: LocalizedStringKey, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(alignment: .top, spacing: 7) {
                 RadioIndicator(selected: selected).padding(.top, 1)
@@ -292,7 +295,7 @@ private struct RetentionSlider: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeNSView(context: Context) -> NSSlider {
         let slider = NSSlider(value: value, minValue: 0, maxValue: 4, target: context.coordinator, action: #selector(Coordinator.changed(_:)))
-        slider.setAccessibilityLabel("Keep History")
+        slider.setAccessibilityLabel(String(localized: "Keep History"))
         return slider
     }
     func updateNSView(_ slider: NSSlider, context: Context) { context.coordinator.parent = self; slider.doubleValue = value }
@@ -309,7 +312,7 @@ private struct RetentionSlider: NSViewRepresentable {
 
 /// Tick dots under the slider's five detents, then Day…Forever centered under them and kept inside the track at the ends.
 private struct RetentionLabels: View {
-    private let labels = ["Day", "Week", "Month", "Year", "Forever"]
+    private let labels: [LocalizedStringKey] = ["Day", "Week", "Month", "Year", "Forever"]
     var body: some View {
         GeometryReader { geometry in
             let inset: CGFloat = 10, step = (geometry.size.width - 2 * inset) / 4
@@ -386,7 +389,7 @@ private struct PrivacySettings: View {
             }
         }
     }
-    private func row(_ title: String, _ detail: String, _ binding: Binding<Bool>) -> some View {
+    private func row(_ title: LocalizedStringKey, _ detail: LocalizedStringKey, _ binding: Binding<Bool>) -> some View {
         Toggle(isOn: binding) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
@@ -398,7 +401,7 @@ private struct PrivacySettings: View {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.applicationBundle]
         panel.directoryURL = URL(fileURLWithPath: "/Applications")
-        panel.prompt = "Add"; panel.message = "Choose applications whose copied content should not be saved."
+        panel.prompt = String(localized: "Add"); panel.message = String(localized: "Choose applications whose copied content should not be saved.")
         panel.allowsMultipleSelection = true
         guard panel.runModal() == .OK else { return }
         for url in panel.urls {
@@ -459,8 +462,9 @@ private struct ShortcutSettingsView: View {
         } message: { Text("Are you sure you want to reset all shortcuts to their default values?") }
     }
     /// Paste's recorder: a 121×25 gray field with the shortcut centered and a small × inside its right end.
-    private func recorder(_ title: String, binding: Binding<KeyStroke?>) -> some View {
-        SettingsRow(title: title) {
+    private func recorder(_ title: String.LocalizationValue, binding: Binding<KeyStroke?>) -> some View {
+        let title = String(localized: title)
+        return SettingsRow(title: LocalizedStringKey(title)) {
             ZStack(alignment: .trailing) {
                 ShortcutRecorder(binding: binding, title: title) { model.shortcutRecordingChanged?($0) }.frame(width: 121, height: 25)
                 Button { binding.wrappedValue = nil } label: { Image(systemName: "xmark").font(.system(size: 9, weight: .semibold)).frame(width: 20, height: 25) }

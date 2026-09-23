@@ -17,11 +17,11 @@ public final class HistoryStore: @unchecked Sendable {
         case unsupportedVersion(Int), damaged(String), migrationMismatch(String), readOnly, notLoaded
         public var errorDescription: String? {
             switch self {
-            case .unsupportedVersion: "This history database was created by a newer version of Elmers."
-            case .damaged(let detail): "The history database is damaged (\(detail))."
-            case .migrationMismatch(let detail): "The old history archive could not be converted (\(detail)). It has been left unchanged."
-            case .readOnly: "The history database was opened read-only."
-            case .notLoaded: "The history database has not been opened."
+            case .unsupportedVersion: String(localized: "This history database was created by a newer version of Elmers.")
+            case .damaged(let detail): String(localized: "The history database is damaged (\(detail)).")
+            case .migrationMismatch(let detail): String(localized: "The old history archive could not be converted (\(detail)). It has been left unchanged.")
+            case .readOnly: String(localized: "The history database was opened read-only.")
+            case .notLoaded: String(localized: "The history database has not been opened.")
             }
         }
     }
@@ -513,8 +513,8 @@ final class RepresentationReader: @unchecked Sendable {
         case changed, missing(String)
         var errorDescription: String? {
             switch self {
-            case .changed: "The item was changed or deleted elsewhere."
-            case .missing(let type): "Stored content (\(type)) could not be read."
+            case .changed: String(localized: "The item was changed or deleted elsewhere.")
+            case .missing(let type): String(localized: "Stored content (\(type)) could not be read.")
             }
         }
     }

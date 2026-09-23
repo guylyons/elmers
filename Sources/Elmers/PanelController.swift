@@ -49,7 +49,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         self.model = model
         panel = ClipboardPanel(contentRect: .init(x: 0, y: 0, width: 1100, height: Self.windowHeight), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         super.init()
-        panel.title = "Elmers Clipboard History"
+        panel.title = String(localized: "Elmers Clipboard History")
         panel.isOpaque = false; panel.backgroundColor = .clear; panel.hasShadow = false
         panel.level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1); panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.hidesOnDeactivate = false; panel.isReleasedWhenClosed = false; panel.delegate = self
@@ -194,13 +194,13 @@ final class PanelController: NSObject, NSWindowDelegate {
         SoundEffects.shared.play(.paste)
         guard AXIsProcessTrusted() else { askForAccessibility(); return }
         guard let target = previousApp, !target.isTerminated else {
-            model.message = "Copied. The previous app is unavailable; use ⌘V in your destination."
+            model.message = String(localized: "Copied. The previous app is unavailable; use ⌘V in your destination.")
             return
         }
         deliveryGeneration += 1
         let generation = deliveryGeneration
         hide(restoreFocus: false)
-        guard target.activate(options: []) else { model.message = "Copied, but the destination could not be activated."; show(resetState: false); return }
+        guard target.activate(options: []) else { model.message = String(localized: "Copied, but the destination could not be activated."); show(resetState: false); return }
         let expectedChange = NSPasteboard.general.changeCount
         attemptPaste(to: target, generation: generation, expectedChange: expectedChange, attempts: 12)
     }
@@ -208,10 +208,11 @@ final class PanelController: NSObject, NSWindowDelegate {
     /// table; its presentation was not observed). The item is already on the clipboard either way.
     private func askForAccessibility() {
         let alert = NSAlert()
-        alert.messageText = "Do you want to paste directly to \(previousApp?.localizedName ?? "the current app")?"
-        alert.informativeText = "Elmers needs accessibility access to paste directly to other apps."
-        alert.addButton(withTitle: "Enable Accessibility Access")
-        alert.addButton(withTitle: "Not Now, Copy to Clipboard")
+        let destination = previousApp?.localizedName ?? String(localized: "the current app")
+        alert.messageText = String(localized: "Do you want to paste directly to \(destination)?")
+        alert.informativeText = String(localized: "Elmers needs accessibility access to paste directly to other apps.")
+        alert.addButton(withTitle: String(localized: "Enable Accessibility Access"))
+        alert.addButton(withTitle: String(localized: "Not Now, Copy to Clipboard"))
         alert.beginSheetModal(for: panel) { [weak self] response in
             guard let self else { return }
             self.hide()
@@ -229,10 +230,10 @@ final class PanelController: NSObject, NSWindowDelegate {
     private func attemptPaste(to target: NSRunningApplication, generation: Int, expectedChange: Int, attempts: Int) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
             guard let self, generation == self.deliveryGeneration else { return }
-            guard NSPasteboard.general.changeCount == expectedChange else { self.model.message = "Clipboard changed before paste. Please try again."; self.show(resetState: false); return }
+            guard NSPasteboard.general.changeCount == expectedChange else { self.model.message = String(localized: "Clipboard changed before paste. Please try again."); self.show(resetState: false); return }
             guard NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier else {
                 if attempts > 0 { self.attemptPaste(to: target, generation: generation, expectedChange: expectedChange, attempts: attempts - 1) }
-                else { self.model.message = "Copied, but the destination did not become active. Paste manually with ⌘V."; self.show(resetState: false) }
+                else { self.model.message = String(localized: "Copied, but the destination did not become active. Paste manually with ⌘V."); self.show(resetState: false) }
                 return
             }
             guard let source = CGEventSource(stateID: .combinedSessionState),
@@ -248,7 +249,7 @@ final class PanelController: NSObject, NSWindowDelegate {
             // Paste's settings window: 640×592 overall, content under a transparent unified title bar so the sidebar runs
             // to the top and the traffic lights sit 25 pt down, level with the pane title.
             let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 640, height: 592), styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView], backing: .buffered, defer: false)
-            window.title = "Elmers Settings"; window.titleVisibility = .hidden; window.isReleasedWhenClosed = false
+            window.title = String(localized: "Elmers Settings"); window.titleVisibility = .hidden; window.isReleasedWhenClosed = false
             window.titlebarAppearsTransparent = true
             window.toolbar = NSToolbar(identifier: "settings"); window.toolbarStyle = .unified
             let hosting = NSHostingView(rootView: SettingsView(model: model))
@@ -264,7 +265,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     func showKeyboardHelp() {
         if helpWindow == nil {
             let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 420, height: 480), styleMask: [.titled, .closable], backing: .buffered, defer: false)
-            window.title = "Keyboard Shortcuts"; window.isReleasedWhenClosed = false
+            window.title = String(localized: "Keyboard Shortcuts"); window.isReleasedWhenClosed = false
             window.contentView = NSHostingView(rootView: KeyboardHelp { [weak window] in window?.close() })
             window.setContentSize(window.contentView?.fittingSize ?? window.frame.size)
             window.center(); helpWindow = window
@@ -296,7 +297,7 @@ final class PanelController: NSObject, NSWindowDelegate {
             window.isReleasedWhenClosed = false; window.level = .floating; previewWindow = window
             applySharing()
         }
-        previewWindow?.title = "\(item.kind.rawValue) — \(item.source)"
+        previewWindow?.title = "\(item.kind.title) — \(item.source)"
         previewWindow?.contentView = NSHostingView(rootView: ItemPreview(item: item))
         previewWindow?.center(); previewWindow?.makeKeyAndOrderFront(nil)
     }

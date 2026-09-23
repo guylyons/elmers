@@ -1,5 +1,14 @@
 # Paste parity inventory
 
+## September 23 — localization
+
+Paste 6.3.11 ships 17 localizations: cs, da, de, en, es, fr, he, it, ja, ko, nl, pl, pt-BR, pt-PT, ru, zh-Hans and zh-Hant. Elmers was English-only.
+
+- **Coverage.** All 213 user-facing strings, AppKit menus, alerts, status messages and core error descriptions included, are localizable and translated into the 16 other languages (`Resources/Localization/<lang>.lproj`). Count plurals (characters, files, lines, words) use Paste's plural rules for each language, so a single file reads "File" / "Datei" as in Paste.
+- **Source of the wording.** 94 strings are word for word Paste's English, or differ only in the app name. For those, Elmers uses Paste's own translation in each language, which is the same parity principle as its English wording. Paste leaves a few untranslated (German "More"), and Elmers supplies those. The other 123 strings are Elmers-only and were translated for Elmers in Paste's terminology.
+- **Verified:** German Settings (General, Privacy) and the panel in German, Japanese and Hebrew rendered through `--show-settings` / `--show-panel` with `-AppleLanguages`. Every generated file passes `plutil -lint`, and every translation keeps the key's format specifiers.
+- **Not compared:** Paste in any language other than English. Right-to-left layout: Elmers in Hebrew is translated but not mirrored, and whether Paste mirrors is unobserved. Translation quality of the Elmers-only strings has not been reviewed by native speakers.
+
 ## September 23 — long histories: no item cap, lazy content, fast search
 
 Paste limits history by age only (Keep History: Day, Week, Month, Year, Forever; its strings table warns "Unlimited history may increase your disk space usage"). Elmers had also capped history at 2,000 unpinned items, because every payload was held in memory.

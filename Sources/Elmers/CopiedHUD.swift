@@ -20,7 +20,7 @@ final class CopiedHUD {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         panel.isReleasedWhenClosed = false; panel.hidesOnDeactivate = false
         panel.animationBehavior = .none
-        panel.title = "Copied"
+        panel.title = String(localized: "Copied")
     }
     var isVisible: Bool { panel.isVisible }
 

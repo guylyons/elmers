@@ -7,7 +7,7 @@ import AppKit
 /// fitted to the menu bar height. `template(from:pointSize:)` remains for a tinted variant: darkness becomes
 /// opacity there. Without the resource (checks run from `.build`), an SF Symbol is used.
 enum StatusIcon {
-    static let accessibilityDescription = "Elmers clipboard history"
+    static let accessibilityDescription = String(localized: "Elmers clipboard history")
 
     static func make() -> NSImage {
         if let url = Bundle.main.url(forResource: "Toolbar", withExtension: "png"), let source = NSImage(contentsOf: url),

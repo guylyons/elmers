@@ -29,26 +29,26 @@ public struct ShortcutSettings: Codable, Equatable, Sendable {
     public var plainTextModifier: KeyModifiers = .shift
     public init() {}
     public var validationError: String? {
-        if quickPasteModifier == plainTextModifier { return "Quick Paste and Plain Text mode need different modifiers." }
+        if quickPasteModifier == plainTextModifier { return String(localized: "Quick Paste and Plain Text mode need different modifiers.") }
         let bindings = [activation, nextBoard, previousBoard].compactMap { $0 }
-        if Set(bindings).count != bindings.count { return "Choose a different shortcut for each action." }
+        if Set(bindings).count != bindings.count { return String(localized: "Choose a different shortcut for each action.") }
         var reserved = self
         reserved.activation = nil; reserved.nextBoard = nil; reserved.previousBoard = nil
         for binding in bindings {
             guard let command = KeyboardRouter.command(for: binding, context: .results, settings: reserved) else { continue }
             // Paste 6.3.11's wording when the menu already owns the combination.
-            if let item = Self.menuItemTitle(command) { return "This shortcut cannot be used because it is already used by the menu item ‘\(item)’." }
-            return "This shortcut is already used by a clipboard command. Choose another combination."
+            if let item = Self.menuItemTitle(command) { return String(localized: "This shortcut cannot be used because it is already used by the menu item ‘\(item)’.") }
+            return String(localized: "This shortcut is already used by a clipboard command. Choose another combination.")
         }
         return nil
     }
     /// The app menu's items that carry a key equivalent (`AppMenu`), by the command they run.
     static func menuItemTitle(_ command: KeyboardCommand) -> String? {
         switch command {
-        case .newText: return "New Text Item"
-        case .settings: return "Settings…"
-        case .pause: return "Pause"
-        case .quit: return "Quit Elmers"
+        case .newText: return String(localized: "New Text Item")
+        case .settings: return String(localized: "Settings…")
+        case .pause: return String(localized: "Pause")
+        case .quit: return String(localized: "Quit Elmers")
         default: return nil
         }
     }

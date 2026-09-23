@@ -28,7 +28,7 @@ struct ShortcutRecorder: NSViewRepresentable {
             isBordered = false; wantsLayer = true
             layer?.cornerRadius = 6; layer?.cornerCurve = .continuous
             target = self; action = #selector(beginRecording)
-            toolTip = "Click to record. Escape cancels; Delete clears."
+            toolTip = String(localized: "Click to record. Escape cancels; Delete clears.")
         }
         required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
         func refreshTitle() {
@@ -76,7 +76,7 @@ struct ShortcutRecorder: NSViewRepresentable {
                 binding = nil; changed?(nil); finish(); return
             }
             guard !stroke.modifiers.intersection([.command, .control, .option]).isEmpty else {
-                title = "Use ⌘, ⌃ or ⌥"; NSSound.beep(); return
+                title = String(localized: "Use ⌘, ⌃ or ⌥"); NSSound.beep(); return
             }
             binding = stroke; changed?(stroke); finish()
         }

@@ -38,7 +38,7 @@ struct HistoryView: View {
                                                                   dragItems: { frame, image in DragSupport.draggingItems(for: item, frame: frame, image: image) }))
                                     .contextMenu { itemMenu(item) }
                                     .accessibilityAddTraits(.isButton)
-                                    .accessibilityLabel("\(item.kind.rawValue), \(item.source), \(String(item.text.prefix(140)))")
+                                    .accessibilityLabel("\(item.kind.title), \(item.source), \(String(item.text.prefix(140)))")
                                     .accessibilityValue(model.selection.ids.contains(item.id) ? "Selected" : "")
                                     .accessibilityAction { model.activate(item) }
                             }
@@ -127,7 +127,7 @@ struct HistoryView: View {
         }
     }
     @ViewBuilder private func boardPills(collapsed: Bool) -> some View {
-        boardPill("Clipboard History", symbol: "clock.arrow.circlepath", color: nil, selected: model.boardID == nil, collapsed: collapsed) { model.boardID = nil }
+        boardPill(String(localized: "Clipboard History"), symbol: "clock.arrow.circlepath", color: nil, selected: model.boardID == nil, collapsed: collapsed) { model.boardID = nil }
             .dropDestination(for: String.self) { ids, _ in
                 // Dropping a pinboard on the history pill moves it to the front.
                 guard let id = ids.first.flatMap(UUID.init), let first = model.history.boards.first?.id else { return false }
@@ -146,7 +146,7 @@ struct HistoryView: View {
                     Divider()
                     Picker("Color", selection: Binding(get: { board.colorIndex }, set: { model.recolorBoard(board, color: $0) })) {
                         ForEach(0..<Pinboard.colorCount, id: \.self) { index in
-                            Label(["Red", "Orange", "Yellow", "Green", "Blue", "Purple", "Pink", "Gray"][index], systemImage: "circle.fill")
+                            Label((["Red", "Orange", "Yellow", "Green", "Blue", "Purple", "Pink", "Gray"] as [LocalizedStringKey])[index], systemImage: "circle.fill")
                                 .tint(CardView.colors[index]).tag(index)
                         }
                     }.pickerStyle(.inline)
@@ -225,7 +225,7 @@ struct HistoryView: View {
         if let board = model.boardID { Button("Unpin") { model.selectedItems.forEach { model.unpin($0, from: board) } } }
         Divider()
         Button("Preview") { model.preview?(item) }.keyboardShortcut(.space, modifiers: [])
-        if item.kind.isImage, let image = imagePreview(item) { ShareLink("Share…", item: Image(nsImage: image), preview: SharePreview(item.title ?? item.kind.rawValue, image: Image(nsImage: image))) }
+        if item.kind.isImage, let image = imagePreview(item) { ShareLink("Share…", item: Image(nsImage: image), preview: SharePreview(item.title ?? item.kind.title, image: Image(nsImage: image))) }
         else if let url = urls.first, item.kind == .link { ShareLink("Share…", item: url) }
         else if !item.text.isEmpty { ShareLink("Share…", item: item.text) }
     }
@@ -246,7 +246,7 @@ struct KeyboardHelp: View {
     @Environment(\.dismiss) private var dismiss
     /// Set when shown in its own window rather than as a sheet.
     var close: (() -> Void)?
-    private let rows: [(String, String)] = [
+    private let rows: [(LocalizedStringKey, String)] = [
         ("Show or hide Elmers", "⇧⌘V"), ("Move between items", "⇥ / ⇧⇥  ·  ← →"), ("Extend selection", "⇧← / ⇧→"), ("First / last item", "⌘↑ / ⌘↓"),
         ("Paste selected items", "↩"), ("Paste as plain text", "⇧↩"), ("Quick paste", "⌘1…⌘9"), ("Copy", "⌘C"),
         ("Preview", "Space"), ("Open link", "⌘O"), ("Edit / Rename", "⌘E / ⌘R"), ("Writing Tools", "⇧⌘E"), ("Delete", "⌫"), ("Undo / Redo", "⌘Z / ⇧⌘Z"),
@@ -257,8 +257,8 @@ struct KeyboardHelp: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Keyboard Shortcuts").font(.title3.bold())
             Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 6) {
-                ForEach(rows, id: \.0) { row in
-                    GridRow { Text(row.0); Text(row.1).font(.system(.body, design: .monospaced)).foregroundStyle(.secondary) }
+                ForEach(rows.indices, id: \.self) { index in
+                    GridRow { Text(rows[index].0); Text(rows[index].1).font(.system(.body, design: .monospaced)).foregroundStyle(.secondary) }
                 }
             }
             HStack { Spacer(); Button("Done") { if let close { close() } else { dismiss() } }.keyboardShortcut(.defaultAction) }

@@ -2,6 +2,7 @@
 import PackageDescription
 let package = Package(
     name: "Elmers",
+    defaultLocalization: "en",
     platforms: [.macOS(.v14)],
     products: [.executable(name: "Elmers", targets: ["Elmers"])],
     targets: [

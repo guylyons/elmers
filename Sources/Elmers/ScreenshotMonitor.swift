@@ -77,7 +77,7 @@ final class ScreenshotMonitor {
                 emit(nil, force: changed); return
             }
             guard let folder else {
-                emit("macOS is not saving screenshots to a folder. Choose a folder in Screenshot’s Options to add saved screenshots here.", force: changed)
+                emit(String(localized: "macOS is not saving screenshots to a folder. Choose a folder in Screenshot’s Options to add saved screenshots here."), force: changed)
                 return
             }
             let attributes = try? FileManager.default.attributesOfItem(atPath: folder.path)
@@ -112,7 +112,7 @@ final class ScreenshotMonitor {
                     let nsError = error as NSError
                     let denied = nsError.domain == NSPOSIXErrorDomain && [Int(EACCES), Int(EPERM)].contains(nsError.code)
                     let needsAccess = exists || denied || (nsError.domain == NSCocoaErrorDomain && nsError.code == NSFileReadNoPermissionError)
-                    emit(needsAccess ? "Elmers cannot read the screenshot folder. Allow folder access to start capturing new screenshots." : "The screenshot folder is unavailable. Capture will resume when it is available.", needsAccess: needsAccess, force: changed)
+                    emit(needsAccess ? String(localized: "Elmers cannot read the screenshot folder. Allow folder access to start capturing new screenshots.") : String(localized: "The screenshot folder is unavailable. Capture will resume when it is available."), needsAccess: needsAccess, force: changed)
                     return
                 }
             }
@@ -123,7 +123,7 @@ final class ScreenshotMonitor {
         do { let captures = try scanner.scan(at: now); emit(scanner.lastIssue, captures: captures) }
         catch {
             closeFolder()
-            emit("The screenshot folder cannot be read. Allow access or restore the folder to resume.", needsAccess: true)
+            emit(String(localized: "The screenshot folder cannot be read. Allow access or restore the folder to resume."), needsAccess: true)
         }
     }
     deinit {

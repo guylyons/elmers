@@ -53,7 +53,7 @@ struct FilterToken: View {
         }
         .padding(.leading, 6).padding(.trailing, 8).frame(height: 16)
         .background(Capsule().fill(Color.primary.opacity(0.09)))
-        .accessibilityElement(children: .combine).accessibilityLabel("Filter: \(filter.title)")
+        .accessibilityElement(children: .combine).accessibilityLabel(String(localized: "Filter: \(filter.title)"))
     }
 }
 
@@ -91,7 +91,7 @@ struct FilterPopover: View {
     static let kinds: [ContentKind] = [.other, .image, .screenshot, .color, .file, .link, .text]
     private var apps: [String] { Array(Set(model.history.items.map(\.source))).sorted { $0.localizedStandardCompare($1) == .orderedAscending } }
 
-    private func section(_ title: String, _ chips: [SearchFilter]) -> some View {
+    private func section(_ title: LocalizedStringKey, _ chips: [SearchFilter]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title).font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary).frame(height: 15)
             LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
@@ -127,9 +127,9 @@ struct FilterChip: View {
 extension SearchFilter {
     var title: String {
         switch self {
-        case let .kind(kind): return kind == .other ? "Unknown" : kind.rawValue
+        case let .kind(kind): return kind.title
         case let .app(name): return name
-        case let .date(range): return range.title
+        case let .date(range): return range.localizedTitle
         case let .device(name): return name
         }
     }
@@ -139,6 +139,18 @@ extension SearchFilter {
         case .app: return "app"
         case .date: return "calendar"
         case .device: return "laptopcomputer"
+        }
+    }
+}
+
+extension DateRangeFilter {
+    var localizedTitle: String {
+        switch self {
+        case .today: return String(localized: "Today")
+        case .yesterday: return String(localized: "Yesterday")
+        case .thisWeek: return String(localized: "This week")
+        case .lastWeek: return String(localized: "Last week")
+        case .last30Days: return String(localized: "Last 30 days")
         }
     }
 }

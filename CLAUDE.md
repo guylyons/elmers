@@ -20,6 +20,13 @@ SwiftPM only (Swift 5.9, macOS 14+, no Xcode project, no third-party deps).
 - `--check-live-storage-persistence` writes to the **real** store (run without `--demo`, never with another Elmers process running).
 - Known flake: the "typing into a fresh search" step of `--check-interaction` can fail right after a build; rerun before debugging.
 
+## Localization
+
+- Elmers ships Paste's 17 languages (`Resources/Localization/<lang>.lproj`, copied into the bundle by `build-app.sh`). Every user-facing string must be localizable: SwiftUI literals, `LocalizedStringKey` parameters, or `String(localized:)` for AppKit and computed text. Never pass a `String` variable to `Text` for UI wording.
+- A new or changed string needs an entry in all 16 non-English `Localizable.strings` files (counts go in `.stringsdict`). Find missing keys with `xcodebuild -exportLocalizations -localizationPath <dir> -exportLanguage en -scheme Elmers`.
+- Strings worded exactly as Paste's use Paste's own translation in each language; Elmers-only strings follow Paste's terminology there (for example German "Pinnwand", French "tableau d'affichage").
+- Check a language with `ELMERS_CAPTURE_DIR=<dir> dist/Elmers.app/Contents/MacOS/Elmers --demo --demo-fixtures --show-panel -AppleLanguages '(de)'` (or `--show-settings` with `ELMERS_SETTINGS_SECTION`).
+
 ## Architecture notes
 
 - Keep pure logic in `ElmersCore` (testable by the runner). AppKit/SwiftUI and OS integration live in `Elmers`, `@MainActor`, with check code behind `#if DEBUG`.
