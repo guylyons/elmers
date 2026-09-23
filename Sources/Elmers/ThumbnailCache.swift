@@ -37,11 +37,13 @@ final class ThumbnailCache {
     private func load(_ item: ClipboardItem, completion: @escaping @MainActor (NSImage?) -> Void) {
         let key = item.fingerprint
         if let image = cache.object(forKey: key as NSString) { completion(image); return }
-        guard !failed.contains(key), let data = imageData(of: item) else { completion(nil); return }
+        guard !failed.contains(key), hasImageData(item) else { completion(nil); return }
         if waiting[key] != nil { waiting[key]!.append(completion); return }
         waiting[key] = [completion]
+        let maxPixelSize = Self.maxPixelSize
         queue.addOperation {
-            let thumbnail = Self.decode(data, maxPixelSize: Self.maxPixelSize)
+            // Large images stay in the database until needed, so even reading the bytes happens off the main thread.
+            let thumbnail = imageData(of: item).flatMap { Self.decode($0, maxPixelSize: maxPixelSize) }
             Task { @MainActor in self.finish(key, thumbnail) }
         }
     }

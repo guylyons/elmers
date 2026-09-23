@@ -1,6 +1,6 @@
 import AppKit
 import Foundation
-@testable import ElmersCore
+import ElmersCore
 
 final class SearchFilterTests {
     private var calendar: Calendar { var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(identifier: "UTC")!; calendar.firstWeekday = 1; return calendar }

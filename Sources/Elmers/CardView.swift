@@ -119,7 +119,7 @@ struct CardView: View {
         }
     }
     @ViewBuilder private var preview: some View {
-        if item.kind.isImage, imageData(of: item) != nil {
+        if item.kind.isImage, hasImageData(item) {
             CardThumbnail(item: item)
         } else if item.kind == .link, let preview = item.linkPreview, preview.title != nil || preview.image != nil {
             VStack(alignment: .leading, spacing: 0) {
@@ -147,7 +147,11 @@ struct CardView: View {
     }
 }
 
-/// The first image representation in the payload.
+/// Whether the payload has an image, known without reading bytes that may still be in the database.
+func hasImageData(_ item: ClipboardItem) -> Bool { !item.payload.types.isDisjoint(with: ["public.png", "public.tiff"]) }
+
+/// The first image representation in the payload. For a stored item this may read the database, so keep it off
+/// the main thread where possible.
 func imageData(of item: ClipboardItem) -> Data? {
     for representations in item.payload.items {
         for type in ["public.png", "public.tiff"] {

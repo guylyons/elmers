@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
 import ImageIO
-@testable import ElmersCore
+import ElmersCore
 
 final class ColorTests {
     func testOnlySixHexDigitsBecomeColors() {

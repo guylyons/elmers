@@ -8,6 +8,32 @@ public enum ContentKind: String, Codable, CaseIterable, Identifiable, Sendable {
     public var isImage: Bool { self == .image || self == .screenshot }
 }
 
+/// Where a stored payload's large representations live, and how to read them back.
+final class DeferredRepresentations: @unchecked Sendable {
+    struct Key: Hashable { let index: Int, type: String }
+    let itemID: UUID
+    let fingerprint: String
+    let sizes: [Key: Int]
+    private let reader: RepresentationReader
+    private let lock = NSLock()
+    private var retained: [Int: [String: Data]]?
+    init(itemID: UUID, fingerprint: String, sizes: [Key: Int], reader: RepresentationReader) {
+        self.itemID = itemID; self.fingerprint = fingerprint; self.sizes = sizes; self.reader = reader
+    }
+    var types: Set<String> { Set(sizes.keys.map(\.type)) }
+    var byteCount: Int { sizes.values.reduce(0, +) }
+    func load() throws -> [Int: [String: Data]] {
+        if let retained = lock.withLock({ retained }) { return retained }
+        let fetched = try reader.representations(of: itemID, fingerprint: fingerprint)
+        // Every deferred representation must come back whole, or the payload would silently lose content.
+        for (key, size) in sizes where fetched[key.index]?[key.type]?.count != size {
+            throw RepresentationReader.ReadError.missing(key.type)
+        }
+        return fetched
+    }
+    func retain() throws { let data = try load(); lock.withLock { retained = data } }
+}
+
 /// A copied color. Paste 6.3.11 makes a Color card only from exactly six hex digits with an optional leading "#":
 /// "#FF8800" and "FF8800" are colors; "#abc", "#FF880080", "0xFF8800", "rgb(…)", "red" and a hex value with
 /// surrounding spaces stay Text.
@@ -29,13 +55,56 @@ public struct HexColor: Equatable, Sendable {
 }
 
 public struct ClipboardPayload: Codable, Equatable, Sendable {
-    public var items: [[String: Data]]
-    public init(items: [[String: Data]]) { self.items = items }
+    /// Representations held in memory. A payload read from the store leaves its large representations (see
+    /// `HistoryStore.inlineLimit`) in the database and lists them in `deferred`; reading `items` fetches them.
+    private var loaded: [[String: Data]]
+    private var deferred: DeferredRepresentations?
+    public init(items: [[String: Data]]) { loaded = items; deferred = nil }
+    init(loaded: [[String: Data]], deferred: DeferredRepresentations?) { self.loaded = loaded; self.deferred = deferred }
+
+    /// Every representation. Large ones of a stored payload are read from the database on each access (or from
+    /// the cache `retainDeferred()` fills); if that read fails, only the in-memory representations are returned.
+    /// Use `materializedItems()` wherever a partial payload must not be accepted.
+    public var items: [[String: Data]] {
+        get { (try? materializedItems()) ?? loaded }
+        set { loaded = newValue; deferred = nil }
+    }
+    /// Every representation, or an error when a stored one cannot be read.
+    public func materializedItems() throws -> [[String: Data]] {
+        guard let deferred else { return loaded }
+        var all = loaded
+        for (index, representations) in try deferred.load() {
+            for (type, data) in representations where all.indices.contains(index) { all[index][type] = data }
+        }
+        return all
+    }
+    /// Loads the stored representations once and keeps them, for a copy that must outlive the database rows,
+    /// such as the undo record of a deletion.
+    public func retainDeferred() throws { try deferred?.retain() }
+    /// True when some representations are still in the database rather than in memory.
+    public var hasDeferredRepresentations: Bool { deferred != nil }
+    public var itemCount: Int { loaded.count }
+    /// Representation types, without reading stored bytes.
+    public var types: Set<String> { Set(loaded.flatMap(\.keys)).union(deferred?.types ?? []) }
+
+    public static func == (lhs: ClipboardPayload, rhs: ClipboardPayload) -> Bool {
+        if lhs.deferred === rhs.deferred { return lhs.loaded == rhs.loaded }
+        return lhs.items == rhs.items
+    }
+    private enum CodingKeys: String, CodingKey { case items }
+    public init(from decoder: Decoder) throws {
+        loaded = try decoder.container(keyedBy: CodingKeys.self).decode([[String: Data]].self, forKey: .items); deferred = nil
+    }
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(try materializedItems(), forKey: .items)
+    }
     public static func text(_ string: String) -> Self {
         .init(items: [[NSPasteboard.PasteboardType.string.rawValue: Data(string.utf8)]])
     }
+    /// Text types always stay in memory, so this never reads the database.
     public var text: String {
-        items.compactMap { representations -> String? in
+        loaded.compactMap { representations -> String? in
             for type in [NSPasteboard.PasteboardType.string.rawValue, "public.url", "public.file-url"] {
                 if let data = representations[type], let text = String(data: data, encoding: .utf8) { return text }
             }
@@ -78,7 +147,7 @@ public struct ClipboardPayload: Codable, Equatable, Sendable {
         }
     }
     func kind(for text: String) -> ContentKind {
-        let types = Set(items.flatMap { $0.keys })
+        let types = self.types
         if types.contains("public.file-url") { return .file }
         if types.contains("public.png") || types.contains("public.tiff") { return .image }
         if HexColor(text) != nil { return .color }
@@ -87,7 +156,7 @@ public struct ClipboardPayload: Codable, Equatable, Sendable {
            ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host != nil { return .link }
         return text.isEmpty ? .other : .text
     }
-    public var byteCount: Int { items.reduce(0) { $0 + $1.values.reduce(0) { $0 + $1.count } } }
+    public var byteCount: Int { loaded.reduce(0) { $0 + $1.values.reduce(0) { $0 + $1.count } } + (deferred?.byteCount ?? 0) }
     public var fingerprint: String {
         var hash = SHA256()
         // Length framing prevents ambiguity between adjacent representations/items.
@@ -109,22 +178,25 @@ public struct ClipboardItem: Codable, Identifiable, Equatable, Sendable {
     public var payload: ClipboardPayload {
         didSet { screenshot = nil; imageDigest = nil; recognizedText = nil; refreshMetadata(); fingerprint = payload.fingerprint }
     }
-    public var source: String
+    public var source: String { didSet { refreshSearchKey() } }
     public var sourceBundleID: String?
     public var copiedAt: Date
     public var boardIDs: Set<UUID>
-    public var title: String?
+    public var title: String? { didSet { refreshSearchKey() } }
     public var fingerprint: String
     /// Optional remote preview for links, filled only when the user enables link previews.
-    public var linkPreview: LinkPreview?
+    public var linkPreview: LinkPreview? { didSet { refreshSearchKey() } }
     /// Text recognized in an image item; empty string records that recognition ran and found nothing.
-    public var recognizedText: String?
+    public var recognizedText: String? { didSet { refreshSearchKey() } }
     public var screenshot: ScreenshotOrigin?
     /// Decoded image identity, computed off the main thread for cross-source screenshot duplicates.
     public var imageDigest: String?
     private var cachedText = ""
     private var cachedKind: ContentKind = .other
     private var cachedByteCount = 0
+    /// Everything search matches (text, source, title, recognized text, link title), folded for case and
+    /// diacritics once per change, so a search compares bytes instead of folding every item on every keystroke.
+    public private(set) var searchKey: [UInt8] = []
     public var text: String { cachedText }
     public var kind: ContentKind { cachedKind == .image && screenshot != nil ? .screenshot : cachedKind }
     public var byteCount: Int { cachedByteCount }
@@ -145,7 +217,14 @@ public struct ClipboardItem: Codable, Identifiable, Equatable, Sendable {
         cachedText = payload.text
         cachedKind = payload.kind(for: cachedText)
         cachedByteCount = payload.byteCount
+        refreshSearchKey()
     }
+    private mutating func refreshSearchKey() {
+        let fields = [cachedText, source, title ?? "", recognizedText ?? "", linkPreview?.title ?? ""]
+        searchKey = Array(Self.fold(fields.joined(separator: "\u{0}")).utf8)
+    }
+    /// The folding search applies to both the items and the typed words.
+    public static func fold(_ text: String) -> String { text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil) }
     // Optional additions preserve backwards decoding of the v1 archive.
     private enum CodingKeys: String, CodingKey { case id, payload, source, sourceBundleID, copiedAt, boardIDs, title, fingerprint, linkPreview, recognizedText, screenshot, imageDigest }
     public init(from decoder: Decoder) throws {

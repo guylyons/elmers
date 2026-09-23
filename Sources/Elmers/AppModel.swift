@@ -367,7 +367,12 @@ final class AppModel: ObservableObject {
         return ClipboardItem(payload: .init(items: items.flatMap { $0.payload.items }), source: first.source, sourceBundleID: first.sourceBundleID)
     }
     func copy(_ item: ClipboardItem, plainText: Bool = false) -> Bool {
-        guard PasteboardCodec.write(item.payload, to: .general, plainText: plainText) else {
+        // Large content is read from the database here; a failed read must not put a partial item on the clipboard.
+        guard let items = try? item.payload.materializedItems() else {
+            message = "This item's content could not be read. It may have been deleted in another window."
+            return false
+        }
+        guard PasteboardCodec.write(ClipboardPayload(items: items), to: .general, plainText: plainText) else {
             message = plainText ? "This item has no plain-text representation." : "The clipboard could not be written."
             return false
         }
@@ -438,6 +443,8 @@ final class AppModel: ObservableObject {
         let ids = Set(items.map(\.id))
         let items = history.items.filter { ids.contains($0.id) }
         guard !items.isEmpty else { return }
+        // The rows go with the deletion, so the undo record keeps its own copy of any content still in the database.
+        for item in items { try? item.payload.retainDeferred() }
         rememberUndo { $0.restore(items) }
         for item in items { history.delete(item.id) }
         persist()
@@ -494,6 +501,8 @@ final class AppModel: ObservableObject {
     }
     func editItem(_ item: ClipboardItem, payload: ClipboardPayload) {
         guard canEdit else { return }
+        // Saving the edit replaces the stored content, so the undo record keeps its own copy of the old one.
+        guard (try? item.payload.retainDeferred()) != nil else { message = "The original content could not be read, so this edit was not applied."; return }
         rememberUndo { model in if let current = model.history.items.first(where: { $0.id == item.id }) { model.editItem(current, payload: item.payload) } }
         history.editItem(item.id, payload: payload); persist()
     }
@@ -501,7 +510,8 @@ final class AppModel: ObservableObject {
     func redo() { if canEdit { undoManager.redo() } }
     private func prune() {
         let cutoff = retentionDays == 0 ? Date.distantPast : Date().addingTimeInterval(-Double(retentionDays) * 86400)
-        history.prune(before: cutoff, limit: 2000)
+        // Paste limits history by age only (Day … Forever); there is no item count cap.
+        history.prune(before: cutoff, limit: .max)
         reconcileSelection()
     }
     private func persist() {

@@ -26,6 +26,11 @@ public final class HistoryStore: @unchecked Sendable {
         }
     }
     public static let schemaVersion = 1
+    /// Representations up to this size are read with the item; larger ones stay in the database until used, so a
+    /// long history of images does not have to fit in memory. Text types are always read, whatever their size,
+    /// because titles, search and the item's type come from them.
+    public static let inlineLimit = 64 * 1024
+    static let textTypes = ["public.utf8-plain-text", "public.url", "public.file-url", "public.rtf"]
     public let directory: URL
     public let readOnly: Bool
     public var databaseURL: URL { directory.appendingPathComponent("history.sqlite") }
@@ -241,11 +246,24 @@ public final class HistoryStore: @unchecked Sendable {
 
     private static func readSnapshot(_ database: SQLiteDatabase) throws -> History {
         var payloads: [String: [Int: [String: Data]]] = [:]
-        let representations = try database.prepare("SELECT item_id, item_index, type, data FROM representations")
+        var sizes: [String: [DeferredRepresentations.Key: Int]] = [:]
+        let inline = textTypes.map { "'\($0)'" }.joined(separator: ", ")
+        let representations = try database.prepare("""
+            SELECT item_id, item_index, type, length(data),
+                   CASE WHEN length(data) <= \(inlineLimit) OR type IN (\(inline)) THEN data END
+            FROM representations
+            """)
         while try representations.step() {
             guard let item = representations.text(0), let type = representations.text(2) else { throw StoreError.damaged("representation row") }
-            payloads[item, default: [:]][representations.int(1), default: [:]][type] = representations.blob(3) ?? Data()
+            let index = representations.int(1)
+            if representations.isNull(4), representations.int(3) > 0 {
+                sizes[item, default: [:]][.init(index: index, type: type)] = representations.int(3)
+                payloads[item, default: [:]][index, default: [:]] = payloads[item]?[index] ?? [:]
+            } else {
+                payloads[item, default: [:]][index, default: [:]][type] = representations.blob(4) ?? Data()
+            }
         }
+        let reader = RepresentationReader(url: database.url)
         var pins: [String: Set<UUID>] = [:]
         let pinRows = try database.prepare("SELECT item_id, board_id FROM pins")
         while try pinRows.step() {
@@ -264,7 +282,8 @@ public final class HistoryStore: @unchecked Sendable {
                 throw StoreError.damaged("item row")
             }
             let stored = payloads[key] ?? [:]
-            let payload = ClipboardPayload(items: (0..<rows.int(6)).map { stored[$0] ?? [:] })
+            let deferred = sizes[key].map { DeferredRepresentations(itemID: id, fingerprint: fingerprint, sizes: $0, reader: reader) }
+            let payload = ClipboardPayload(loaded: (0..<rows.int(6)).map { stored[$0] ?? [:] }, deferred: deferred)
             let preview = rows.isNull(11) ? nil : LinkPreview(title: rows.text(9), image: rows.blob(10), attempted: rows.int(11) != 0)
             let screenshot = rows.text(12).flatMap(URL.init(string:)).map {
                 ScreenshotOrigin(originalURL: $0, fileIdentity: rows.text(13) ?? "", bookmark: rows.blob(14))
@@ -315,13 +334,21 @@ public final class HistoryStore: @unchecked Sendable {
         for item in history.items.reversed() {
             let previous = baseline[item.id]
             guard StoredItem(item) != previous else { continue }
+            var payloadItems: [[String: Data]]?
+            if previous?.fingerprint != item.fingerprint {
+                // A partial payload must never replace stored bytes. When deferred content can no longer be read
+                // because another writer deleted or replaced the item, that writer's change stands and this item
+                // is left out of the save instead of failing every save from now on.
+                do { payloadItems = try item.payload.materializedItems() }
+                catch is RepresentationReader.ReadError { continue }
+            }
             if previous != nil { replacedContent = true }
             let key = SQLiteDatabase.Value.text(item.id.uuidString)
             func optional(_ text: String?) -> SQLiteDatabase.Value { text.map { .text($0) } ?? .null }
             func optional(_ data: Data?) -> SQLiteDatabase.Value { data.map { .blob($0) } ?? .null }
             try upsert.run([
                 key, .double(item.copiedAt.timeIntervalSinceReferenceDate), .text(item.source), optional(item.sourceBundleID),
-                optional(item.title), .text(item.fingerprint), .int(item.payload.items.count), optional(item.recognizedText),
+                optional(item.title), .text(item.fingerprint), .int(item.payload.itemCount), optional(item.recognizedText),
                 optional(item.imageDigest), optional(item.linkPreview?.title), optional(item.linkPreview?.image),
                 item.linkPreview.map { .int($0.attempted ? 1 : 0) } ?? .null,
                 optional(item.screenshot?.originalURL.absoluteString), optional(item.screenshot?.fileIdentity), optional(item.screenshot?.bookmark)
@@ -333,7 +360,7 @@ public final class HistoryStore: @unchecked Sendable {
             }
             if previous?.fingerprint != item.fingerprint {
                 try clearRepresentations.run([key])
-                for (index, representations) in item.payload.items.enumerated() {
+                for (index, representations) in (payloadItems ?? []).enumerated() {
                     for (type, data) in representations { try insertRepresentation.run([key, .int(index), .text(type), .blob(data)]) }
                 }
                 statistics.payloadsWritten += 1
@@ -475,6 +502,42 @@ public final class HistoryStore: @unchecked Sendable {
         let files = FileManager.default
         guard files.fileExists(atPath: legacyArchiveURL.path) else { return }
         try files.moveItem(at: legacyArchiveURL, to: nextMigratedArchiveURL())
+    }
+}
+
+/// Reads an item's stored representations on demand, through its own read-only connection so a card or a paste on
+/// the main thread never waits behind a save. Reads check the item's fingerprint, so bytes another process has
+/// since replaced are never mixed into an older item.
+final class RepresentationReader: @unchecked Sendable {
+    enum ReadError: LocalizedError {
+        case changed, missing(String)
+        var errorDescription: String? {
+            switch self {
+            case .changed: "The item was changed or deleted elsewhere."
+            case .missing(let type): "Stored content (\(type)) could not be read."
+            }
+        }
+    }
+    let url: URL
+    private let lock = NSLock()
+    private var database: SQLiteDatabase?
+    init(url: URL) { self.url = url }
+    func representations(of itemID: UUID, fingerprint: String) throws -> [Int: [String: Data]] {
+        try lock.withLock {
+            let database = try self.database ?? SQLiteDatabase(url: url, create: false, readOnly: true)
+            self.database = database
+            return try database.readTransaction {
+                let key = SQLiteDatabase.Value.text(itemID.uuidString)
+                let item = try database.prepare("SELECT fingerprint FROM items WHERE id = ?")
+                try item.bind([key])
+                guard try item.step(), item.text(0) == fingerprint else { throw ReadError.changed }
+                let rows = try database.prepare("SELECT item_index, type, data FROM representations WHERE item_id = ?")
+                try rows.bind([key])
+                var result: [Int: [String: Data]] = [:]
+                while try rows.step() { if let type = rows.text(1) { result[rows.int(0), default: [:]][type] = rows.blob(2) ?? Data() } }
+                return result
+            }
+        }
     }
 }
 

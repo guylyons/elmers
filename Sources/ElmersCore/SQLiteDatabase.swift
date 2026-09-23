@@ -9,8 +9,10 @@ final class SQLiteDatabase {
     }
     enum Value { case int(Int), double(Double), text(String), blob(Data), null }
     private let handle: OpaquePointer
+    let url: URL
 
     init(url: URL, create: Bool, readOnly: Bool = false) throws {
+        self.url = url
         // SQLite would create the file with the process umask, and it copies that mode onto the journal,
         // WAL and SHM files it opens later. Create it private first so nothing is ever briefly world-readable.
         if create, !FileManager.default.fileExists(atPath: url.path) {

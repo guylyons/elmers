@@ -45,6 +45,7 @@ let security = StorageSecurityTests()
 let searchFilters = SearchFilterTests()
 let colors = ColorTests()
 let rotation = ImageRotationTests()
+let lazy = LazyPayloadTests()
 let checks: [(String, () throws -> Void)] = [
     ("panel timing curves match Paste's recorded motion", motion.testPanelCurvesMatchPasteRecordings),
     ("deleted and replaced content leaves no trace on disk", security.testDeletedAndReplacedContentLeavesNoTraceOnDisk),
@@ -97,6 +98,12 @@ let checks: [(String, () throws -> Void)] = [
     ("color components, display, and contrast", colors.testColorComponentsDisplayAndContrast),
     ("Color is a filter chip and a typed keyword", colors.testColorIsAFilterAndATypedKeyword),
     ("image quarter turns move pixels exactly", rotation.testQuarterTurnsMovePixelsExactly),
+    ("large representations load on demand", lazy.testLargeRepresentationsLoadOnDemand),
+    ("renaming a lazy item keeps its stored bytes", lazy.testRenamingALazyItemKeepsItsStoredBytes),
+    ("undoing a deletion restores retained bytes", lazy.testUndoingADeletionRestoresRetainedBytes),
+    ("unreadable content is never saved partially", lazy.testUnreadableContentIsNeverSavedPartially),
+    ("an edited item never reads its replacement", lazy.testAnEditedItemNeverReadsItsReplacementIntoTheOldPayload),
+    ("a duplicate merge keeps a lazy image's bytes", lazy.testDuplicateMergeIntoALazyImageKeepsItsBytes),
     ("retention protects pins", history.testRetentionPreservesPinnedItems),
     ("board deletion preserves history", history.testDeletingBoardPreservesClipboardItem),
     ("binary archive round trip", history.testArchiveRoundTripPreservesBinaryFormatsAndBoards),

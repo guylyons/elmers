@@ -40,7 +40,14 @@ func reportStorage(directory override: URL? = nil) {
         catch { print("\(url.lastPathComponent): unreadable (\(error.localizedDescription))") }
     }
     guard FileManager.default.fileExists(atPath: store.databaseURL.path) else { print("history.sqlite: none"); return }
-    do { print("\(store.databaseURL.lastPathComponent): \(summary(try store.load()))") }
+    do {
+        let history = try store.load()
+        print("\(store.databaseURL.lastPathComponent): \(summary(history))")
+        // Items whose large representations stay in the database: each must read back whole, matching its fingerprint.
+        let deferred = history.items.filter(\.payload.hasDeferredRepresentations)
+        let intact = deferred.filter { item in (try? item.payload.materializedItems()).map { ClipboardPayload(items: $0).fingerprint } == item.fingerprint }
+        print("deferred content: \(deferred.count) items, \(intact.count) read back intact")
+    }
     catch { print("\(store.databaseURL.lastPathComponent): unreadable (\(error.localizedDescription))") }
 }
 
@@ -89,4 +96,33 @@ func benchmarkStorage() throws {
     history.delete(history.items[10].id)
     try measure("sqlite: save a deletion") { try store.save(history) }
     try measure("sqlite: load") { _ = try HistoryStore(directory: directory).load() }
+
+    // "Keep History: Forever" has no item cap, so measure a long history: 20,000 items, one in ten a 250 KB image.
+    let large = FileManager.default.temporaryDirectory.appendingPathComponent("elmers-benchmark-large-" + UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: large) }
+    var long = History()
+    for index in 0..<20_000 {
+        let date = Date(timeIntervalSinceReferenceDate: Double(index))
+        if index % 10 == 0 { long.capture(.init(items: [["public.png": random(250_000)]]), source: "Preview", at: date) }
+        else { long.capture(.text("long history \(index) " + String(repeating: "words ", count: 20)), source: "Notes", at: date) }
+    }
+    let writer = HistoryStore(directory: large)
+    _ = try writer.load()
+    try measure("sqlite: save 20,000 items (500 MB images)") { try writer.save(long) }
+    long = History()
+    let before = residentBytes()
+    var loaded = History()
+    try measure("sqlite: load 20,000 items") { loaded = try HistoryStore(directory: large).load() }
+    print(String(format: "resident memory added by that load        %8.1f MB", Double(residentBytes() - before) / 1_048_576))
+    measure("search 20,000 items for a word") { _ = loaded.filtered(query: "19999") }
+    let image = loaded.items.first { $0.kind.isImage }!
+    try measure("read one deferred 250 KB image") { _ = try image.payload.materializedItems() }
+}
+
+/// The process's resident memory, in bytes.
+func residentBytes() -> Int {
+    var info = mach_task_basic_info()
+    var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size / MemoryLayout<natural_t>.size)
+    let result = withUnsafeMutablePointer(to: &info) { $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count) } }
+    return result == KERN_SUCCESS ? Int(info.resident_size) : 0
 }

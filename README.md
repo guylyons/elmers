@@ -133,9 +133,9 @@ docs/             Paste parity inventory and development checkpoints
 
 ## Data
 
-- History: `~/Library/Application Support/Elmers/history.plist`
-- Limits: 2,000 unpinned items and 32 MB per capture. File URLs are stored as references, so Elmers doesn't back up the files themselves.
-- If the archive can't be read, Elmers keeps the original file and stops capturing so it never overwrites your history.
+- History: `~/Library/Application Support/Elmers/history.sqlite`, private to your account, excluded from Time Machine, and wiped as you delete items.
+- History is limited by age only, as in Paste (Settings › General › Keep History, Day through Forever), and up to 32 MB per capture. Large content stays on disk until it is shown, pasted or dragged, so a long history does not have to fit in memory. File URLs are stored as references, so Elmers doesn't back up the files themselves.
+- If the history can't be read, Elmers leaves the database untouched and stops capturing so it never overwrites your history.
 
 ## Roadmap
 

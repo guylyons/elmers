@@ -14,13 +14,17 @@ public struct History: Codable, Sendable {
              ($0.screenshot != nil) != (screenshot != nil) && abs($0.copiedAt.timeIntervalSince(date)) <= 10 &&
              $0.kind.isImage && payload.kind.isImage) }) {
             item = items.remove(at: index)
-            if item.fingerprint != fingerprint, var representations = item.payload.items.first, let incoming = payload.items.first {
+            if item.fingerprint != fingerprint, let incoming = payload.items.first {
                 let origin = item.screenshot
                 let recognized = item.recognizedText
-                // Prefer clipboard formats on conflicts and retain other useful encodings if within the capture bound.
-                representations.merge(incoming) { old, new in screenshot == nil ? new : old }
-                let merged = ClipboardPayload(items: [representations])
-                item.payload = merged.byteCount <= ScreenshotImage.maximumBytes ? merged : (screenshot == nil ? payload : item.payload)
+                // The stored item's large representations may still be in the database. If they cannot be read,
+                // merging would drop them, so the clipboard copy replaces the item instead, or it is left as is.
+                if var representations = (try? item.payload.materializedItems())?.first {
+                    // Prefer clipboard formats on conflicts and retain other useful encodings if within the capture bound.
+                    representations.merge(incoming) { old, new in screenshot == nil ? new : old }
+                    let merged = ClipboardPayload(items: [representations])
+                    if merged.byteCount <= ScreenshotImage.maximumBytes { item.payload = merged } else if screenshot == nil { item.payload = payload }
+                } else if screenshot == nil { item.payload = payload }
                 item.screenshot = origin; item.recognizedText = recognized
             }
             item.copiedAt = max(item.copiedAt, date); item.source = source; item.sourceBundleID = sourceBundleID
@@ -34,15 +38,18 @@ public struct History: Codable, Sendable {
     }
     public func filtered(query: String = "", kind: ContentKind? = nil, boardID: UUID? = nil) -> [ClipboardItem] {
         // Type words are consumed by the search field before the query reaches here (see SearchQuery).
-        let tokens = query.split(whereSeparator: \.isWhitespace).map(String.init)
+        let tokens = query.split(whereSeparator: \.isWhitespace).map { Array(ClipboardItem.fold(String($0)).utf8) }
         return items.filter { item in
             (kind == nil || item.kind == kind || (kind == .image && item.kind.isImage)) && (boardID == nil || item.boardIDs.contains(boardID!)) &&
-            tokens.allSatisfy { token in
-                [item.text, item.source, item.title ?? "", item.recognizedText ?? "", item.linkPreview?.title ?? ""].contains {
-                    $0.range(of: token, options: [.caseInsensitive, .diacriticInsensitive]) != nil
-                }
-            }
+            tokens.allSatisfy { token in Self.contains(item.searchKey, token) }
         }
+    }
+    /// Byte search of a folded token in a folded key. The key joins fields with NUL, so a token never spans two.
+    static func contains(_ haystack: [UInt8], _ needle: [UInt8]) -> Bool {
+        guard !needle.isEmpty else { return true }
+        return haystack.withUnsafeBytes { key in needle.withUnsafeBytes { word in
+            memmem(key.baseAddress, key.count, word.baseAddress, word.count) != nil
+        } }
     }
     @discardableResult public mutating func createBoard(name: String) -> Pinboard {
         let board = Pinboard(name: name.trimmingCharacters(in: .whitespacesAndNewlines), colorIndex: boards.count % Pinboard.colorCount)
