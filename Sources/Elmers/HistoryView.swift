@@ -179,11 +179,12 @@ struct HistoryView: View {
         .hoverHighlight(Capsule(), suppressed: selected && !collapsed)
         .help(collapsed ? name : "")
     }
+    /// Paste 6.3.11's wording: "History is empty", "Pinboard is empty", "Nothing found". Its strings table has no
+    /// subtitles for these states; the icon and layout are not yet compared with Paste.
     private var emptyState: some View {
         VStack(spacing: 10) {
             Image(systemName: !model.hasSearch ? "doc.on.clipboard" : "magnifyingglass").font(.system(size: 32, weight: .light)).foregroundStyle(.secondary)
-            Text(!model.hasSearch ? (model.boardID == nil ? "Your clipboard, remembered." : "Keep your favorites here.") : "No matching items").font(.system(size: 18, weight: .semibold))
-            Text(!model.hasSearch ? (model.boardID == nil ? "Copy something in any app to get started." : "Right-click a clipboard item to pin it here.") : "Try another search or content type.").font(.system(size: 13)).foregroundStyle(.secondary)
+            Text(model.hasSearch ? "Nothing found" : model.boardID == nil ? "History is empty" : "Pinboard is empty").font(.system(size: 18, weight: .semibold))
         }.frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     @ViewBuilder private func itemMenu(_ item: ClipboardItem) -> some View {
@@ -205,6 +206,9 @@ struct HistoryView: View {
         Button("Copy") { if let aggregate = model.selectedAggregate(), model.copy(aggregate) { model.showCopied?() } }.keyboardShortcut("c")
         Divider()
         Button("Edit") { model.openEditor?(item) }.keyboardShortcut("e").disabled(item.text.isEmpty || !model.canEdit)
+        if #available(macOS 15.2, *) {
+            Button("Writing Tools") { model.openWritingTools?(item) }.keyboardShortcut("e", modifiers: [.command, .shift]).disabled(item.text.isEmpty || !model.canEdit)
+        }
         Button("Rename") { renamingItem = item; boardName = item.title ?? ""; boardDialog = true }.keyboardShortcut("r").disabled(!model.canEdit)
         Button("Delete") { model.deleteItems(model.selectedItems) }.keyboardShortcut(.delete, modifiers: []).disabled(!model.canEdit)
         Divider()
@@ -245,7 +249,7 @@ struct KeyboardHelp: View {
     private let rows: [(String, String)] = [
         ("Show or hide Elmers", "⇧⌘V"), ("Move between items", "⇥ / ⇧⇥  ·  ← →"), ("Extend selection", "⇧← / ⇧→"), ("First / last item", "⌘↑ / ⌘↓"),
         ("Paste selected items", "↩"), ("Paste as plain text", "⇧↩"), ("Quick paste", "⌘1…⌘9"), ("Copy", "⌘C"),
-        ("Preview", "Space"), ("Open link", "⌘O"), ("Edit / Rename", "⌘E / ⌘R"), ("Delete", "⌫"), ("Undo / Redo", "⌘Z / ⇧⌘Z"),
+        ("Preview", "Space"), ("Open link", "⌘O"), ("Edit / Rename", "⌘E / ⌘R"), ("Writing Tools", "⇧⌘E"), ("Delete", "⌫"), ("Undo / Redo", "⌘Z / ⇧⌘Z"),
         ("Search / Filters", "⌘F"), ("New text item", "⌘N"), ("New pinboard", "⇧⌘N"),
         ("Next / previous pinboard", "⌘→ / ⌘←"), ("Pause capture", "⌘T"), ("Settings", "⌘,")
     ]

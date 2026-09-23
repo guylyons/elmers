@@ -43,7 +43,7 @@ public struct ShortcutSettings: Codable, Equatable, Sendable {
 public enum KeyboardContext { case results, search, editor }
 public enum KeyboardCommand: Equatable {
     case move(Int, extend: Bool), first, last, selectAll, paste(plain: Bool), quickPaste(Int, plain: Bool)
-    case copy, preview, open, rename, edit, newText, delete, undo, redo, focusSearch, focusResults, filters
+    case copy, preview, open, rename, edit, writingTools, newText, delete, undo, redo, focusSearch, focusResults, filters
     case newBoard, nextBoard, previousBoard, pause, settings, quit, escape, showInHistory
 }
 public enum KeyboardRouter {
@@ -92,6 +92,7 @@ public enum KeyboardRouter {
             }
         }
         if modifiers == [.command, .shift], key == 6 { return .redo }
+        if modifiers == [.command, .shift], key == 14 { return .writingTools }
         if modifiers.isEmpty {
             switch key { case 49: return .preview; case 51,117: return .delete; default: break }
         }

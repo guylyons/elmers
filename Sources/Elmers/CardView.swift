@@ -108,7 +108,7 @@ struct CardView: View {
     private var symbol: String { item.kind.symbolName }
     private var footer: String {
         switch item.kind {
-        case .text: return "\(item.text.count) characters"
+        case .text: return "\(item.text.count) character\(item.text.count == 1 ? "" : "s")" // Paste: "1 character", "41 characters"
         case .link:
             // Paste shows the address without its scheme: "pasteapp.io/help".
             guard let url = URL(string: item.text.components(separatedBy: "\n").first ?? item.text), let host = url.host else { return "Link" }

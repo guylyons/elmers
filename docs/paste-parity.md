@@ -1,5 +1,28 @@
 # Paste parity inventory
 
+## September 23 — Paste's strings table as an inventory
+
+Source: `Paste.app/Contents/Resources/PastePackages_PasteLocalization.bundle` (6.3.11), which has 450 English keys, 6 plural rules and 17 localizations (cs, da, de, en, es, fr, he, it, ja, ko, nl, pl, pt-BR, pt-PT, ru, zh-Hans, zh-Hant). These are documented strings, not verified behavior. iOS-only strings (keyboard extension, widget, Home Screen, action extension) and subscription/licensing strings are out of scope. The bundle also shows a `paste://` URL scheme (its routes are not in the strings), `CKSharingSupported` for shared pinboards, and App Intents metadata with no actions: the Mac build exposes no Shortcuts actions.
+
+| Surface | Paste wording | Elmers status |
+|---|---|---|
+| Card count footer | Plurals: "%d character(s)", "File" / "%d files", "%d item(s)", "%d line(s)", "%d word(s)" | fixed: "1 character" was "1 characters". Where Paste uses the files, lines and words plurals has not been seen |
+| Empty states | "History is empty", "Pinboard is empty", "Nothing found" (no subtitles in the table) | wording adopted, and Elmers' own subtitles removed; the icon and layout have not been compared |
+| Erase History | "Are you sure you want to erase your Clipboard History?" / "Pinned items and Pinboards won't be deleted. This action cannot be undone." | adopted |
+| Ignore Applications, empty | "No items" | adopted |
+| Writing Tools | Card menu "Writing Tools"; the editor toolbar has Writing Tools, Bold, Italic, Underline, Strikethrough, Rotate left/right (images), Discard/Save changes | menu item added. **Open:** image rotate in the editor |
+| Delete Pinboard | "The Pinboard and all its content will be deleted. This action cannot be undone." | **differs**: Elmers keeps the items in Clipboard History and supports ⌘Z. Paste's behavior needs a test pinboard to confirm |
+| Delete selected items | "Delete selected items?" confirmation | **open**: when Paste asks (count threshold, buttons) is unobserved; Elmers deletes without asking |
+| Direct paste prompt | "Do you want to paste directly to %@?" · "Paste needs accessibility access to paste directly to other apps." · Not Now, Copy to Clipboard / Enable Accessibility Access | **open**: Elmers shows the Copied overlay's "Enable Direct Paste ›" instead; when Paste shows this prompt is unobserved |
+| Onboarding (macOS) | Intro "A Better Way to Copy and Paste" · Get Started → Quick Start (Activation shortcut, Clipboard history with "Unlimited history may increase your disk space usage", iCloud sync, Run in background) → "Paste to Any App" accessibility request (Allow Access, I'll Do It Later, I'm Having an Issue, Open System Settings) → a Useful Links pinboard with Welcome Aboard, Keep, Organize and Search notes and help links | **open**: Elmers has no onboarding. Paste's first run cannot be replayed without resetting its data, so this rests on the strings |
+| Tips | In-app tips: Enable Direct Paste, Open at Login, Run in Background, Enable iCloud Sync (rating and Product Hunt prompts are marketing and are excluded) | **open**: placement unobserved |
+| Pause | "Pause Paste", "Pause for %@", "Paused until %@", "Paste Paused" / "Paste Resumed" | partly: the Pause menu and timers exist; the "Paused until" label and the paused/resumed notices are unobserved |
+| Preview unavailable | "Preview unavailable" / "Preview can't be shown, but the content is saved, and you're able to paste it" | **open** |
+| Diagnostics | Start Diagnostic, Stop & Copy Logs, Reset Search Index | not applicable: Elmers has no remote support channel or separate search index |
+| Shortcut recorder | Errors for Option-only shortcuts before macOS 15.2, shortcuts used by a menu item, and system-wide shortcuts | **open**: compare with Elmers' conflict messages |
+| Show in Menu Bar | A General setting | not shown in the observed General pane (layout matched to 0.5 pt without it); probably conditional |
+| Check for Updates | Updater menu item | not applicable to a locally built app |
+
 ## September 23 — Color type
 
 Reference: Paste 6.3.11, same display and appearance as the search-mode section. Harmless test strings were copied with `pbcopy` while Paste was running, and only the first card's accessibility frames and titles were read, plus one window-bound capture of that card. The test strings remain in Paste's history. They were not removed, because removing them means driving Paste's UI while the user was using the Mac.
@@ -135,7 +158,7 @@ Reference: Paste **6.3.11** (`com.wiheads.paste`) on macOS **27.0** (26A428). In
 | Settings › General | Open at login · Run in background · iCloud sync (Not available ⓘ, disabled) · Sound effects · **Paste Items** radio group with descriptions and illustration, "Always paste as Plain Text" checkbox · **Keep History** slider Day/Week/Month/Year/Forever · Erase History… | implemented: login item via SMAppService, background = Dock icon policy, sync row shown as not available, sound toggle, radio group with descriptions (no illustration), plain-text checkbox, slider with lower-limit confirmation ("You have items older than the new history limit…"), Erase History… with confirmation |
 | Settings › Privacy | Show during screen sharing · Generate link previews · Ignore confidential content · Ignore transient content · Ignore Applications list (icons, names, +/−; defaults Keychain Access, Passwords) | implemented. "Generate link previews" fetches title and image with LinkPresentation and stores a small PNG on the item; **default off** in Elmers (Paste defaults on) so no URL leaves the Mac until the user opts in. Screen-sharing toggle sets window sharing type. App list uses an application chooser |
 | Settings › Shortcuts | Activate Paste ⇧⌘V · Activate Paste Stack ⇧⌘C · Show next Pinboard ⌘→ · Show previous Pinboard ⌘← · Quick Paste ⌘ + 1…9 · Plain Text mode ⇧ · Reset shortcuts to default… (confirmation) | implemented except the Stack recorder (Stack deferred; no dead control) |
-| Card context menu (text) | Paste to <previous app> ↩ · Copy ⌘C · — · Edit ⌘E · Writing Tools ⇧⌘E · Rename ⌘R · Delete ⌫ · — · Pin › (pinboards with color dots, Create Pinboard…) · — · Preview Space · Share › | implemented: same order; "Paste to <app>" label when direct paste is on, "Paste" in clipboard mode; Share uses the system share sheet; Writing Tools absent |
+| Card context menu (text) | Paste to <previous app> ↩ · Copy ⌘C · — · Edit ⌘E · Writing Tools ⇧⌘E · Rename ⌘R · Delete ⌫ · — · Pin › (pinboards with color dots, Create Pinboard…) · — · Preview Space · Share › | implemented: same order; "Paste to <app>" label when direct paste is on, "Paste" in clipboard mode; Share uses the system share sheet. **Writing Tools ⇧⌘E added September 23**: it opens the item in the editor with all text selected and calls the system Writing Tools (macOS 15.2+); the system panel itself was not exercised in a check |
 | Card context menu (link) | Open ⌘O at top, then the text menu | implemented; file items add Reveal in Finder |
 | Pinboard pill context menu | Rename · Share Pinboard · Delete… · row of 8 color swatches (red, orange, yellow, green, blue, purple, pink, gray) | implemented: Rename, Delete… with confirmation, 8 colors; Share Pinboard absent (sync feature) |
 | Delete pinboard alert | "Delete “name”?" / "The Pinboard and all its content will be deleted. This action cannot be undone." | implemented with Paste's title; message differs because Elmers keeps items in history and supports undo |

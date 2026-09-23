@@ -224,10 +224,10 @@ private struct GeneralSettings: View {
             Button("Delete", role: .destructive) { if let days = pendingRetention { model.retentionDays = days } }
             Button("Cancel", role: .cancel) {}
         } message: { Text("Pinned items and Pinboards won't be deleted. This action cannot be undone.") }
-        .alert("Erase History?", isPresented: $confirmErase) {
+        .alert("Are you sure you want to erase your Clipboard History?", isPresented: $confirmErase) {
             Button("Erase", role: .destructive) { model.eraseHistory() }
             Button("Cancel", role: .cancel) {}
-        } message: { Text("All unpinned items will be deleted. Pinned items and Pinboards are kept.") }
+        } message: { Text("Pinned items and Pinboards won't be deleted. This action cannot be undone.") }
     }
     /// Radio rows with the indicator on the left and the description under the title, as in Paste's "Paste Items".
     private func option(_ title: String, _ detail: String, selected: Bool, action: @escaping () -> Void) -> some View {
@@ -354,7 +354,7 @@ private struct PrivacySettings: View {
                     .contentShape(Rectangle()).onTapGesture { selectedApp = selectedApp == id ? nil : id }
                     .accessibilityAddTraits(selectedApp == id ? [.isButton, .isSelected] : .isButton)
                 }
-                if model.excludedBundleIDs.isEmpty { Text("No applications").font(.system(size: 13)).foregroundStyle(.secondary).frame(height: 40) }
+                if model.excludedBundleIDs.isEmpty { Text("No items").font(.system(size: 13)).foregroundStyle(.secondary).frame(height: 40) }
                 Rectangle().fill(SettingsStyle.separator).frame(height: 0.5)
                 HStack(spacing: 0) {
                     Button { addApplication() } label: { Image(systemName: "plus").frame(width: 22, height: 22) }.help("Add Application")

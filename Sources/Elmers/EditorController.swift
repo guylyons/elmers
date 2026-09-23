@@ -166,6 +166,8 @@ final class EditorController: NSObject, NSTextViewDelegate {
     @objc func toggleItalic() { toggleTrait(.italic) }
     @objc func toggleUnderline() { toggleAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue) }
     @objc func toggleStrikethrough() { toggleAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue) }
+    /// Writing Tools works on the selection, so select the whole item first.
+    func showWritingToolsForAllText() { textView.selectAll(nil); showWritingTools() }
     @objc func showWritingTools() {
         if #available(macOS 15.2, *) { NSApp.sendAction(#selector(NSResponder.showWritingTools(_:)), to: textView, from: self) }
     }

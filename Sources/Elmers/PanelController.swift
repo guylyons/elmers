@@ -70,6 +70,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         model.showSettings = { [weak self] in self?.openSettings() }
         model.preview = { [weak self] in self?.openPreview($0) }
         model.openEditor = { [weak self] in self?.openEditor($0) }
+        model.openWritingTools = { [weak self] in self?.openWritingTools($0) }
         model.sharingChanged = { [weak self] in self?.applySharing() }
         applySharing()
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
@@ -269,6 +270,12 @@ final class PanelController: NSObject, NSWindowDelegate {
             self.previousApp?.activate(options: [])
         }
     }
+    /// Paste 6.3.11's Writing Tools ⇧⌘E: the item opens in the editor with the system Writing Tools over its text.
+    func openWritingTools(_ item: ClipboardItem) {
+        guard model.canEdit, !item.text.isEmpty else { return }
+        openEditor(item)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in self?.editor.showWritingToolsForAllText() }
+    }
     func openPreview(_ item: ClipboardItem) {
         if previewWindow == nil {
             let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 640, height: 460), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
@@ -325,6 +332,7 @@ final class PanelController: NSObject, NSWindowDelegate {
                 }
             case .rename: NotificationCenter.default.post(name: .elmersRename, object: nil)
             case .edit: NotificationCenter.default.post(name: .elmersEdit, object: nil)
+            case .writingTools: if let item = model.selected, !item.text.isEmpty { openWritingTools(item) }
             case .newText: if model.canEdit { NotificationCenter.default.post(name: .elmersNewText, object: nil) }
             case .delete: model.deleteItems(model.selectedItems)
             case .undo: model.undo()

@@ -46,7 +46,7 @@ final class InteractionModelTests {
             (.init(36, .shift), .paste(plain: true)), (.init(18, .command), .quickPaste(0, plain: false)),
             (.init(25, [.command, .shift]), .quickPaste(8, plain: true)),
             (.init(8, .command), .copy), (.init(49), .preview), (.init(31, .command), .open),
-            (.init(15, .command), .rename), (.init(14, .command), .edit), (.init(45, .command), .newText),
+            (.init(15, .command), .rename), (.init(14, .command), .edit), (.init(14, [.command, .shift]), .writingTools), (.init(45, .command), .newText),
             (.init(51), .delete), (.init(6, .command), .undo), (.init(6, [.command, .shift]), .redo),
             (.init(3, .command), .focusSearch), (.init(48), .move(1, extend: false)), (.init(48, .shift), .move(-1, extend: false)),
             (.init(45, [.command, .shift]), .newBoard), (.init(124, .command), .nextBoard),

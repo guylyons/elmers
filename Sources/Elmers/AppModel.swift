@@ -78,6 +78,7 @@ final class AppModel: ObservableObject {
     var preview: ((ClipboardItem) -> Void)?
     /// Opens the floating editor for a new item (nil) or an existing one.
     var openEditor: ((ClipboardItem?) -> Void)?
+    var openWritingTools: ((ClipboardItem) -> Void)?
     var isDemo: Bool { ProcessInfo.processInfo.arguments.contains("--demo") }
     private let defaults: UserDefaults
     private let store: HistoryStore
