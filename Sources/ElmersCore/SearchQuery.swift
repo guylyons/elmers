@@ -37,6 +37,7 @@ extension ContentKind {
         case .image: return ["image", "images", "photo", "photos", "picture", "pictures"]
         case .screenshot: return ["screenshot", "screenshots"]
         case .file: return ["file", "files"]
+        case .color: return ["color", "colors", "colour", "colours"]
         case .other: return ["content"]
         }
     }

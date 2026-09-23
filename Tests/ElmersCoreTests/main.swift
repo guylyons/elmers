@@ -43,6 +43,7 @@ let store = HistoryStoreTests()
 let motion = MotionTests()
 let security = StorageSecurityTests()
 let searchFilters = SearchFilterTests()
+let colors = ColorTests()
 let checks: [(String, () throws -> Void)] = [
     ("panel timing curves match Paste's recorded motion", motion.testPanelCurvesMatchPasteRecordings),
     ("deleted and replaced content leaves no trace on disk", security.testDeletedAndReplacedContentLeavesNoTraceOnDisk),
@@ -91,6 +92,9 @@ let checks: [(String, () throws -> Void)] = [
     ("date filter chips cover calendar ranges", searchFilters.testDateChipsCoverCalendarRanges),
     ("filter tokens keep pick order and toggle", searchFilters.testTokensKeepPickOrderAndToggle),
     ("Image filter chip includes screenshots", searchFilters.testImageChipIncludesScreenshots),
+    ("only six hex digits become colors", colors.testOnlySixHexDigitsBecomeColors),
+    ("color components, display, and contrast", colors.testColorComponentsDisplayAndContrast),
+    ("Color is a filter chip and a typed keyword", colors.testColorIsAFilterAndATypedKeyword),
     ("retention protects pins", history.testRetentionPreservesPinnedItems),
     ("board deletion preserves history", history.testDeletingBoardPreservesClipboardItem),
     ("binary archive round trip", history.testArchiveRoundTripPreservesBinaryFormatsAndBoards),

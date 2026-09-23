@@ -3,9 +3,29 @@ import CryptoKit
 import Foundation
 
 public enum ContentKind: String, Codable, CaseIterable, Identifiable, Sendable {
-    case text = "Text", link = "Link", image = "Image", screenshot = "Screenshot", file = "File", other = "Content"
+    case text = "Text", link = "Link", image = "Image", screenshot = "Screenshot", file = "File", color = "Color", other = "Content"
     public var id: String { rawValue }
     public var isImage: Bool { self == .image || self == .screenshot }
+}
+
+/// A copied color. Paste 6.3.11 makes a Color card only from exactly six hex digits with an optional leading "#":
+/// "#FF8800" and "FF8800" are colors; "#abc", "#FF880080", "0xFF8800", "rgb(…)", "red" and a hex value with
+/// surrounding spaces stay Text.
+public struct HexColor: Equatable, Sendable {
+    public let red: Double, green: Double, blue: Double
+    /// The value as the card shows it, always with a leading "#".
+    public let display: String
+    public init?(_ text: String) {
+        let digits = text.hasPrefix("#") ? text.dropFirst() : Substring(text)
+        guard digits.count == 6, digits.allSatisfy(\.isHexDigit), let value = UInt32(digits, radix: 16) else { return nil }
+        red = Double(value >> 16 & 0xFF) / 255; green = Double(value >> 8 & 0xFF) / 255; blue = Double(value & 0xFF) / 255
+        display = "#" + digits
+    }
+    /// Relative luminance (WCAG), used to pick dark or light text on the swatch.
+    public var luminance: Double {
+        func linear(_ c: Double) -> Double { c <= 0.039_28 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }
+        return 0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue)
+    }
 }
 
 public struct ClipboardPayload: Codable, Equatable, Sendable {
@@ -61,6 +81,7 @@ public struct ClipboardPayload: Codable, Equatable, Sendable {
         let types = Set(items.flatMap { $0.keys })
         if types.contains("public.file-url") { return .file }
         if types.contains("public.png") || types.contains("public.tiff") { return .image }
+        if HexColor(text) != nil { return .color }
         let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if !value.contains(where: { $0.isWhitespace }), let url = URL(string: value),
            ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host != nil { return .link }

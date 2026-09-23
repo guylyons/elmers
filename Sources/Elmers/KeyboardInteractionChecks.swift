@@ -131,6 +131,11 @@ final class KeyboardInteractionChecks {
                     view.cacheDisplay(in: view.bounds, to: rep)
                     try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: directory).appendingPathComponent("filter-popover.png"))
                 }
+                model.newText("#FF8800")
+                model.filters = SearchFilters([.kind(.color)])
+                guard model.visibleItems.count == 1, model.visibleItems.first?.kind == .color else { fail("Color chip should show only the copied color") }
+                capturePanel(controller, name: "color-card")
+                model.filters.removeAll()
                 model.newText("https://example.com/search-mode-fixture")
                 model.filters.toggle(.kind(.text)); model.filters.toggle(.kind(.link)); model.filters.toggle(.date(.today))
                 let now = Date(), start = Calendar.current.startOfDay(for: now)

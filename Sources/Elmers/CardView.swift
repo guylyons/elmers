@@ -45,22 +45,31 @@ struct CardView: View {
             }
             .foregroundStyle(.white).padding(.leading, 13).padding(.trailing, 3).frame(height: 50)
             .background(accent) // Paste's header is a flat tint (#1C3EC3 top to bottom), not a gradient.
-            VStack(spacing: 0) {
-                preview
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .clipped()
-                // Paste's footer sits on the bottom edge: counts are centered on one line, link addresses are
-                // left-aligned and may wrap onto a second line that grows upward.
-                HStack(alignment: .bottom, spacing: 5) {
-                    if !item.boardIDs.isEmpty { Image(systemName: "pin.fill").font(.system(size: 9)).padding(.bottom, 3) }
-                    if item.kind == .link {
-                        Text(footer).lineLimit(2).truncationMode(.tail).multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)
-                    } else {
-                        Text(footer).lineLimit(1).frame(maxWidth: .infinity)
+            if let color = HexColor(item.text), item.kind == .color {
+                // Paste 6.3.11 fills the whole body with the color and centers the value in 18-pt monospaced type,
+                // with no count footer.
+                Text(color.display).font(.system(size: 18, design: .monospaced))
+                    .foregroundStyle(color.luminance > 0.18 ? Color.black.opacity(0.85) : Color.white.opacity(0.9))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(.sRGB, red: color.red, green: color.green, blue: color.blue))
+            } else {
+                VStack(spacing: 0) {
+                    preview
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .clipped()
+                    // Paste's footer sits on the bottom edge: counts are centered on one line, link addresses are
+                    // left-aligned and may wrap onto a second line that grows upward.
+                    HStack(alignment: .bottom, spacing: 5) {
+                        if !item.boardIDs.isEmpty { Image(systemName: "pin.fill").font(.system(size: 9)).padding(.bottom, 3) }
+                        if item.kind == .link {
+                            Text(footer).lineLimit(2).truncationMode(.tail).multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)
+                        } else {
+                            Text(footer).lineLimit(1).frame(maxWidth: .infinity)
+                        }
                     }
-                }
-                .font(.system(size: 12)).foregroundStyle(.secondary).padding(.horizontal, 13).padding(.bottom, 10).padding(.top, 4)
-            }.background(item.kind == .link && item.linkPreview == nil ? Self.linkBodyColor : Self.bodyColor)
+                    .font(.system(size: 12)).foregroundStyle(.secondary).padding(.horizontal, 13).padding(.bottom, 10).padding(.top, 4)
+                }.background(item.kind == .link && item.linkPreview == nil ? Self.linkBodyColor : Self.bodyColor)
+            }
         }
         .frame(width: Self.width, height: Self.height)
         .clipShape(RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous))
@@ -237,7 +246,7 @@ final class CardImageCache {
 extension ContentKind {
     /// SF Symbol used for this type on cards and in the search field's type filter.
     var symbolName: String {
-        switch self { case .text: return "text.alignleft"; case .link: return "link"; case .image: return "photo"; case .screenshot: return "viewfinder"; case .file: return "doc"; case .other: return "doc.on.clipboard" }
+        switch self { case .text: return "text.alignleft"; case .link: return "link"; case .image: return "photo"; case .screenshot: return "viewfinder"; case .file: return "doc"; case .color: return "paintpalette"; case .other: return "doc.on.clipboard" }
     }
     /// Lowercase plural for the search placeholder: "Search images".
     var searchNoun: String {

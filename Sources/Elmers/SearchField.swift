@@ -87,9 +87,8 @@ struct FilterPopover: View {
         }
         .frame(width: 440, height: 320)
     }
-    /// Paste 6.3.11 lists Unknown, Image, Color, File, Link, Text. Elmers adds Screenshot after Image and has no Color
-    /// type yet.
-    static let kinds: [ContentKind] = [.other, .image, .screenshot, .file, .link, .text]
+    /// Paste 6.3.11 lists Unknown, Image, Color, File, Link, Text. Elmers adds its Screenshot type after Image.
+    static let kinds: [ContentKind] = [.other, .image, .screenshot, .color, .file, .link, .text]
     private var apps: [String] { Array(Set(model.history.items.map(\.source))).sorted { $0.localizedStandardCompare($1) == .orderedAscending } }
 
     private func section(_ title: String, _ chips: [SearchFilter]) -> some View {
