@@ -251,3 +251,7 @@
 "This shortcut is already used by a clipboard command. Choose another combination." = "Ce raccourci est déjà utilisé par une commande du presse-papiers. Choisissez une autre combinaison.";
 "Close" = "Fermer";
 "Create Pinboard" = "Créer un tableau d'affichage";
+"Paste Stack" = "Paste Stack";
+"Reverse order" = "Inverser l’ordre";
+"Copy items to add them to the stack" = "Copiez des éléments pour les ajouter à la pile";
+"Activate Paste Stack" = "Activer Paste Stack";

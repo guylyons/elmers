@@ -425,6 +425,8 @@ private struct ShortcutSettingsView: View {
         VStack(alignment: .trailing, spacing: 0) {
             SettingsGroup {
                 recorder("Activate Elmers", binding: $model.shortcuts.activation)
+                SettingsSeparator()
+                recorder("Activate Paste Stack", binding: $model.shortcuts.stack)
             }
             SettingsGroup {
                 recorder("Show next Pinboard", binding: $model.shortcuts.nextBoard)

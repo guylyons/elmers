@@ -251,3 +251,7 @@
 "This shortcut is already used by a clipboard command. Choose another combination." = "이 단축키는 이미 클립보드 명령에서 사용 중입니다. 다른 조합을 선택하십시오.";
 "Close" = "닫기";
 "Create Pinboard" = "핀보드 생성";
+"Paste Stack" = "Paste Stack";
+"Reverse order" = "순서 뒤집기";
+"Copy items to add them to the stack" = "항목을 복사하면 스택에 추가됩니다";
+"Activate Paste Stack" = "Paste Stack 활성화";

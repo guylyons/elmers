@@ -251,3 +251,7 @@
 "This shortcut is already used by a clipboard command. Choose another combination." = "Dieser Tastenkurzbefehl wird bereits von einem Befehl der Zwischenablage verwendet. Wähle eine andere Kombination.";
 "Close" = "Schließen";
 "Create Pinboard" = "Pinnwand erstellen";
+"Paste Stack" = "Paste Stack";
+"Reverse order" = "Reihenfolge umkehren";
+"Copy items to add them to the stack" = "Kopiere Einträge, um sie dem Stapel hinzuzufügen";
+"Activate Paste Stack" = "Paste Stack aktivieren";

@@ -251,3 +251,7 @@
 "This shortcut is already used by a clipboard command. Choose another combination." = "Tuto zkratku už používá příkaz schránky. Vyberte jinou kombinaci.";
 "Close" = "Zavřít";
 "Create Pinboard" = "Vytvořit Pinboard";
+"Paste Stack" = "Paste Stack";
+"Reverse order" = "Obrátit pořadí";
+"Copy items to add them to the stack" = "Zkopírujte položky a přidejte je do zásobníku";
+"Activate Paste Stack" = "Aktivace Paste Stack";

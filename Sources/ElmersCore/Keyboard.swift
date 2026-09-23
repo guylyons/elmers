@@ -30,10 +30,10 @@ public struct ShortcutSettings: Codable, Equatable, Sendable {
     public init() {}
     public var validationError: String? {
         if quickPasteModifier == plainTextModifier { return String(localized: "Quick Paste and Plain Text mode need different modifiers.") }
-        let bindings = [activation, nextBoard, previousBoard].compactMap { $0 }
+        let bindings = [activation, stack, nextBoard, previousBoard].compactMap { $0 }
         if Set(bindings).count != bindings.count { return String(localized: "Choose a different shortcut for each action.") }
         var reserved = self
-        reserved.activation = nil; reserved.nextBoard = nil; reserved.previousBoard = nil
+        reserved.activation = nil; reserved.stack = nil; reserved.nextBoard = nil; reserved.previousBoard = nil
         for binding in bindings {
             guard let command = KeyboardRouter.command(for: binding, context: .results, settings: reserved) else { continue }
             // Paste 6.3.11's wording when the menu already owns the combination.

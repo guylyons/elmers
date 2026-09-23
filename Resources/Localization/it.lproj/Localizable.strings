@@ -251,3 +251,7 @@
 "This shortcut is already used by a clipboard command. Choose another combination." = "Questa abbreviazione è già usata da un comando degli appunti. Scegli un’altra combinazione.";
 "Close" = "Chiudi";
 "Create Pinboard" = "Crea una bacheca";
+"Paste Stack" = "Paste Stack";
+"Reverse order" = "Inverti ordine";
+"Copy items to add them to the stack" = "Copia elementi per aggiungerli alla pila";
+"Activate Paste Stack" = "Attiva Stack di Paste";

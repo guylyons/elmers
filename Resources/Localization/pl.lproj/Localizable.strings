@@ -251,3 +251,7 @@
 "This shortcut is already used by a clipboard command. Choose another combination." = "Ten skrót jest już używany przez polecenie schowka. Wybierz inną kombinację.";
 "Close" = "Zamknij";
 "Create Pinboard" = "Utwórz Pinboard";
+"Paste Stack" = "Paste Stack";
+"Reverse order" = "Odwróć kolejność";
+"Copy items to add them to the stack" = "Kopiuj elementy, aby dodać je do stosu";
+"Activate Paste Stack" = "Aktywuj Paste Stack";

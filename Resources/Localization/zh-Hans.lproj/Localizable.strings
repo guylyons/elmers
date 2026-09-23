@@ -251,3 +251,7 @@
 "This shortcut is already used by a clipboard command. Choose another combination." = "此快捷键已被剪贴板命令使用。请选择其他组合。";
 "Close" = "关闭";
 "Create Pinboard" = "创建 Pinboard";
+"Paste Stack" = "Paste Stack";
+"Reverse order" = "反转顺序";
+"Copy items to add them to the stack" = "拷贝项目以将其添加到堆栈";
+"Activate Paste Stack" = "启动 Paste Stack";

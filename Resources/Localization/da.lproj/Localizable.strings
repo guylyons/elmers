@@ -251,3 +251,7 @@
 "This shortcut is already used by a clipboard command. Choose another combination." = "Denne genvej bruges allerede af en udklipskommando. Vælg en anden kombination.";
 "Close" = "Luk";
 "Create Pinboard" = "Opret Pinboard";
+"Paste Stack" = "Paste Stack";
+"Reverse order" = "Vend rækkefølgen";
+"Copy items to add them to the stack" = "Kopiér emner for at føje dem til stakken";
+"Activate Paste Stack" = "Aktiver Paste Stack";

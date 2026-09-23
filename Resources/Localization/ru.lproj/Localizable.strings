@@ -251,3 +251,7 @@
 "This shortcut is already used by a clipboard command. Choose another combination." = "Это сочетание клавиш уже используется командой буфера обмена. Выберите другое.";
 "Close" = "Закрыть";
 "Create Pinboard" = "Создать пинборд";
+"Paste Stack" = "Paste Stack";
+"Reverse order" = "Обратный порядок";
+"Copy items to add them to the stack" = "Копируйте элементы, чтобы добавить их в стопку";
+"Activate Paste Stack" = "Активировать Paste Stack";

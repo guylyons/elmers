@@ -251,3 +251,7 @@
 "This shortcut is already used by a clipboard command. Choose another combination." = "Este atalho já é usado por um comando da área de transferência. Escolha outra combinação.";
 "Close" = "Fechar";
 "Create Pinboard" = "Criar Pinboard";
+"Paste Stack" = "Paste Stack";
+"Reverse order" = "Inverter ordem";
+"Copy items to add them to the stack" = "Copie itens para os adicionar à pilha";
+"Activate Paste Stack" = "Ativar Paste Stack";

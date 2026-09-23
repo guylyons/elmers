@@ -251,3 +251,7 @@
 "This shortcut is already used by a clipboard command. Choose another combination." = "Este atajo ya lo usa un comando del portapapeles. Elige otra combinación.";
 "Close" = "Cerrar";
 "Create Pinboard" = "Crear Pinboard";
+"Paste Stack" = "Paste Stack";
+"Reverse order" = "Invertir orden";
+"Copy items to add them to the stack" = "Copia elementos para añadirlos a la pila";
+"Activate Paste Stack" = "Activar Paste Stack";

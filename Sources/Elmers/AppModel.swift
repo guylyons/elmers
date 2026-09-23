@@ -64,7 +64,7 @@ final class AppModel: ObservableObject {
     @Published var shortcuts = ShortcutSettings() {
         didSet {
             if let error = shortcuts.validationError { shortcuts = oldValue; shortcutValidationError = error; return }
-            let changed = [(shortcuts.activation, oldValue.activation), (shortcuts.nextBoard, oldValue.nextBoard), (shortcuts.previousBoard, oldValue.previousBoard)]
+            let changed = [(shortcuts.activation, oldValue.activation), (shortcuts.stack, oldValue.stack), (shortcuts.nextBoard, oldValue.nextBoard), (shortcuts.previousBoard, oldValue.previousBoard)]
                 .compactMap { new, old in new != old ? new : nil }
             if changed.contains(where: SystemShortcuts.isReserved) { shortcuts = oldValue; shortcutValidationError = SystemShortcuts.usedMessage; return }
             shortcutValidationError = changed.contains(where: SystemShortcuts.needsOptionWarning) ? SystemShortcuts.optionMessage : nil
@@ -118,6 +118,8 @@ final class AppModel: ObservableObject {
     /// Opens the floating editor for a new item (nil) or an existing one.
     var openEditor: ((ClipboardItem?) -> Void)?
     var openWritingTools: ((ClipboardItem) -> Void)?
+    /// Every accepted copy, before history merges duplicates (Paste Stack takes each one).
+    var onCapture: ((ClipboardPayload, String) -> Void)?
     var isDemo: Bool { ProcessInfo.processInfo.arguments.contains("--demo") }
     private let defaults: UserDefaults
     private let store: HistoryStore
@@ -283,6 +285,7 @@ final class AppModel: ObservableObject {
         let sourceName = sourceID.flatMap { id in NSWorkspace.shared.urlForApplication(withBundleIdentifier: id)?.deletingPathExtension().lastPathComponent } ?? (sourceChanged ? "Unknown App" : app?.localizedName ?? "Unknown App")
         do {
             if let payload = try PasteboardCodec.read(from: board, ignoreConfidential: ignoreConfidential, ignoreTransient: ignoreTransient) {
+                onCapture?(payload, sourceName)
                 if payload.kind.isImage {
                     captureImage(payload, source: sourceName, sourceID: sourceID)
                 } else {

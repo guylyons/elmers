@@ -251,3 +251,7 @@
 "This shortcut is already used by a clipboard command. Choose another combination." = "此快速鍵已由剪貼簿指令使用。請選擇其他組合。";
 "Close" = "關閉";
 "Create Pinboard" = "建立剪貼夾";
+"Paste Stack" = "Paste Stack";
+"Reverse order" = "反轉順序";
+"Copy items to add them to the stack" = "拷貝項目即可加入堆疊";
+"Activate Paste Stack" = "激活粘貼堆棧";

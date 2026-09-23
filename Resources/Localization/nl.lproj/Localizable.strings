@@ -251,3 +251,7 @@
 "This shortcut is already used by a clipboard command. Choose another combination." = "Deze toetscombinatie wordt al gebruikt door een klembordopdracht. Kies een andere combinatie.";
 "Close" = "Sluit";
 "Create Pinboard" = "Maak Prikbord";
+"Paste Stack" = "Paste Stack";
+"Reverse order" = "Keer volgorde om";
+"Copy items to add them to the stack" = "Kopieer items om ze aan de stapel toe te voegen";
+"Activate Paste Stack" = "Activeer Paste Stack";

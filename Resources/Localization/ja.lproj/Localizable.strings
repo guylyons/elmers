@@ -251,3 +251,7 @@
 "This shortcut is already used by a clipboard command. Choose another combination." = "このショートカットはクリップボードのコマンドで使用されています。別の組み合わせを選択してください。";
 "Close" = "閉じる";
 "Create Pinboard" = "ピンボードの作成";
+"Paste Stack" = "Paste Stack";
+"Reverse order" = "順序を逆にする";
+"Copy items to add them to the stack" = "項目をコピーするとスタックに追加されます";
+"Activate Paste Stack" = "Paste Stackを有効にする";

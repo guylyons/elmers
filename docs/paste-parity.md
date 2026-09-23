@@ -1,5 +1,16 @@
 # Paste parity inventory
 
+## September 23 — Paste Stack (working; look provisional)
+
+Paste Stack had been deferred since September 15 ("return to the saved Stack design later"). With the instruction to continue to full parity, it is now built from the saved design and Paste's help ("Using Paste Stack").
+
+- **Shortcut:** ⇧⌘C (Settings › Shortcuts › Activate Paste Stack, as in Paste's first shortcut group) opens and closes a small floating Stack window. Global shortcuts now answer only to their own hot key ID, so several can be registered at once.
+- **Collecting:** while the window is open, every accepted copy joins the Stack in copy order. Repeated copies are separate entries, independent of history's duplicate merging.
+- **Pasting:** while the Stack is open, holds entries and Accessibility is granted, ⌘V is taken system-wide. It writes the next entry to the clipboard, sends ⌘V to the frontmost app with the Stack's own ⌘V released, and removes the entry. A failed clipboard write keeps the entry. Otherwise ⌘V stays with the system.
+- **Controls:** an arrows button reverses the order (Paste: "change the direction of the stack by clicking on the arrows button"), and the context menu's Delete removes an entry. The window grows with its entries up to the 438-pt height of Paste's storyboard, and its frame is saved.
+- **Checks:** `PasteStack` core check (order, duplicates, reverse, consume, delete); `--demo --check-stack` (collects only while open, order, reverse, delete, close).
+- **Not verified:** a real ⌘V into another app through the Stack. **Unknown until Paste's Stack is observed:** its window layout and styling, where it opens, what it shows when empty, and whether entries survive closing it. Paste's storyboard (264 pt wide, a list, a scroller, a title and two small buttons) and its saved frame (264×76 when empty) are the only evidence so far. The two-finger swipe to delete described in the help is iOS.
+
 ## September 23 — from Paste's Help Center: search keys and link previews
 
 - **Down arrow from search.** Paste's help: "Navigate search results using the Right Arrow or Down Arrow keys." Down in the search field now moves focus to the results (`KeyboardRouter`, checked in core). Return in search still pastes at once and Tab still moves the selection; both are the user's earlier decisions, not Paste's documented Return and Tab behavior.
@@ -292,7 +303,7 @@ Statuses distinguish observation from implementation. No feature is verified sol
 | Rich content and files | Full format preservation required by project | unexplored | Round-trip tests plus cross-app verification |
 | Multi-selection / drag and drop | Multi-selection observed via ⇧/⌘ clicks and ⌘A; drag-out from cards not exercised on the reference this session | in progress | Elmers: cards drag out with every stored item and representation through an AppKit drag session; pinboard pills reorder by drag. Both verified with real pointer drags on September 22 (see that section). Multi-selection drag drags only the grabbed card; Paste's multi-selection drag and reference comparison remain unverified |
 | Edit / new text / previews | New Text Item observed in menu | unexplored | Inspect reference workflows |
-| Paste Stack | Shortcut entry observed | unexplored | Inspect queue ordering and delivery |
+| Paste Stack | Shortcut entry observed | in progress (September 23) | Working; look provisional until compared |
 | OCR | Official search documentation describes image text search | implemented | Vision `VNRecognizeTextRequest` (accurate level, background, two images at a time) fills `recognizedText`; search matches it and the preview window shows it. Checked with a rendered fixture (fast level). Reference behavior not observed locally |
 | iCloud and companion devices | iCloud toggle observed | blocked | Requires signing, entitlements, and device testing |
 | Accessibility / localization | Discovery required | unexplored | VoiceOver, keyboard, contrast, language tests |

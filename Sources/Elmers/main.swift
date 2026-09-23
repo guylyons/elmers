@@ -8,6 +8,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var panelController: PanelController!
     var statusItem: NSStatusItem!
     let shortcut = GlobalShortcut()
+    let stackShortcut = GlobalShortcut()
+    var stackController: StackController!
     private var pausedObserver: AnyCancellable?
     private var onboarding: OnboardingController?
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -24,13 +26,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panelController.statusItemFrame = { [weak self] in self?.statusItem.button?.window?.frame }
         pausedObserver = model.$paused.removeDuplicates().sink { [weak self] paused in self?.statusItem.button?.image = StatusIcon.make(paused: paused) }
         shortcut.onActivate = { [weak self] in self?.panelController.toggle() }
+        stackController = StackController(model: model)
+        stackShortcut.onActivate = { [weak self] in self?.stackController.toggle() }
+        model.activateStack = { [weak self] in self?.stackController.toggle() }
         model.shortcutsChanged = { [weak self] in
             guard let self else { return }
             self.model.shortcutConflict = self.shortcut.register(self.model.shortcuts.activation) ? nil : String(localized: "The history shortcut is in use by another app. Quit Paste to use the same shortcut in Elmers.")
+            self.stackShortcut.register(self.model.shortcuts.stack)
         }
         model.shortcutRecordingChanged = { [weak self] recording in
             guard let self else { return }
-            if recording { self.shortcut.register(nil) } else { self.model.shortcutsChanged?() }
+            if recording { self.shortcut.register(nil); self.stackShortcut.register(nil) } else { self.model.shortcutsChanged?() }
         }
         model.shortcutsChanged?()
         let menu = NSMenu()
@@ -105,6 +111,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
             poll(0)
+            return
+        }
+        if ProcessInfo.processInfo.arguments.contains("--check-stack") {
+            // Paste Stack without keyboard focus: copies join it in order while it is open, and it reverses, deletes and closes.
+            precondition(model.isDemo, "Stack checks require --demo")
+            let stack = stackController!
+            func fail(_ message: String) -> Never { print("FAIL: \(message)"); fflush(stdout); exit(1) }
+            model.onCapture?(.text("before opening"), "Notes")
+            guard stack.stack.isEmpty else { fail("a copy joined the Stack while it was closed") }
+            stack.open()
+            model.onCapture?(.text("first"), "Notes"); model.onCapture?(.text("second"), "Notes"); model.onCapture?(.text("first"), "Notes")
+            guard stack.isOpen, stack.stack.pasteOrder.map(\.payload.text) == ["first", "second", "first"] else { fail("Stack order \(stack.stack.pasteOrder.map(\.payload.text))") }
+            stack.reverse()
+            guard stack.stack.next?.payload.text == "first", stack.stack.pasteOrder.map(\.payload.text) == ["first", "second", "first"].reversed() else { fail("reverse") }
+            if let second = stack.stack.entries.first(where: { $0.payload.text == "second" }) { stack.remove(second.id) }
+            guard stack.stack.entries.count == 2 else { fail("delete") }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                if let directory = ProcessInfo.processInfo.environment["ELMERS_CAPTURE_DIR"], let view = NSApp.windows.first(where: { $0.isVisible && $0.title == String(localized: "Paste Stack") })?.contentView,
+                   let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+                    view.cacheDisplay(in: view.bounds, to: rep)
+                    try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: directory).appendingPathComponent("stack.png"))
+                }
+                stack.close()
+                guard !stack.isOpen else { fail("close") }
+                print("PASS: Paste Stack collects copies in order while open, reverses, deletes and closes"); exit(0)
+            }
             return
         }
         if ProcessInfo.processInfo.arguments.contains("--show-panel"), let directory = ProcessInfo.processInfo.environment["ELMERS_CAPTURE_DIR"] {
