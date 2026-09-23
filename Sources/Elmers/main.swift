@@ -174,6 +174,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return
         }
+        if ProcessInfo.processInfo.arguments.contains("--open-panel-later") {
+            // For hands-on pointer tests: opens the demo panel 3 s after launch, the way the shortcut does, over whatever
+            // app is frontmost by then (Elmers stays inactive, as in daily use).
+            precondition(model.isDemo, "--open-panel-later requires --demo")
+            model.start()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { self.panelController.show() }
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--show-settings") {
             // For side-by-side captures: opens Settings on the pane named by ELMERS_SETTINGS_SECTION (General by default).
             model.start(); panelController.openSettings()
