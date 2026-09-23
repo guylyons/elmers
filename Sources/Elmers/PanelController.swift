@@ -12,6 +12,25 @@ final class ClipboardPanel: NSPanel {
 final class PanelController: NSObject, NSWindowDelegate {
     let model: AppModel
     let panel: ClipboardPanel
+    /// The glass panel. The window stays put on the screen's bottom edge while this view's frame slides.
+    private var glass: NSView!
+    private var restingScreen: NSScreen?
+    /// False from the moment `hide()` starts, even while the slide-out is still on screen.
+    private(set) var isShown = false
+    private var transitionGeneration = 0
+    static let windowHeight: CGFloat = 332
+    static let inset: CGFloat = 8
+    static let cornerRadius: CGFloat = 25
+    /// Measured from 60 fps recordings of Paste 6.3.11: the panel rises 332 pt in 0.15 s, covering over half the
+    /// distance in the first 20 ms, and leaves in 0.18 s with a gentle ease-in-out.
+    static let showDuration: TimeInterval = 0.15
+    static let hideDuration: TimeInterval = 0.18
+    private var slideLink: CADisplayLink?
+    private var slideStart: CFTimeInterval = 0
+    private var slideFrom: CGFloat = 0, slideTo: CGFloat = 0
+    private var slideDuration: TimeInterval = 0
+    private var slideCurve = TimingCurve.panelIn
+    private var slideCompletion: (() -> Void)?
     private var settingsWindow: NSWindow?
     private var previewWindow: NSWindow?
     let editor = EditorController()
@@ -26,20 +45,22 @@ final class PanelController: NSObject, NSWindowDelegate {
 
     init(model: AppModel) {
         self.model = model
-        panel = ClipboardPanel(contentRect: .init(x: 0, y: 0, width: 1100, height: 332), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel = ClipboardPanel(contentRect: .init(x: 0, y: 0, width: 1100, height: Self.windowHeight), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         super.init()
         panel.title = "Elmers Clipboard History"
-        panel.isOpaque = false; panel.backgroundColor = .clear; panel.hasShadow = true
+        panel.isOpaque = false; panel.backgroundColor = .clear; panel.hasShadow = false
         panel.level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1); panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.hidesOnDeactivate = false; panel.isReleasedWhenClosed = false; panel.delegate = self
-        let material = NSVisualEffectView()
-        material.material = .hudWindow; material.blendingMode = .behindWindow; material.state = .active
-        material.wantsLayer = true; material.layer?.cornerRadius = 24; material.layer?.masksToBounds = true
+        panel.animationBehavior = .none // the slide is the only transition; no system fade on order in/out
+        // Paste 6.3.11 keeps a full-width window flush with the bottom of the screen and slides a Liquid Glass
+        // panel inside it, inset 8 pt from the sides and bottom and flush with the window's top edge.
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: 1100, height: Self.windowHeight))
         let hosting = NSHostingView(rootView: HistoryView(model: model))
-        hosting.translatesAutoresizingMaskIntoConstraints = false
-        material.addSubview(hosting)
-        NSLayoutConstraint.activate([hosting.leadingAnchor.constraint(equalTo: material.leadingAnchor), hosting.trailingAnchor.constraint(equalTo: material.trailingAnchor), hosting.topAnchor.constraint(equalTo: material.topAnchor), hosting.bottomAnchor.constraint(equalTo: material.bottomAnchor)])
-        panel.contentView = material
+        glass = Self.makeGlass(content: hosting)
+        glass.frame = NSRect(x: Self.inset, y: Self.inset, width: root.bounds.width - 2 * Self.inset, height: root.bounds.height - Self.inset)
+        glass.autoresizingMask = [.width, .height]
+        root.addSubview(glass)
+        panel.contentView = root
         model.deliver = { [weak self] item, plain in self?.paste(item, plainText: plain) }
         model.dismiss = { [weak self] in self?.hide() }
         model.showCopied = { [weak self] in self?.showCopied() }
@@ -62,7 +83,57 @@ final class PanelController: NSObject, NSWindowDelegate {
             }
         }
     }
-    func toggle() { panel.isVisible ? hide() : show() }
+    func toggle() { isShown ? hide() : show() }
+    private static func makeGlass(content: NSView) -> NSView {
+        if #available(macOS 26.0, *) {
+            let glass = NSGlassEffectView()
+            glass.style = .regular; glass.cornerRadius = cornerRadius
+            glass.contentView = content
+            return glass
+        }
+        let material = NSVisualEffectView()
+        material.material = .hudWindow; material.blendingMode = .behindWindow; material.state = .active
+        material.wantsLayer = true; material.layer?.cornerRadius = cornerRadius; material.layer?.masksToBounds = true
+        content.frame = material.bounds; content.autoresizingMask = [.width, .height]
+        material.addSubview(content)
+        return material
+    }
+    private var animatesTransitions: Bool { !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+    /// Slides the glass panel to `visible` (its resting place, inset from the window's sides and bottom) or one
+    /// window-height lower, below the screen edge. Liquid Glass is composited at its view's model frame, so a
+    /// Core Animation move would leave the glass behind; like Paste's own animator, the frame is stepped on every
+    /// display refresh instead. The window itself stays still: fast window moves were not composited in step.
+    private func slide(visible: Bool, completion: (() -> Void)? = nil) {
+        let target = visible ? Self.inset : Self.inset - Self.windowHeight
+        slideLink?.invalidate(); slideLink = nil
+        slideCompletion = nil
+        let from = glass.frame.origin.y
+        // Driven by the screen the panel rests on, so the refresh rate is that display's.
+        guard animatesTransitions, from != target, let screen = restingScreen ?? panel.screen ?? NSScreen.main else {
+            glass.setFrameOrigin(NSPoint(x: Self.inset, y: target)); completion?(); return
+        }
+        slideFrom = from; slideTo = target
+        slideDuration = visible ? Self.showDuration : Self.hideDuration
+        slideCurve = visible ? .panelIn : .panelOut
+        slideCompletion = completion
+        // Opening the history lays out the freshly reset cards during the next refresh; starting the clock a refresh
+        // later keeps that work from swallowing the slide's first, largest step.
+        slideStart = visible ? -1 : 0
+        let link = screen.displayLink(target: self, selector: #selector(stepSlide(_:)))
+        link.add(to: .main, forMode: .common)
+        slideLink = link
+    }
+    @objc private func stepSlide(_ link: CADisplayLink) {
+        if slideStart < 0 { slideStart = 0; return }
+        if slideStart == 0 { slideStart = link.timestamp }
+        let elapsed = (link.targetTimestamp - slideStart) / slideDuration
+        let progress = CGFloat(slideCurve.value(at: elapsed))
+        glass.setFrameOrigin(NSPoint(x: Self.inset, y: (slideFrom + (slideTo - slideFrom) * progress).rounded()))
+        guard elapsed >= 1 else { return }
+        link.invalidate(); slideLink = nil
+        let completion = slideCompletion; slideCompletion = nil
+        completion?()
+    }
     /// Paste's "Show during screen sharing" hides the clipboard windows from screen capture when off.
     private func applySharing() {
         let type: NSWindow.SharingType = model.showDuringScreenSharing ? .readOnly : .none
@@ -75,16 +146,36 @@ final class PanelController: NSObject, NSWindowDelegate {
         if front?.processIdentifier != ProcessInfo.processInfo.processIdentifier { previousApp = front }
         model.destinationApp = previousApp?.localizedName
         let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main
-        if let screen { panel.setFrame(NSRect(x: screen.frame.minX + 6, y: screen.frame.minY + 6, width: screen.frame.width - 12, height: 326), display: true) }
+        // Start one window-height below the screen edge, unless the panel is already up or a slide-out is still
+        // running, which then reverses from where it is.
+        if let screen, !(panel.isVisible && (isShown || slideLink != nil)) {
+            restingScreen = screen
+            panel.setFrame(NSRect(x: screen.frame.minX, y: screen.frame.minY, width: screen.frame.width, height: Self.windowHeight), display: true)
+            glass.setFrameOrigin(NSPoint(x: Self.inset, y: Self.inset - Self.windowHeight))
+        }
         if resetState { model.resetForActivation() } else { model.reconcileSelection() }
         ThumbnailCache.shared.prewarm(model.visibleItems.prefix(40))
+        transitionGeneration += 1
+        panel.ignoresMouseEvents = false
+        isShown = true
         panel.makeKeyAndOrderFront(nil)
+        slide(visible: true)
         focusResults()
     }
     func hide(restoreFocus: Bool = true) {
-        guard panel.isVisible else { return }
-        panel.orderOut(nil)
+        guard isShown else { return }
+        isShown = false
+        transitionGeneration += 1
+        let generation = transitionGeneration
+        panel.ignoresMouseEvents = true
         if restoreFocus { previousApp?.activate(options: []) }
+        slide(visible: false) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, generation == self.transitionGeneration else { return }
+                self.panel.orderOut(nil)
+                self.panel.ignoresMouseEvents = false
+            }
+        }
     }
     private func paste(_ item: ClipboardItem, plainText: Bool) {
         guard model.copy(item, plainText: plainText) else { return }
@@ -177,6 +268,7 @@ final class PanelController: NSObject, NSWindowDelegate {
             }
         }
         guard event.window == panel, panel.attachedSheet == nil else { return event }
+        guard isShown else { return nil }
         let stroke = KeyStroke(event.keyCode, KeyModifiers(event.modifierFlags))
         let context: KeyboardContext = model.searchIsFocused ? .search : .results
         if context == .search, stroke == KeyStroke(51), model.removeTypedFilter() { return nil }

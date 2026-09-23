@@ -9,16 +9,16 @@ enum StatusItemChecks {
                 guard let settings = NSApp.windows.first(where: { $0.title == "Elmers Settings" }), settings.isVisible else {
                     print("FAIL: right-click on status item did not open Settings"); fflush(stdout); exit(1)
                 }
-                guard !delegate.panelController.panel.isVisible else {
+                guard !delegate.panelController.isShown else {
                     print("FAIL: right-click opened history"); fflush(stdout); exit(1)
                 }
                 settings.close()
                 click(delegate: delegate, right: false) {
-                    guard delegate.panelController.panel.isVisible else {
+                    guard delegate.panelController.isShown else {
                         print("FAIL: left-click did not open history"); fflush(stdout); exit(1)
                     }
                     click(delegate: delegate, right: true) {
-                        guard settings.isVisible, !delegate.panelController.panel.isVisible else {
+                        guard settings.isVisible, !delegate.panelController.isShown else {
                             print("FAIL: right-click did not replace history with Settings"); fflush(stdout); exit(1)
                         }
                         print("PASS: status-item right-click opens/reopens Settings; left-click opens history"); fflush(stdout); exit(0)

@@ -181,7 +181,7 @@ final class KeyboardInteractionChecks {
         let model = controller.model, editor = controller.editor
         let countBefore = model.history.items.count
         controller.openEditor(nil)
-        guard editor.panel.isVisible, !controller.panel.isVisible else { print("FAIL: editor did not replace the panel"); fflush(stdout); exit(1) }
+        guard editor.panel.isVisible, !controller.isShown else { print("FAIL: editor did not replace the panel"); fflush(stdout); exit(1) }
         editor.textView.insertText("Hello editor\nsecond line", replacementRange: NSRange(location: 0, length: 0))
         guard editor.statistics == "24 characters · 4 words · 2 lines" else { print("FAIL: editor statistics: \(editor.statistics)"); fflush(stdout); exit(1) }
         editor.textView.setSelectedRange(NSRange(location: 0, length: 5))

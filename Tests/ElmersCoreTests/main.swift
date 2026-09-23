@@ -35,7 +35,9 @@ let history = HistoryTests()
 let pasteboard = PasteboardTests()
 let screenshots = ScreenshotTests()
 let store = HistoryStoreTests()
+let motion = MotionTests()
 let checks: [(String, () throws -> Void)] = [
+    ("panel timing curves match Paste's recorded motion", motion.testPanelCurvesMatchPasteRecordings),
     ("store creates a private empty database", store.testNewDirectoryGetsPrivateEmptyDatabase),
     ("store rejects damaged or newer databases", store.testDamagedOrNewerDatabaseIsRejectedAndLeftUntouched),
     ("store round trip preserves every field", store.testRoundTripPreservesEveryField),

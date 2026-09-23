@@ -8,9 +8,9 @@ struct CardView: View {
     /// Paste turns the selected card's ring gray while the pointer rests on a different card.
     var ringDimmed = false
     let index: Int
-    static let width: CGFloat = 235
-    static let height: CGFloat = 236
-    static let cornerRadius: CGFloat = 15
+    static let width: CGFloat = 232
+    static let height: CGFloat = 232
+    static let cornerRadius: CGFloat = 16
     static let colors: [Color] = [.red, .orange, .yellow, .green, .blue, .purple, .pink, .gray]
     private var accent: Color {
         if let id = item.sourceBundleID, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id),
@@ -29,7 +29,7 @@ struct CardView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: -1) {
                     Text(item.title ?? item.kind.rawValue).font(.system(size: 15, weight: .semibold)).lineLimit(1)
                     TimelineView(.periodic(from: .now, by: 15)) { context in
                         Text(Self.relativeTime(item.copiedAt, now: context.date)).font(.system(size: 12)).opacity(0.9).lineLimit(1)
@@ -56,16 +56,17 @@ struct CardView: View {
                     }
                 }
                 .font(.system(size: 12)).foregroundStyle(.secondary).padding(.horizontal, 13).padding(.bottom, 10).padding(.top, 4)
-            }.background(item.kind == .link && item.linkPreview == nil ? Self.linkBodyColor : Color(nsColor: .textBackgroundColor))
+            }.background(item.kind == .link && item.linkPreview == nil ? Self.linkBodyColor : Self.bodyColor)
         }
         .frame(width: Self.width, height: Self.height)
         .clipShape(RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous))
         .shadow(color: .black.opacity(0.08), radius: 3, y: 1)
-        // Paste draws the selection as a 3-pt ring just outside the card, with no border on unselected cards.
+        // Paste 6.3.11 draws the selection as a 4-pt ring hugging the outside of the card, with no gap and no
+        // border on unselected cards.
         .overlay {
             if selected {
                 RoundedRectangle(cornerRadius: Self.cornerRadius + 4, style: .continuous)
-                    .strokeBorder(ringDimmed ? Color(nsColor: .systemGray) : Color.accentColor, lineWidth: 3).padding(-4)
+                    .strokeBorder(ringDimmed ? Color(nsColor: .systemGray) : Self.ringColor, lineWidth: 4).padding(-4)
             }
         }
         .accessibilityElement(children: .ignore)
@@ -81,6 +82,12 @@ struct CardView: View {
         formatter.unitsStyle = .full; formatter.dateTimeStyle = .named
         return formatter.localizedString(for: date, relativeTo: now)
     }
+    /// Paste's ring is a Display P3 blue (renders #016EFE), more saturated than the sRGB system accent.
+    static let ringColor = Color(.displayP3, red: 0.004, green: 0.431, blue: 0.996)
+    /// Card bodies are white in light mode and #141414 in dark mode (measured on Paste 6.3.11).
+    static let bodyColor = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? NSColor(white: 0.078, alpha: 1) : .white
+    })
     /// Paste's link placeholder body is a cool light gray (#F3F4F7) rather than white.
     static let linkBodyColor = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? NSColor(white: 0.14, alpha: 1) : NSColor(red: 0.953, green: 0.957, blue: 0.969, alpha: 1)

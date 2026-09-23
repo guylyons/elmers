@@ -25,7 +25,7 @@ struct HistoryView: View {
             else {
                 ScrollViewReader { proxy in
                     ScrollView(.horizontal) {
-                        LazyHStack(spacing: 21) {
+                        LazyHStack(spacing: 24) {
                             ForEach(Array(model.visibleItems.enumerated()), id: \.element.id) { index, item in
                                 CardView(item: item, selected: model.selection.ids.contains(item.id), ringDimmed: hoveredID != nil && hoveredID != item.id, index: index)
                                     .id(item.id)
@@ -39,8 +39,11 @@ struct HistoryView: View {
                                     .accessibilityValue(model.selection.ids.contains(item.id) ? "Selected" : "")
                                     .accessibilityAction { model.activate(item) }
                             }
-                        }.padding(.horizontal, 28).padding(.vertical, 6)
+                        }.padding(.horizontal, 24).padding(.vertical, 8)
                     }
+                    // Paste 6.3.11: cards start 8 pt below the 60-pt toolbar and end 24 pt above the panel's bottom
+                    // edge. A taller scroll view would center them vertically instead.
+                    .frame(height: CardView.height + 16)
                     .scrollIndicators(.hidden)
                     .onChange(of: model.selectedID) { _, id in
                         if let id { withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo(id) } }
@@ -132,7 +135,7 @@ struct HistoryView: View {
                 }
                 Button { renamingItem = nil; editingBoard = nil; boardName = ""; boardDialog = true } label: { Image(systemName: "plus").font(.system(size: 17)) }
                     .buttonStyle(.plain).frame(width: 34, height: 34).hoverHighlight(Circle()).help("Create Pinboard (⇧⌘N)").disabled(!model.canEdit)
-            }.font(.system(size: 12)).padding(.horizontal, 60)
+            }.font(.system(size: 13)).padding(.horizontal, 60)
             HStack {
                 if model.paused { Label("Paused", systemImage: "pause.fill").font(.caption).padding(.leading, 24) }
                 Spacer()
@@ -160,9 +163,9 @@ struct HistoryView: View {
     private func boardPill(_ name: String, symbol: String?, color: Color?, selected: Bool, action: @escaping () -> Void) -> some View {
         // Not a Button: a button's click tracking takes the mouse-drag events, so `.draggable` on a pinboard
         // pill never started a drag and pills could not be reordered.
-        HStack(spacing: 5) {
+        HStack(spacing: 6) {
             if let symbol { Image(systemName: symbol) }
-            if let color { Circle().fill(color).frame(width: 10, height: 10) }
+            if let color { Circle().fill(color).frame(width: 12, height: 12) }
             Text(name).lineLimit(1)
         }.padding(.horizontal, 10).padding(.vertical, 6).background(selected ? Color.primary.opacity(0.1) : Color.clear, in: Capsule())
         .contentShape(Capsule())
