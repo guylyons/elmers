@@ -12,7 +12,8 @@ final class ClipboardPanel: NSPanel {
 final class PanelController: NSObject, NSWindowDelegate {
     let model: AppModel
     let panel: ClipboardPanel
-    /// The glass panel. The window stays put on the screen's bottom edge while this view's frame slides.
+    /// The glass panel and the history above it. The window stays put on the screen's bottom edge while this
+    /// view's frame slides.
     private var glass: NSView!
     private var restingScreen: NSScreen?
     /// False from the moment `hide()` starts, even while the slide-out is still on screen.
@@ -33,6 +34,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     private var slideCompletion: (() -> Void)?
     private var settingsWindow: NSWindow?
     private var previewWindow: NSWindow?
+    private var helpWindow: NSWindow?
     let editor = EditorController()
     let copiedHUD = CopiedHUD()
     private var previousApp: NSRunningApplication?
@@ -84,19 +86,27 @@ final class PanelController: NSObject, NSWindowDelegate {
         }
     }
     func toggle() { isShown ? hide() : show() }
+    /// The glass is only the panel's background, with the history view layered above it rather than inside it:
+    /// an `NSGlassEffectView.contentView` is drawn vibrant, which turned the toolbar's 85 % label color pure white
+    /// and brightened pinboard colors, unlike Paste's.
     private static func makeGlass(content: NSView) -> NSView {
+        let container = NSView()
+        let background: NSView
         if #available(macOS 26.0, *) {
             let glass = NSGlassEffectView()
             glass.style = .regular; glass.cornerRadius = cornerRadius
-            glass.contentView = content
-            return glass
+            background = glass
+        } else {
+            let material = NSVisualEffectView()
+            material.material = .hudWindow; material.blendingMode = .behindWindow; material.state = .active
+            material.wantsLayer = true; material.layer?.cornerRadius = cornerRadius; material.layer?.masksToBounds = true
+            background = material
         }
-        let material = NSVisualEffectView()
-        material.material = .hudWindow; material.blendingMode = .behindWindow; material.state = .active
-        material.wantsLayer = true; material.layer?.cornerRadius = cornerRadius; material.layer?.masksToBounds = true
-        content.frame = material.bounds; content.autoresizingMask = [.width, .height]
-        material.addSubview(content)
-        return material
+        for view in [background, content] {
+            view.frame = container.bounds; view.autoresizingMask = [.width, .height]
+            container.addSubview(view)
+        }
+        return container
     }
     private var animatesTransitions: Bool { !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
     /// Slides the glass panel to `visible` (its resting place, inset from the window's sides and bottom) or one
@@ -137,7 +147,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     /// Paste's "Show during screen sharing" hides the clipboard windows from screen capture when off.
     private func applySharing() {
         let type: NSWindow.SharingType = model.showDuringScreenSharing ? .readOnly : .none
-        for window in [panel, settingsWindow, previewWindow, editor.panel, copiedHUD.panel] { window?.sharingType = type }
+        for window in [panel, settingsWindow, previewWindow, helpWindow, editor.panel, copiedHUD.panel] { window?.sharingType = type }
     }
     /// A fresh activation starts from the default state; a re-show after a failed paste keeps what was on screen.
     func show(resetState: Bool = true) {
@@ -220,12 +230,32 @@ final class PanelController: NSObject, NSWindowDelegate {
     func openSettings() {
         hide(restoreFocus: false)
         if settingsWindow == nil {
-            let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 640, height: 564), styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
+            // Paste's settings window: 640×592 overall, content under a transparent unified title bar so the sidebar runs
+            // to the top and the traffic lights sit 25 pt down, level with the pane title.
+            let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 640, height: 592), styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView], backing: .buffered, defer: false)
             window.title = "Elmers Settings"; window.titleVisibility = .hidden; window.isReleasedWhenClosed = false
-            window.contentView = NSHostingView(rootView: SettingsView(model: model)); window.center(); settingsWindow = window
+            window.titlebarAppearsTransparent = true
+            window.toolbar = NSToolbar(identifier: "settings"); window.toolbarStyle = .unified
+            let hosting = NSHostingView(rootView: SettingsView(model: model))
+            hosting.sizingOptions = []
+            window.contentView = hosting
+            window.setFrame(NSRect(x: 0, y: 0, width: 640, height: 592), display: false)
+            window.center(); settingsWindow = window
             applySharing()
         }
         NSApp.activate(ignoringOtherApps: true); settingsWindow?.makeKeyAndOrderFront(nil)
+    }
+    /// Keyboard Shortcuts from the menu bar icon's menu, when there is no panel to host it as a sheet.
+    func showKeyboardHelp() {
+        if helpWindow == nil {
+            let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 420, height: 480), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            window.title = "Keyboard Shortcuts"; window.isReleasedWhenClosed = false
+            window.contentView = NSHostingView(rootView: KeyboardHelp { [weak window] in window?.close() })
+            window.setContentSize(window.contentView?.fittingSize ?? window.frame.size)
+            window.center(); helpWindow = window
+            applySharing()
+        }
+        NSApp.activate(ignoringOtherApps: true); helpWindow?.makeKeyAndOrderFront(nil)
     }
     /// As in Paste, the history panel closes while the editor is open and focus returns to the previous app afterwards.
     func openEditor(_ item: ClipboardItem?) {

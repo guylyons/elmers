@@ -1,5 +1,23 @@
 # Paste parity inventory
 
+## September 23 — menu bar right-click menu and Settings window
+
+Reference: Paste 6.3.11. The right-click menu was read through the accessibility tree and one capture of the menu. Settings panes were captured window-bound at 2× on the built-in display (640×592, dark appearance); Elmers was captured the same way through the debug-only `--show-settings` flag (`ELMERS_SETTINGS_SECTION=General|Privacy|Shortcuts`). The user's menu bar collapses status items behind a hidden-icons chevron, which has to be expanded before either icon can be right-clicked.
+
+| Surface | Observed in Paste 6.3.11 | Elmers status |
+|---|---|---|
+| Right-click on the menu bar icon | The same menu as the panel's … button: About Paste · New Text Item ⌘N · Settings… ⌘, · Help › (Getting Started, Keyboard Shortcuts, Help Center, Product Updates, Feature Request, Contact Support, Stop Diagnostic, Reset Search Index) · Paste on Twitter · Pause Paste › (Pause ⌘T, separator, Pause for 15m/30m/1h/3h/8h) · Quit Paste ⌘Q | implemented: one `AppMenu` serves both. The right-click previously opened Settings directly (September 15 request), superseded by the user's September 23 request. Help › Keyboard Shortcuts opens a standalone window when the panel isn't open. Paste's web-only entries and Paste on Twitter are left out (no Elmers counterpart). Verified by `--check-status-item`, which reads the presented menu and chooses Settings…, and by a real right-click |
+| Window chrome | No visible title bar. Traffic lights 25 pt down over a full-height 200-pt sidebar (#2A2A2A); page #282828; pane title 15 pt semibold on the traffic-light row | implemented: `.fullSizeContentView`, transparent unified title bar, fixed 640×592 frame |
+| Sidebar | Native source list. Rows 32 pt from y 50, selection x 10–190 in the accent color with ~9-pt corners, blue icons (#138DFF, about 15×19 pt) centered at x ≈ 29, labels at x 47 | implemented: same geometry; 18-pt symbols in P3 (0.075, 0.553, 1); measured icon box within 1 pt |
+| Groups | #2C2C2C fill, 0.5-pt #3A3A3A border, 9-pt corners, x 220–620; 36-pt rows with inset hairlines; 13-pt bold headings 30 pt below the previous group | implemented as `SettingsGroup`/`SettingsRow`/`SettingsHeader` instead of a grouped `Form`, whose colors and spacing could not be matched. General group edges measured at 52, 197, 254, 418, 475, 587.5 pt against Paste's 52, 197.5, 254, 418, 475, 588. Privacy's match to 0.5 pt |
+| Switches | Small switches (about 35.5×15.5 pt) | small control size (31.5×17.5 pt); the regular size measured 37.5×21.5 |
+| Paste Items | Radio options with 11-pt descriptions and a 96×64 illustration at the right (Paste's own artwork); Always paste as Plain Text below a hairline | implemented with an original illustration that changes with the choice; radio text rows within 1 pt |
+| Keep History | Full-width slider with a blue fill and round knob, dots below the detents, Day…Forever under them, Erase History… at the bottom right | native `NSSlider` without system tick marks (these turn the knob into a pill on macOS 26) plus drawn dots and labels. The old SwiftUI slider was squeezed into the right half with misaligned labels, and Erase History… fell below the window |
+| Privacy | 12-pt descriptions wrapping at the switch (for example "Do not save passwords and sensitive data when detected." on one line); Ignore Applications heading with a subtitle outside a group of 40-pt rows with 28-pt icons and a +/− bar | implemented; Elmers' own Screenshots group follows, below Paste's layout |
+| Shortcuts | Recorder is a 121×25 gray field (#60605F) with the shortcut centered and a × inside the right end; Reset shortcuts to default… right-aligned 21 pt below the groups | implemented; buttons use Paste's flat 24-pt style (`SettingsButtonStyle`). Paste's Activate Paste Stack row is absent (Stack deferred), so the groups sit 36 pt higher |
+
+Not compared: light appearance; Paste's hover and pressed states; Help Center (Paste opens a website, Elmers shows Keyboard Shortcuts). Checks: core 47/47; `--check-interaction`, `--check-status-item`, `--check-sounds` and `--check-screenshots` pass. Paste was quit afterwards and the demo defaults restored.
+
 ## September 22, night — panel motion, Liquid Glass, card and toolbar metrics
 
 Reference: Paste 6.3.11 on macOS 27.0 (26A428), built-in display 1512×982 pt at 2×, dark appearance, Dock visible. Evidence is numeric only: 60 fps region recordings (`screencapture -v -R`) and still captures reduced to offsets, edge positions and pixel values in the session scratchpad. After the first frame showed older history cards, no further Paste frames were viewed; only the toolbar and one card header were cropped. Nothing from the recordings is committed. Paste did not capture the seven `pbcopy` fixture strings, so its history is unchanged. The daily-use Elmers was quit during the fixture copies and relaunched afterwards. Paste was quit again at the end, because it was not running before.
@@ -17,6 +35,19 @@ Reference: Paste 6.3.11 on macOS 27.0 (26A428), built-in display 1512×982 pt at
 | Toolbar | Pill labels 13 pt regular (ink of "Useful Links" 72×10 pt, matched by measuring text widths). Pinboard dots 12 pt. Selected pill ≈10 % white capsule. Toolbar row centered 30 pt below the panel top. | implemented: 13-pt labels (previously 12), 12-pt dots (previously 10), 6-pt dot spacing. Vertical center already matched |
 
 Verification: `scripts/test.sh` 47/47, including the new "panel timing curves match Paste's recorded motion" check, which tests the curves against the recorded offsets. `--check-interaction` passes (37 steps, three runs), as do `--check-status-item` (which now reads `PanelController.isShown`), `--check-sounds` and `--check-screenshots`. `--check-scroll-performance` passes at p95 13.8 ms, max 21.1 ms, 6 of 183 steps over 16.7 ms, up from p95 9.45 ms before the glass panel; still inside the 16.7 ms p95 budget. `dist/Elmers.app` was rebuilt; the installed `/Applications/Elmers.app` was not replaced.
+
+**Toolbar refinement (September 23).** User report: the overflow ellipsis sat off-center in its hover circle, and the search, clock, pill text and + lacked Paste's refinement. The fixes below were measured from the same Paste capture at 2×.
+
+| Item | Paste 6.3.11 | Before | Now |
+|---|---|---|---|
+| Glyph and text color | #E1–#E9, the 85 % label color over the glass | pure #FFFFFF: SwiftUI inside `NSGlassEffectView.contentView` is drawn vibrant | history view layered above the glass instead of inside it; renders #DE–#E1 |
+| Ellipsis | ink 2929–2959 px, dots 6–7 px, center 32 pt from the panel's right edge | borderless SwiftUI `Menu` re-rendered the 19-pt symbol as a 12-pt-wide control image with its own padding, off-center in the hover circle | plain button with an AppKit menu; SF `ellipsis` 18 pt light; ink 2928–2958 px, dots 6 px; hover circle and dots both centered at 2943.5 px (checked with a real hover) |
+| Search / clock / + glyphs | 32×33, 29×26, 27×27 px | same symbols and sizes | unchanged (SF 17 pt regular matches); they had only looked heavier because of the pure white |
+| Spacing | magnifier → clock 67 px, pill text → next pill text 101 px, last pill text → + 77 px | 9-pt spacing everywhere | 7.5 pt between pills, plus 7 pt of outside padding on search and +: 68, 99 and 77 px |
+| Pill padding | 10 pt leading, about 14 pt trailing | 10/10 | 10/12 |
+| Pinboard red | #FE3A3C (Display P3) | #FF5C5C (system red, brightened by vibrancy) | P3 (1, 0.23, 0.24) renders #FF3B3D; the other seven colors use Apple's light-mode values as P3 and are unverified |
+
+Not matched: Paste's selected pill has a faint top-to-bottom gradient (#4E → #50 over #3B); Elmers' pill is flat. The Paste-side hover highlight was not captured, and the menu's position relative to the button is unverified against Paste. Checks: core 47/47, interaction 37 steps, status item, sounds, screenshots, and scroll (p95 14.2 ms) all pass.
 
 Recording caveat: a heuristic that counts changed rows in a recording made the first Elmers attempts look like a top-down wipe. Tracking the selection ring's top edge settled it: the demo opens its history at launch, so the first press was a hide. Use the ring tracker (or any single feature's position), not changed-row counts, for motion comparisons.
 

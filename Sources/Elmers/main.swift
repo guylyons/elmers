@@ -15,7 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.image = StatusIcon.make()
             button.target = self; button.action = #selector(statusItemClicked)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
-            button.toolTip = "Elmers — Shift-Command-V · Right-click for Settings"
+            button.toolTip = "Elmers — Shift-Command-V · Right-click for more"
         }
         panelController.statusItemFrame = { [weak self] in self?.statusItem.button?.window?.frame }
         shortcut.onActivate = { [weak self] in self?.panelController.toggle() }
@@ -72,6 +72,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             InteractionChecks.run(model: model, controller: panelController)
             return
         }
+        if ProcessInfo.processInfo.arguments.contains("--show-settings") {
+            // For side-by-side captures: opens Settings on the pane named by ELMERS_SETTINGS_SECTION (General by default).
+            model.start(); panelController.openSettings()
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--check-live-storage-persistence") {
             precondition(!model.isDemo, "Live storage checks require the real store")
             StoragePersistenceChecks.run(model: model)
@@ -81,8 +86,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.start(); panelController.show()
     }
     @objc func statusItemClicked() {
-        if NSApp.currentEvent?.type == .rightMouseUp { settings() }
+        if NSApp.currentEvent?.type == .rightMouseUp { presentStatusMenu(statusMenu()) }
         else { toggle() }
+    }
+    /// Right-clicking Paste's menu bar icon opens the same menu as the panel's … button.
+    func statusMenu() -> NSMenu {
+        AppMenu.make(model: model) { [weak self] in self?.panelController.showKeyboardHelp() }
+    }
+    /// Shows `menu` from the status item with the system's placement and highlight. Replaced by checks, which
+    /// cannot drive a modal menu-tracking loop.
+    lazy var presentStatusMenu: (NSMenu) -> Void = { [weak self] menu in
+        guard let self, let button = self.statusItem.button else { return }
+        self.statusItem.menu = menu
+        button.performClick(nil)
+        self.statusItem.menu = nil
     }
     @objc func toggle() { if model.shortcutConflict != nil { model.shortcutsChanged?() }; panelController.toggle() }
     @objc func settings() { panelController.openSettings() }

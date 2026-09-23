@@ -11,7 +11,11 @@ struct CardView: View {
     static let width: CGFloat = 232
     static let height: CGFloat = 232
     static let cornerRadius: CGFloat = 16
-    static let colors: [Color] = [.red, .orange, .yellow, .green, .blue, .purple, .pink, .gray]
+    /// Pinboard colors in Display P3. Paste's red renders #FE3A3C, which no sRGB system red reaches; the other seven
+    /// take Apple's light-mode system values as P3 components in the same way and are not yet compared with Paste.
+    static let colors: [Color] = [(1, 0.23, 0.24), (1, 0.584, 0), (1, 0.8, 0), (0.204, 0.78, 0.349), (0, 0.478, 1),
+                                  (0.686, 0.322, 0.871), (1, 0.176, 0.333), (0.557, 0.557, 0.576)]
+        .map { Color(.displayP3, red: $0.0, green: $0.1, blue: $0.2) }
     private var accent: Color {
         if let id = item.sourceBundleID, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id),
            let color = CardImageCache.shared.color(for: id, url: url) { return color }

@@ -24,17 +24,28 @@ struct ShortcutRecorder: NSViewRepresentable {
         override var acceptsFirstResponder: Bool { true }
         init() {
             super.init(frame: .zero)
-            bezelStyle = .rounded
+            // Paste's recorder is a flat gray field (#60605F in dark mode) with the shortcut centered in light text.
+            isBordered = false; wantsLayer = true
+            layer?.cornerRadius = 6; layer?.cornerCurve = .continuous
             target = self; action = #selector(beginRecording)
             toolTip = "Click to record. Escape cancels; Delete clears."
         }
         required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
-        func refreshTitle() { title = recording ? "Type shortcut…" : binding?.label ?? "Record Shortcut" }
+        func refreshTitle() {
+            let text = recording ? "Type shortcut…" : binding?.label ?? "Record Shortcut"
+            let paragraph = NSMutableParagraphStyle(); paragraph.alignment = .center
+            attributedTitle = NSAttributedString(string: text, attributes: [.font: NSFont.systemFont(ofSize: 13), .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph])
+        }
+        override var wantsUpdateLayer: Bool { true }
+        override func updateLayer() {
+            let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            layer?.backgroundColor = (recording ? NSColor.controlAccentColor.withAlphaComponent(0.35) : dark ? NSColor(white: 0x60 / 255.0, alpha: 1) : NSColor(white: 0, alpha: 0.09)).cgColor
+        }
         @objc func beginRecording() {
             window?.makeFirstResponder(self)
-            recording = true; recordingChanged?(true); refreshTitle()
+            recording = true; recordingChanged?(true); refreshTitle(); needsDisplay = true
         }
-        private func finish() { recording = false; recordingChanged?(false); refreshTitle() }
+        private func finish() { recording = false; recordingChanged?(false); refreshTitle(); needsDisplay = true }
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             windowObservers.forEach { NotificationCenter.default.removeObserver($0) }

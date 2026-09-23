@@ -13,6 +13,7 @@ struct HistoryView: View {
     @State private var deletingBoard: Pinboard?
     @State private var helpVisible = false
     @State private var hoveredID: UUID?
+    @State private var overflowAnchor = MenuAnchor.Holder()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -83,7 +84,8 @@ struct HistoryView: View {
     }
     private var toolbar: some View {
         ZStack {
-            HStack(spacing: 9) {
+            // Paste 6.3.11: 7.5 pt between pills, about 15 pt between a pill and the search or + button.
+            HStack(spacing: 7.5) {
                 if searchVisible || !model.query.isEmpty {
                     HStack(spacing: 6) {
                         Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
@@ -99,7 +101,7 @@ struct HistoryView: View {
                     }.padding(.horizontal, 10).frame(width: 240, height: 30).background(.primary.opacity(0.06), in: Capsule())
                 } else {
                     Button { searchVisible = true; searchFocused = true } label: { Image(systemName: "magnifyingglass").font(.system(size: 17)) }
-                        .buttonStyle(.plain).frame(width: 34, height: 34).hoverHighlight(Circle()).help("Search (⌘F)")
+                        .buttonStyle(.plain).frame(width: 34, height: 34).contentShape(Circle()).hoverHighlight(Circle()).padding(.horizontal, 7).help("Search (⌘F)")
                 }
                 if searchVisible || model.kind != nil {
                     Button { filtersVisible.toggle() } label: {
@@ -134,31 +136,24 @@ struct HistoryView: View {
                         }
                 }
                 Button { renamingItem = nil; editingBoard = nil; boardName = ""; boardDialog = true } label: { Image(systemName: "plus").font(.system(size: 17)) }
-                    .buttonStyle(.plain).frame(width: 34, height: 34).hoverHighlight(Circle()).help("Create Pinboard (⇧⌘N)").disabled(!model.canEdit)
+                    .buttonStyle(.plain).frame(width: 34, height: 34).contentShape(Circle()).hoverHighlight(Circle()).padding(.horizontal, 7).help("Create Pinboard (⇧⌘N)").disabled(!model.canEdit)
             }.font(.system(size: 13)).padding(.horizontal, 60)
             HStack {
                 if model.paused { Label("Paused", systemImage: "pause.fill").font(.caption).padding(.leading, 24) }
                 Spacer()
-                Menu {
-                    Button("About Elmers") { AboutPanel.show() }
-                    Divider()
-                    Button("New Text Item") { model.openEditor?(nil) }.keyboardShortcut("n").disabled(!model.canEdit)
-                    Button("Settings…") { model.showSettings?() }.keyboardShortcut(",")
-                    Divider()
-                    Menu("Help") { Button("Keyboard Shortcuts") { helpVisible = true } }
-                    Divider()
-                    if model.paused { Button("Resume Elmers") { model.resume() } }
-                    else {
-                        Menu("Pause Elmers") {
-                            Button("Pause") { model.pause(minutes: nil) }.keyboardShortcut("t")
-                            ForEach([15, 30, 60, 180, 480], id: \.self) { minutes in Button("Pause for \(minutes < 60 ? "\(minutes)m" : "\(minutes / 60)h")") { model.pause(minutes: minutes) } }
-                        }
-                    }
-                    Button("Quit Elmers") { NSApp.terminate(nil) }.keyboardShortcut("q")
-                } label: { Image(systemName: "ellipsis").font(.system(size: 19)) }
-                .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 34, height: 34).hoverHighlight(Circle()).padding(.trailing, 19).help("More")
+                // A plain button that pops an AppKit menu: a borderless SwiftUI Menu re-renders its label as a
+                // control image with its own padding, which shrank the dots and pushed them off the hover circle.
+                Button { showOverflowMenu() } label: {
+                    Image(systemName: "ellipsis").font(.system(size: 18, weight: .light)).frame(width: 34, height: 34).contentShape(Circle())
+                }
+                .buttonStyle(.plain).hoverHighlight(Circle()).background(MenuAnchor(holder: overflowAnchor))
+                .padding(.trailing, 15).help("More").accessibilityLabel("More")
             }
         }
+    }
+    private func showOverflowMenu() {
+        guard let anchor = overflowAnchor.view else { return }
+        AppMenu.make(model: model) { helpVisible = true }.popUp(positioning: nil, at: NSPoint(x: 0, y: -4), in: anchor)
     }
     private func boardPill(_ name: String, symbol: String?, color: Color?, selected: Bool, action: @escaping () -> Void) -> some View {
         // Not a Button: a button's click tracking takes the mouse-drag events, so `.draggable` on a pinboard
@@ -167,7 +162,7 @@ struct HistoryView: View {
             if let symbol { Image(systemName: symbol) }
             if let color { Circle().fill(color).frame(width: 12, height: 12) }
             Text(name).lineLimit(1)
-        }.padding(.horizontal, 10).padding(.vertical, 6).background(selected ? Color.primary.opacity(0.1) : Color.clear, in: Capsule())
+        }.padding(.leading, 10).padding(.trailing, 12).padding(.vertical, 6).background(selected ? Color.primary.opacity(0.1) : Color.clear, in: Capsule())
         .contentShape(Capsule())
         .onTapGesture(perform: action)
         .accessibilityElement(children: .combine)
@@ -257,6 +252,8 @@ extension Notification.Name {
 /// Keyboard reference reachable from the overflow menu's Help submenu.
 struct KeyboardHelp: View {
     @Environment(\.dismiss) private var dismiss
+    /// Set when shown in its own window rather than as a sheet.
+    var close: (() -> Void)?
     private let rows: [(String, String)] = [
         ("Show or hide Elmers", "⇧⌘V"), ("Move between items", "⇥ / ⇧⇥  ·  ← →"), ("Extend selection", "⇧← / ⇧→"), ("First / last item", "⌘↑ / ⌘↓"),
         ("Paste selected items", "↩"), ("Paste as plain text", "⇧↩"), ("Quick paste", "⌘1…⌘9"), ("Copy", "⌘C"),
@@ -272,7 +269,7 @@ struct KeyboardHelp: View {
                     GridRow { Text(row.0); Text(row.1).font(.system(.body, design: .monospaced)).foregroundStyle(.secondary) }
                 }
             }
-            HStack { Spacer(); Button("Done") { dismiss() }.keyboardShortcut(.defaultAction) }
+            HStack { Spacer(); Button("Done") { if let close { close() } else { dismiss() } }.keyboardShortcut(.defaultAction) }
         }.padding(24).frame(width: 420)
     }
 }
@@ -291,4 +288,12 @@ private struct HoverHighlight<S: Shape>: ViewModifier {
 
 extension View {
     func hoverHighlight<S: Shape>(_ shape: S, suppressed: Bool = false) -> some View { modifier(HoverHighlight(shape: shape, suppressed: suppressed)) }
+}
+
+/// Exposes the NSView behind a SwiftUI control so an AppKit menu can pop up from it.
+struct MenuAnchor: NSViewRepresentable {
+    final class Holder { weak var view: NSView? }
+    let holder: Holder
+    func makeNSView(context: Context) -> NSView { let view = NSView(); holder.view = view; return view }
+    func updateNSView(_ view: NSView, context: Context) { holder.view = view }
 }
