@@ -9,10 +9,32 @@ import AppKit
 enum StatusIcon {
     static let accessibilityDescription = String(localized: "Elmers clipboard history")
 
-    static func make() -> NSImage {
+    static func make(paused: Bool = false) -> NSImage {
+        let icon: NSImage
         if let url = Bundle.main.url(forResource: "Toolbar", withExtension: "png"), let source = NSImage(contentsOf: url),
-           let image = render(source, pointSize: 20, template: false) { return image }
-        return NSImage(systemSymbolName: "square.on.square", accessibilityDescription: accessibilityDescription)!
+           let image = render(source, pointSize: 20, template: false) { icon = image }
+        else { icon = NSImage(systemSymbolName: "square.on.square", accessibilityDescription: accessibilityDescription)! }
+        return paused ? pausedVariant(of: icon) : icon
+    }
+
+    /// Paste 6.3.11 marks a paused history with a pause sign ("II") cut into the icon's bottom-right corner
+    /// (its "StatusItem/paused" artwork). Elmers draws the same sign over its own character; the bars take the menu
+    /// bar's text color, resolved each time the image is drawn so they follow light and dark menu bars.
+    static func pausedVariant(of icon: NSImage) -> NSImage {
+        let image = NSImage(size: NSSize(width: 22, height: 22), flipped: false) { bounds in
+            icon.draw(in: NSRect(x: 0, y: 2, width: 20, height: 20))
+            let bars = [NSRect(x: 15, y: 1, width: 2.5, height: 8), NSRect(x: 19.5, y: 1, width: 2.5, height: 8)]
+            // A gap around the bars keeps them legible over the artwork.
+            NSGraphicsContext.current?.compositingOperation = .clear
+            for bar in bars { NSBezierPath(roundedRect: bar.insetBy(dx: -1.25, dy: -1.25), xRadius: 1.5, yRadius: 1.5).fill() }
+            NSGraphicsContext.current?.compositingOperation = .sourceOver
+            NSColor.labelColor.setFill()
+            for bar in bars { NSBezierPath(roundedRect: bar, xRadius: 0.75, yRadius: 0.75).fill() }
+            _ = bounds
+            return true
+        }
+        image.accessibilityDescription = String(localized: "Elmers clipboard history, paused")
+        return image
     }
 
     static func template(from source: NSImage, pointSize: CGFloat) -> NSImage? { render(source, pointSize: pointSize, template: true) }

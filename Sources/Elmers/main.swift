@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -6,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var panelController: PanelController!
     var statusItem: NSStatusItem!
     let shortcut = GlobalShortcut()
+    private var pausedObserver: AnyCancellable?
     func applicationDidFinishLaunching(_ notification: Notification) {
         model = AppModel()
         model.applyActivationPolicy()
@@ -18,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.toolTip = String(localized: "Elmers — Shift-Command-V · Right-click for more")
         }
         panelController.statusItemFrame = { [weak self] in self?.statusItem.button?.window?.frame }
+        pausedObserver = model.$paused.removeDuplicates().sink { [weak self] paused in self?.statusItem.button?.image = StatusIcon.make(paused: paused) }
         shortcut.onActivate = { [weak self] in self?.panelController.toggle() }
         model.shortcutsChanged = { [weak self] in
             guard let self else { return }
@@ -88,6 +91,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             model.start(); panelController.show()
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                 KeyboardInteractionChecks.capturePanel(self.panelController, name: "panel")
+                // The menu bar icon, normal and paused, at 4× on a light and a dark bar.
+                let icons = [StatusIcon.make(), StatusIcon.make(paused: true)]
+                let sheet = NSImage(size: NSSize(width: 200, height: 200), flipped: false) { _ in
+                    for (row, appearance) in [NSAppearance(named: .aqua)!, NSAppearance(named: .darkAqua)!].enumerated() {
+                        appearance.performAsCurrentDrawingAppearance {
+                            (row == 0 ? NSColor(white: 0.93, alpha: 1) : NSColor(white: 0.15, alpha: 1)).setFill()
+                            NSRect(x: 0, y: CGFloat(row) * 100, width: 200, height: 100).fill()
+                            for (column, icon) in icons.enumerated() { icon.draw(in: NSRect(x: 6 + CGFloat(column) * 100, y: CGFloat(row) * 100 + 6, width: 88, height: 88)) }
+                        }
+                    }
+                    return true
+                }
+                if let tiff = sheet.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
+                    try? png.write(to: URL(fileURLWithPath: directory).appendingPathComponent("status-icons.png"))
+                }
                 exit(0)
             }
             return

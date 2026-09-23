@@ -1,5 +1,9 @@
 # Paste parity inventory
 
+## September 23 — paused menu bar icon
+
+Paste 6.3.11's asset catalog has a "StatusItem/paused" image: its logo with a pause sign ("II") cut into the bottom-right corner. It also has the 17-frame "StatusItem/0…16" animation, in which the logo drops, tilts and settles back; what triggers it is still unobserved. Elmers now marks a paused history with the same sign in the same place over its own character. The bars take the menu bar's text color and leave a clear gap around them, and the paused state gets its own accessibility description. It was rendered on light and dark menu bars through `--show-panel`, which now also writes `status-icons.png`. Not done: the capture animation, until its trigger is seen.
+
 ## September 23 — localization
 
 Paste 6.3.11 ships 17 localizations: cs, da, de, en, es, fr, he, it, ja, ko, nl, pl, pt-BR, pt-PT, ru, zh-Hans and zh-Hant. Elmers was English-only.
