@@ -46,6 +46,7 @@ let searchFilters = SearchFilterTests()
 let colors = ColorTests()
 let rotation = ImageRotationTests()
 let lazy = LazyPayloadTests()
+let stackTests = PasteStackTests()
 let checks: [(String, () throws -> Void)] = [
     ("panel timing curves match Paste's recorded motion", motion.testPanelCurvesMatchPasteRecordings),
     ("deleted and replaced content leaves no trace on disk", security.testDeletedAndReplacedContentLeavesNoTraceOnDisk),
@@ -100,6 +101,7 @@ let checks: [(String, () throws -> Void)] = [
     ("Color is a filter chip and a typed keyword", colors.testColorIsAFilterAndATypedKeyword),
     ("image quarter turns move pixels exactly", rotation.testQuarterTurnsMovePixelsExactly),
     ("large representations load on demand", lazy.testLargeRepresentationsLoadOnDemand),
+    ("Paste Stack pastes in copy order until reversed", stackTests.testEntriesPasteInCopyOrderUntilReversed),
     ("renaming a lazy item keeps its stored bytes", lazy.testRenamingALazyItemKeepsItsStoredBytes),
     ("undoing a deletion restores retained bytes", lazy.testUndoingADeletionRestoresRetainedBytes),
     ("unreadable content is never saved partially", lazy.testUnreadableContentIsNeverSavedPartially),
