@@ -18,6 +18,11 @@ final class AppModel: ObservableObject {
     private var absorbingTypedFilter = false
     /// Paste's search mode: the field is open and the pinboard pills shrink to their icons.
     @Published var searchOpen = false
+    /// Whether the first direct paste without Accessibility access has already shown the guide.
+    var askedForAccessibility: Bool {
+        get { defaults.bool(forKey: "askedForAccessibility") }
+        set { defaults.set(newValue, forKey: "askedForAccessibility") }
+    }
     /// The item whose title is being edited in place, if any.
     @Published var renamingID: UUID?
     @Published var filtersOpen = false

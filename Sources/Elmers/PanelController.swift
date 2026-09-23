@@ -192,7 +192,13 @@ final class PanelController: NSObject, NSWindowDelegate {
         guard model.copy(item, plainText: plainText) else { return }
         guard model.directPaste else { hide(); showCopied(); return }
         SoundEffects.shared.play(.paste)
-        guard AXIsProcessTrusted() else { askForAccessibility(); return }
+        // Paste guides you through Accessibility "when you attempt to paste an item for the first time"; after that, an
+        // item picked without access is simply copied, with the Copied overlay offering Enable Direct Paste.
+        guard AXIsProcessTrusted() else {
+            if model.askedForAccessibility { hide(); showCopied() }
+            else { model.askedForAccessibility = true; askForAccessibility() }
+            return
+        }
         guard let target = previousApp, !target.isTerminated else {
             model.message = String(localized: "Copied. The previous app is unavailable; use ⌘V in your destination.")
             return
@@ -225,7 +231,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     /// Paste confirms a copy with a HUD near the bottom of the screen instead of a message in the panel.
     func showCopied() {
         SoundEffects.shared.play(.copy)
-        copiedHUD.show(on: panel.screen, offerDirectPaste: !model.directPaste)
+        copiedHUD.show(on: panel.screen, offerDirectPaste: !model.directPaste || !AXIsProcessTrusted())
     }
     private func attemptPaste(to target: NSRunningApplication, generation: Int, expectedChange: Int, attempts: Int) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
