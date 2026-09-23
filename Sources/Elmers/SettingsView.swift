@@ -265,7 +265,7 @@ private struct RadioIndicator: View {
 
 /// An original drawing beside the Paste Items choices: a history strip whose selected card goes either into an app
 /// window (direct paste) or onto the clipboard. Paste shows its own artwork here; this is not a copy of it.
-private struct PasteModeIllustration: View {
+struct PasteModeIllustration: View {
     let directPaste: Bool
     var body: some View {
         ZStack(alignment: .bottom) {

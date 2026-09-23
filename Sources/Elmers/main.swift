@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
     let shortcut = GlobalShortcut()
     private var pausedObserver: AnyCancellable?
+    private var onboarding: OnboardingController?
     func applicationDidFinishLaunching(_ notification: Notification) {
         model = AppModel()
         model.applyActivationPolicy()
@@ -155,7 +156,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         #endif
-        model.start(); panelController.show()
+        model.start()
+        if model.needsOnboarding {
+            // First run: the setup, then the panel on the Useful Links pinboard it leaves behind.
+            let onboarding = OnboardingController(model: model)
+            onboarding.finished = { [weak self] in
+                guard let self else { return }
+                self.model.seedUsefulLinks()
+                self.model.boardID = self.model.history.boards.first { $0.name == String(localized: "Useful Links") }?.id
+                self.panelController.show(resetState: false)
+                self.onboarding = nil
+            }
+            self.onboarding = onboarding
+            onboarding.show()
+            #if DEBUG
+            if let directory = ProcessInfo.processInfo.environment["ELMERS_CAPTURE_DIR"] {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                    if let view = NSApp.windows.first(where: { $0.isVisible && $0.title == String(localized: "Welcome") })?.contentView,
+                       let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+                        view.cacheDisplay(in: view.bounds, to: rep)
+                        let step = ProcessInfo.processInfo.environment["ELMERS_ONBOARDING_STEP"] ?? "welcome"
+                        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: directory).appendingPathComponent("onboarding-\(step).png"))
+                    }
+                    exit(0)
+                }
+            }
+            #endif
+            return
+        }
+        panelController.show()
     }
     @objc func statusItemClicked() {
         if NSApp.currentEvent?.type == .rightMouseUp { presentStatusMenu(statusMenu()) }

@@ -38,6 +38,8 @@ public final class HistoryStore: @unchecked Sendable {
     public var migratedArchiveURL: URL { directory.appendingPathComponent("history.plist.migrated") }
     var stagingURL: URL { directory.appendingPathComponent("history.sqlite.migrating") }
     public private(set) var lastSave = SaveStatistics()
+    /// True when `load()` created an empty database: no earlier history, database or archive, existed. First run.
+    public private(set) var createdEmptyDatabase = false
     private var database: SQLiteDatabase?
     private var savedItems: [UUID: StoredItem] = [:]
     private var savedBoards: [Pinboard] = []
@@ -61,6 +63,7 @@ public final class HistoryStore: @unchecked Sendable {
             try files.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
             let legacy = files.fileExists(atPath: legacyArchiveURL.path) ? Self.canonical(try Archive(url: legacyArchiveURL).load()) : nil
             try build(legacy ?? History())
+            createdEmptyDatabase = legacy == nil
             if let legacy {
                 let converted = try Self.read(Self.open(stagingURL, readOnly: true))
                 try Self.verify(converted, matches: legacy)

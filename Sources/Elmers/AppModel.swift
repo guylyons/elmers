@@ -18,6 +18,35 @@ final class AppModel: ObservableObject {
     private var absorbingTypedFilter = false
     /// Paste's search mode: the field is open and the pinboard pills shrink to their icons.
     @Published var searchOpen = false
+    /// Paste's first run leaves a Useful Links pinboard with a welcome note, three short guides and help links. Elmers
+    /// adapts the wording (it has no sync) and links to its own guide and issue tracker.
+    func seedUsefulLinks() {
+        guard canEdit, !history.boards.contains(where: { $0.name == String(localized: "Useful Links") }) else { return }
+        createBoard(name: String(localized: "Useful Links"))
+        guard let board = history.boards.last else { return }
+        let notes: [(String, String)] = [
+            (String(localized: "Welcome Aboard"), String(localized: "We've pinned a few links here to help you get the most out of Elmers.\n\nTo open any link, select Open in the context menu or use ⌘O shortcut.")),
+            (String(localized: "Keep"), String(localized: "Access and reuse anything you've copied.\n\nActivate Elmers using ⇧⌘V, select the items, and press the return key to paste them into any app.")),
+            (String(localized: "Organize"), String(localized: "Pin items to pinboards using the context menu or drag-and-drop.\n\nPinned items are not deleted when you clear your history.")),
+            (String(localized: "Search"), String(localized: "Start typing to search. Filter by content type or the source app.\n\nFor example, search for “mail link meeting slides” to find a link to the slides you copied from Mail.")),
+            (String(localized: "Getting Started"), Onboarding.guideURL.absoluteString),
+            (String(localized: "Help and Support"), Onboarding.supportURL.absoluteString),
+        ]
+        // Captured oldest first so the welcome note ends up at the front of the pinboard.
+        for (title, body) in notes.reversed() {
+            let item = history.capture(.text(body), source: "Elmers")
+            history.renameItem(item.id, title: title)
+            history.pin(item.id, to: board.id)
+        }
+        persist()
+    }
+    /// Set once the first-run setup has been completed or dismissed.
+    var onboardingCompleted: Bool {
+        get { defaults.bool(forKey: "onboardingCompleted") }
+        set { defaults.set(newValue, forKey: "onboardingCompleted") }
+    }
+    /// A brand-new history (no earlier database or archive) gets the first-run setup.
+    var needsOnboarding: Bool { !onboardingCompleted && (store.createdEmptyDatabase || ProcessInfo.processInfo.arguments.contains("--show-onboarding")) }
     /// Whether the first direct paste without Accessibility access has already shown the guide.
     var askedForAccessibility: Bool {
         get { defaults.bool(forKey: "askedForAccessibility") }
