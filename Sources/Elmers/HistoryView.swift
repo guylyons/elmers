@@ -16,7 +16,7 @@ struct HistoryView: View {
         VStack(spacing: 0) {
             toolbar.frame(height: 60)
             if let message = model.message {
-                HStack { Text(message).font(.system(size: 12)); Spacer(); Button { model.message = nil } label: { Image(systemName: "xmark.circle.fill") }.buttonStyle(.plain) }
+                HStack { Text(message).font(.system(size: 12)); Spacer(); Button { model.message = nil } label: { Image(systemName: "xmark.circle.fill") }.accessibilityLabel("Close").buttonStyle(.plain) }
                     .padding(.horizontal, 24).padding(.bottom, 6)
             }
             if model.visibleItems.isEmpty { emptyState }
@@ -112,10 +112,10 @@ struct HistoryView: View {
                     // Paste 6.3.11: 7.5 pt between pills, about 15 pt between a pill and the search or + button.
                     HStack(spacing: 7.5) {
                         Button { openSearch() } label: { Image(systemName: "magnifyingglass").font(.system(size: 17)) }
-                            .buttonStyle(.plain).frame(width: 34, height: 34).contentShape(Circle()).hoverHighlight(Circle()).padding(.horizontal, 7).help("Search (⌘F)")
+                            .buttonStyle(.plain).frame(width: 34, height: 34).contentShape(Circle()).hoverHighlight(Circle()).padding(.horizontal, 7).help("Search (⌘F)").accessibilityLabel("Search")
                         boardPills(collapsed: false)
                         Button { editingBoard = nil; boardName = ""; boardDialog = true } label: { Image(systemName: "plus").font(.system(size: 17)) }
-                            .buttonStyle(.plain).frame(width: 34, height: 34).contentShape(Circle()).hoverHighlight(Circle()).padding(.horizontal, 7).help("Create Pinboard (⇧⌘N)").disabled(!model.canEdit)
+                            .buttonStyle(.plain).frame(width: 34, height: 34).contentShape(Circle()).hoverHighlight(Circle()).padding(.horizontal, 7).help("Create Pinboard (⇧⌘N)").accessibilityLabel("Create Pinboard").disabled(!model.canEdit)
                     }.font(.system(size: 13)).padding(.horizontal, 60)
                 }
                 HStack {

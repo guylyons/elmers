@@ -360,10 +360,10 @@ private struct PrivacySettings: View {
                 if model.excludedBundleIDs.isEmpty { Text("No items").font(.system(size: 13)).foregroundStyle(.secondary).frame(height: 40) }
                 Rectangle().fill(SettingsStyle.separator).frame(height: 0.5)
                 HStack(spacing: 0) {
-                    Button { addApplication() } label: { Image(systemName: "plus").frame(width: 22, height: 22) }.help("Add Application")
+                    Button { addApplication() } label: { Image(systemName: "plus").frame(width: 22, height: 22) }.help("Add Application").accessibilityLabel("Add Application")
                     Rectangle().fill(SettingsStyle.separator).frame(width: 0.5, height: 12)
                     Button { if let selectedApp { model.includeApp(bundleID: selectedApp); self.selectedApp = nil } } label: { Image(systemName: "minus").frame(width: 22, height: 22) }
-                        .disabled(selectedApp == nil).help("Remove Application")
+                        .disabled(selectedApp == nil).help("Remove Application").accessibilityLabel("Remove Application")
                     Spacer()
                 }.buttonStyle(.borderless).font(.system(size: 12)).padding(.horizontal, 2).frame(height: 24)
             }
@@ -469,7 +469,7 @@ private struct ShortcutSettingsView: View {
                 ShortcutRecorder(binding: binding, title: title) { model.shortcutRecordingChanged?($0) }.frame(width: 121, height: 25)
                 Button { binding.wrappedValue = nil } label: { Image(systemName: "xmark").font(.system(size: 9, weight: .semibold)).frame(width: 20, height: 25) }
                     .buttonStyle(.plain).foregroundStyle(Color.white.opacity(0.8)).opacity(binding.wrappedValue == nil ? 0 : 1)
-                    .disabled(binding.wrappedValue == nil).help("Remove").padding(.trailing, 2)
+                    .disabled(binding.wrappedValue == nil).help("Remove").accessibilityLabel("Remove").padding(.trailing, 2)
             }
         }
     }

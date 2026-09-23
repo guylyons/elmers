@@ -249,3 +249,5 @@
 "This screenshot format is not supported yet. Use PNG, JPEG, TIFF or HEIC in macOS." = "Ce format de capture d’écran n’est pas encore pris en charge. Utilisez PNG, JPEG, TIFF ou HEIC dans macOS.";
 "This shortcut cannot be used because it is already used by the menu item ‘%@’." = "Ce raccourci ne peut pas être utilisé car il est déjà utilisé par l'élément de menu '%@'.";
 "This shortcut is already used by a clipboard command. Choose another combination." = "Ce raccourci est déjà utilisé par une commande du presse-papiers. Choisissez une autre combinaison.";
+"Close" = "Fermer";
+"Create Pinboard" = "Créer un tableau d'affichage";

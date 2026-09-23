@@ -249,3 +249,5 @@
 "This screenshot format is not supported yet. Use PNG, JPEG, TIFF or HEIC in macOS." = "尚不支持此截屏格式。请在 macOS 中使用 PNG、JPEG、TIFF 或 HEIC。";
 "This shortcut cannot be used because it is already used by the menu item ‘%@’." = "由于菜单项 \"%@\" 已使用该快捷键，因此无法使用。";
 "This shortcut is already used by a clipboard command. Choose another combination." = "此快捷键已被剪贴板命令使用。请选择其他组合。";
+"Close" = "关闭";
+"Create Pinboard" = "创建 Pinboard";

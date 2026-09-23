@@ -249,3 +249,5 @@
 "This screenshot format is not supported yet. Use PNG, JPEG, TIFF or HEIC in macOS." = "Este formato de captura aún no es compatible. Usa PNG, JPEG, TIFF o HEIC en macOS.";
 "This shortcut cannot be used because it is already used by the menu item ‘%@’." = "Este atajo no se puede usar porque ya lo utiliza el elemento de menú ‘%@’.";
 "This shortcut is already used by a clipboard command. Choose another combination." = "Este atajo ya lo usa un comando del portapapeles. Elige otra combinación.";
+"Close" = "Cerrar";
+"Create Pinboard" = "Crear Pinboard";
