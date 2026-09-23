@@ -458,11 +458,11 @@ final class AppModel: ObservableObject {
             }
         }
     }
-    /// Unpinned items are deleted; pinned ones leave Clipboard History and stay in their pinboards.
+    /// Unpinned items are deleted; pinned ones leave Clipboard History and stay in their pinboards. As Paste's
+    /// confirmation says, this cannot be undone (an undo record would have to hold the whole history in memory).
     func eraseHistory() {
         guard canEdit else { return }
-        rememberItems(Set(history.items.map(\.id)))
-        history.eraseHistory(); selection.clear(); persist()
+        history.eraseHistory(); selection.clear(); undoManager.removeAllActions(); persist()
     }
     var excludedBundleIDs: [String] {
         excludedApps.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
