@@ -140,9 +140,12 @@ struct CardView: View {
                     .font(.system(size: 13, weight: .medium)).lineLimit(4)
             }.padding(13)
         } else {
-            Text(item.text.isEmpty ? "\(item.payload.items.count) clipboard item(s)" : String(item.text.prefix(1600)))
-                .font(.system(size: 13)).foregroundStyle(Color(nsColor: .textColor))
-                .frame(maxWidth: .infinity, alignment: .topLeading).padding(13)
+            if item.text.isEmpty { PreviewUnavailable(compact: true) }
+            else {
+                Text(String(item.text.prefix(1600)))
+                    .font(.system(size: 13)).foregroundStyle(Color(nsColor: .textColor))
+                    .frame(maxWidth: .infinity, alignment: .topLeading).padding(13)
+            }
         }
     }
 }
@@ -195,9 +198,24 @@ struct ItemPreview: View {
                     ScrollView { Text(text).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }.frame(maxHeight: 120)
                 }
             }
-            else { ScrollView { Text(item.text.isEmpty ? "No text preview available." : item.text).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) } }
+            else if item.text.isEmpty { PreviewUnavailable(compact: false) }
+            else { ScrollView { Text(item.text).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) } }
             Text(item.copiedAt.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
         }.padding(24).frame(minWidth: 480, minHeight: 320)
+    }
+}
+
+/// Paste 6.3.11's wording for content it keeps but cannot draw: "Preview unavailable" / "Preview can't be shown, but the
+/// content is saved, and you're able to paste it". Paste's layout for this state has not been seen.
+struct PreviewUnavailable: View {
+    let compact: Bool
+    var body: some View {
+        VStack(spacing: compact ? 4 : 8) {
+            Text("Preview unavailable").font(.system(size: compact ? 13 : 17, weight: .semibold))
+            Text("Preview can’t be shown, but the\u{00A0}content is saved, and\u{00A0}you’re able to\u{00A0}paste it")
+                .font(.system(size: compact ? 12 : 13)).foregroundStyle(.secondary)
+        }
+        .multilineTextAlignment(.center).padding(compact ? 13 : 24).frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
