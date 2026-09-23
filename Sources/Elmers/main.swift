@@ -96,7 +96,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let sheet = NSImage(size: NSSize(width: 200, height: 200), flipped: false) { _ in
                     for (row, appearance) in [NSAppearance(named: .aqua)!, NSAppearance(named: .darkAqua)!].enumerated() {
                         appearance.performAsCurrentDrawingAppearance {
-                            (row == 0 ? NSColor(white: 0.93, alpha: 1) : NSColor(white: 0.15, alpha: 1)).setFill()
+                            let bar = row == 0 ? NSColor(white: 0.93, alpha: 1) : NSColor(white: 0.15, alpha: 1)
+                            bar.setFill()
                             NSRect(x: 0, y: CGFloat(row) * 100, width: 200, height: 100).fill()
                             for (column, icon) in icons.enumerated() { icon.draw(in: NSRect(x: 6 + CGFloat(column) * 100, y: CGFloat(row) * 100 + 6, width: 88, height: 88)) }
                         }

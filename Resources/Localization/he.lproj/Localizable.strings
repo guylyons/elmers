@@ -212,3 +212,4 @@
 "This screenshot format is not supported yet. Use PNG, JPEG, TIFF or HEIC in macOS." = "פורמט צילום המסך הזה עדיין לא נתמך. השתמש ב־PNG, JPEG, TIFF או HEIC ב־macOS.";
 "This shortcut cannot be used because it is already used by the menu item ‘%@’." = "לא ניתן להשתמש בקיצור דרך זה מכיוון שהוא כבר נמצא בשימוש על ידי פריט התפריט '%@'.";
 "This shortcut is already used by a clipboard command. Choose another combination." = "קיצור המקשים הזה כבר בשימוש של פקודת לוח. בחר צירוף אחר.";
+"Elmers clipboard history, paused" = "היסטוריית הלוח של Elmers, מושהית";

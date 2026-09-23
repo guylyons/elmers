@@ -212,3 +212,4 @@
 "This screenshot format is not supported yet. Use PNG, JPEG, TIFF or HEIC in macOS." = "Этот формат снимков экрана пока не поддерживается. Используйте в macOS PNG, JPEG, TIFF или HEIC.";
 "This shortcut cannot be used because it is already used by the menu item ‘%@’." = "Это сочетание клавиш нельзя использовать, так как оно уже используется пунктом меню '%@'.";
 "This shortcut is already used by a clipboard command. Choose another combination." = "Это сочетание клавиш уже используется командой буфера обмена. Выберите другое.";
+"Elmers clipboard history, paused" = "История буфера обмена Elmers, приостановлена";

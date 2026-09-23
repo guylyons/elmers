@@ -212,3 +212,4 @@
 "This screenshot format is not supported yet. Use PNG, JPEG, TIFF or HEIC in macOS." = "Tento formát snímku obrazovky zatím není podporován. V macOS použijte PNG, JPEG, TIFF nebo HEIC.";
 "This shortcut cannot be used because it is already used by the menu item ‘%@’." = "Tuto klávesovou zkratku nelze použít, protože ji již používá položka nabídky '%@'.";
 "This shortcut is already used by a clipboard command. Choose another combination." = "Tuto zkratku už používá příkaz schránky. Vyberte jinou kombinaci.";
+"Elmers clipboard history, paused" = "Historie schránky Elmers, pozastaveno";

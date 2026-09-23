@@ -212,3 +212,4 @@
 "This screenshot format is not supported yet. Use PNG, JPEG, TIFF or HEIC in macOS." = "Ten format zrzutu ekranu nie jest jeszcze obsługiwany. Używaj PNG, JPEG, TIFF lub HEIC w macOS.";
 "This shortcut cannot be used because it is already used by the menu item ‘%@’." = "Tego skrótu nie można użyć, ponieważ jest on już używany przez pozycję menu '%@'.";
 "This shortcut is already used by a clipboard command. Choose another combination." = "Ten skrót jest już używany przez polecenie schowka. Wybierz inną kombinację.";
+"Elmers clipboard history, paused" = "Historia schowka Elmers, wstrzymana";

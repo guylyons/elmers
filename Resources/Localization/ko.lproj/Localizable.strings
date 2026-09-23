@@ -212,3 +212,4 @@
 "This screenshot format is not supported yet. Use PNG, JPEG, TIFF or HEIC in macOS." = "이 스크린샷 포맷은 아직 지원되지 않습니다. macOS에서 PNG, JPEG, TIFF 또는 HEIC를 사용하십시오.";
 "This shortcut cannot be used because it is already used by the menu item ‘%@’." = "이 바로 가기는 메뉴 항목 '%@' 에서 이미 사용하고 있으므로 사용할 수 없습니다.";
 "This shortcut is already used by a clipboard command. Choose another combination." = "이 단축키는 이미 클립보드 명령에서 사용 중입니다. 다른 조합을 선택하십시오.";
+"Elmers clipboard history, paused" = "Elmers 클립보드 내역, 일시 정지됨";
