@@ -165,7 +165,7 @@
 "Sound effects" = "Zvukové efekty";
 "Statistics" = "Statistiky";
 "Text" = "Text";
-"The Pinboard will be deleted. Its items stay in Clipboard History. You can undo this with ⌘Z." = "Nástěnka bude smazána. Její položky zůstanou v historii schránky. Můžete to vrátit pomocí ⌘Z.";
+"The Pinboard and all its content will be deleted. You can undo this with ⌘Z." = "Nástěnka Pinboard a veškerý její obsah budou odstraněny. Můžete to vrátit pomocí ⌘Z.";
 "The history shortcut is in use by another app. Quit Paste to use the same shortcut in Elmers." = "Zkratku pro historii používá jiná aplikace. Ukončete Paste, abyste mohli stejnou zkratku použít v Elmers.";
 "The original content could not be read, so this edit was not applied." = "Původní obsah se nepodařilo přečíst, proto úprava nebyla použita.";
 "The original screenshot file can’t be found. You can still copy or paste the image saved in Elmers." = "Původní soubor snímku nebyl nalezen. Obrázek uložený v Elmers můžete dál kopírovat nebo vkládat.";

@@ -165,7 +165,7 @@
 "Sound effects" = "Geluidseffecten";
 "Statistics" = "Statistieken";
 "Text" = "Tekst";
-"The Pinboard will be deleted. Its items stay in Clipboard History. You can undo this with ⌘Z." = "Het prikbord wordt verwijderd. De items blijven in de klembordgeschiedenis. Je kunt dit ongedaan maken met ⌘Z.";
+"The Pinboard and all its content will be deleted. You can undo this with ⌘Z." = "Het prikbord en alle inhoud wordt verwijderd. Je kunt dit ongedaan maken met ⌘Z.";
 "The history shortcut is in use by another app. Quit Paste to use the same shortcut in Elmers." = "De toetscombinatie voor de geschiedenis wordt door een andere app gebruikt. Stop Paste om dezelfde toetscombinatie in Elmers te gebruiken.";
 "The original content could not be read, so this edit was not applied." = "De oorspronkelijke inhoud kon niet worden gelezen, dus deze wijziging is niet toegepast.";
 "The original screenshot file can’t be found. You can still copy or paste the image saved in Elmers." = "Het oorspronkelijke bestand van de schermafbeelding is niet gevonden. Je kunt de in Elmers bewaarde afbeelding nog steeds kopiëren of plakken.";

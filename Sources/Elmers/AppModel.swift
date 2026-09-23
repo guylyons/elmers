@@ -419,7 +419,12 @@ final class AppModel: ObservableObject {
             }
         }
     }
-    func eraseHistory() { deleteItems(history.items.filter { $0.boardIDs.isEmpty }); selection.clear() }
+    /// Unpinned items are deleted; pinned ones leave Clipboard History and stay in their pinboards.
+    func eraseHistory() {
+        guard canEdit else { return }
+        rememberItems(Set(history.items.map(\.id)))
+        history.eraseHistory(); selection.clear(); persist()
+    }
     var excludedBundleIDs: [String] {
         excludedApps.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
     }
@@ -431,14 +436,40 @@ final class AppModel: ObservableObject {
     private func rememberUndo(_ action: @escaping @MainActor (AppModel) -> Void) {
         undoManager.registerUndo(withTarget: self) { target in MainActor.assumeIsolated { action(target) } }
     }
-    func pin(_ item: ClipboardItem, to board: Pinboard) {
-        guard canEdit, !item.boardIDs.contains(board.id) else { return }
-        rememberUndo { $0.unpin(item, from: board.id) }; history.pin(item.id, to: board.id); persist()
+    /// Records the items as they are now, content included, so undo can put them back even when the change deletes
+    /// them (unpinning an item that has left history, Erase History).
+    private func rememberItems(_ ids: Set<UUID>) {
+        let before = history.items.filter { ids.contains($0.id) }
+        for item in before { try? item.payload.retainDeferred() }
+        rememberUndo { $0.restoreSnapshot(before, ids: ids) }
     }
-    func unpin(_ item: ClipboardItem, from board: UUID) {
-        guard canEdit, let pinboard = history.boards.first(where: { $0.id == board }) else { return }
-        rememberUndo { model in if let current = model.history.items.first(where: { $0.id == item.id }) { model.pin(current, to: pinboard) } }
-        history.unpin(item.id, from: board); persist()
+    private func restoreSnapshot(_ items: [ClipboardItem], ids: Set<UUID>) {
+        rememberItems(ids)
+        for item in items { history.replaceItem(item) }
+        persist()
+    }
+    /// Pinning moves items into `board` (Paste: one pinboard per item).
+    func pin(_ items: [ClipboardItem], to board: Pinboard) {
+        let moving = items.filter { !$0.boardIDs.contains(board.id) }
+        guard canEdit, !moving.isEmpty else { return }
+        rememberItems(Set(moving.map(\.id)))
+        for item in moving.reversed() { history.pin(item.id, to: board.id) }
+        persist()
+    }
+    func pin(_ item: ClipboardItem, to board: Pinboard) { pin([item], to: board) }
+    func unpin(_ items: [ClipboardItem], from board: UUID) {
+        guard canEdit, !items.isEmpty else { return }
+        rememberItems(Set(items.map(\.id)))
+        for item in items { history.unpin(item.id, from: board) }
+        persist()
+    }
+    func unpin(_ item: ClipboardItem, from board: UUID) { unpin([item], from: board) }
+    /// Drag and drop inside a pinboard: moves `ids` just before `target`, or to the end.
+    func movePinned(_ ids: [UUID], before target: UUID?, in board: UUID) {
+        guard canEdit, !ids.isEmpty else { return }
+        rememberItems(Set(history.filtered(boardID: board).map(\.id)))
+        for id in ids { history.movePinned(id, before: target, in: board) }
+        persist()
     }
     func delete(_ item: ClipboardItem) { deleteItems([item]) }
     func deleteItems(_ items: [ClipboardItem]) {
@@ -469,12 +500,14 @@ final class AppModel: ObservableObject {
     }
     func deleteBoard(_ board: Pinboard) {
         guard canEdit, let index = history.boards.firstIndex(where: { $0.id == board.id }) else { return }
-        let pinned = Set(history.items.filter { $0.boardIDs.contains(board.id) }.map(\.id))
-        rememberUndo { $0.restore(board, at: index, pins: pinned) }
+        // Deleting a pinboard deletes its items, so the undo record keeps them, content still in the database included.
+        let pinned = history.items.filter { $0.boardIDs.contains(board.id) }
+        for item in pinned { try? item.payload.retainDeferred() }
+        rememberUndo { $0.restore(board, at: index, items: pinned) }
         history.deleteBoard(board.id); if boardID == board.id { boardID = nil }; persist()
     }
-    private func restore(_ board: Pinboard, at index: Int, pins: Set<UUID>) {
-        rememberUndo { $0.deleteBoard(board) }; history.restoreBoard(board, at: index, pinnedIDs: pins); persist()
+    private func restore(_ board: Pinboard, at index: Int, items: [ClipboardItem]) {
+        rememberUndo { $0.deleteBoard(board) }; history.restoreBoard(board, at: index, items: items); persist()
     }
     func recolorBoard(_ board: Pinboard, color: Int) {
         guard canEdit else { return }; history.recolorBoard(board.id, color: color); persist()

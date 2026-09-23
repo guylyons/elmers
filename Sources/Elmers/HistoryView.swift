@@ -36,6 +36,11 @@ struct HistoryView: View {
                                         if !model.hasSearch { model.searchOpen = false; model.filtersOpen = false }
                                     },
                                                                   dragItems: { frame, image in DragSupport.draggingItems(for: item, frame: frame, image: image) }))
+                                    .onDrop(of: [DragSupport.itemIDsType.rawValue], isTargeted: nil) { providers in
+                                        // Inside a pinboard, a card dropped on another moves in front of it.
+                                        guard let board = model.boardID, !model.hasSearch else { return false }
+                                        return DragSupport.droppedItemIDs(providers) { ids in model.movePinned(ids, before: item.id, in: board) }
+                                    }
                                     .contextMenu { itemMenu(item) }
                                     .accessibilityAddTraits(.isButton)
                                     .accessibilityLabel("\(item.kind.title), \(item.source), \(String(item.text.prefix(140)))")
@@ -81,7 +86,7 @@ struct HistoryView: View {
         .alert("Delete “\(deletingBoard?.name ?? "")”?", isPresented: Binding(get: { deletingBoard != nil }, set: { if !$0 { deletingBoard = nil } })) {
             Button("Delete", role: .destructive) { if let board = deletingBoard { model.deleteBoard(board) } }
             Button("Cancel", role: .cancel) {}
-        } message: { Text("The Pinboard will be deleted. Its items stay in Clipboard History. You can undo this with ⌘Z.") }
+        } message: { Text("The Pinboard and all its content will be deleted. You can undo this with ⌘Z.") }
         .sheet(isPresented: $helpVisible) { KeyboardHelp() }
     }
     private var searching: Bool { model.searchOpen || model.hasSearch }
@@ -136,9 +141,11 @@ struct HistoryView: View {
         ForEach(model.history.boards) { board in
             boardPill(board.name, symbol: nil, color: CardView.colors[board.colorIndex % CardView.colors.count], selected: model.boardID == board.id, collapsed: collapsed) { model.boardID = board.id }
                 .draggable(board.id.uuidString)
-                .dropDestination(for: String.self) { ids, _ in
-                    guard let id = ids.first.flatMap(UUID.init), id != board.id else { return false }
-                    model.reorderBoard(id, before: board.id); return true
+                // A card dropped here is pinned to this pinboard (Paste: pin "by dragging it into a pinboard");
+                // another pill dropped here moves before it.
+                .onDrop(of: [DragSupport.itemIDsType.rawValue, "public.utf8-plain-text"], isTargeted: nil) { providers in
+                    DragSupport.droppedItemIDs(providers) { ids in model.pin(model.history.items.filter { ids.contains($0.id) }, to: board) }
+                        || DragSupport.droppedBoardID(providers) { id in if id != board.id { model.reorderBoard(id, before: board.id) } }
                 }
                 .contextMenu {
                     Button("Rename") { renamingItem = nil; editingBoard = board; boardName = board.name; boardDialog = true }
@@ -215,14 +222,14 @@ struct HistoryView: View {
         Menu("Pin") {
             ForEach(model.history.boards) { board in
                 let pinned = model.selectedItems.allSatisfy { $0.boardIDs.contains(board.id) }
-                Button { model.selectedItems.forEach { pinned ? model.unpin($0, from: board.id) : model.pin($0, to: board) } } label: {
+                Button { pinned ? model.unpin(model.selectedItems, from: board.id) : model.pin(model.selectedItems, to: board) } label: {
                     Label(board.name, systemImage: pinned ? "checkmark.circle.fill" : "circle.fill").tint(CardView.colors[board.colorIndex % CardView.colors.count])
                 }
             }
             if !model.history.boards.isEmpty { Divider() }
             Button("Create Pinboard…") { renamingItem = nil; editingBoard = nil; boardName = ""; boardDialog = true }
         }.disabled(!model.canEdit)
-        if let board = model.boardID { Button("Unpin") { model.selectedItems.forEach { model.unpin($0, from: board) } } }
+        if let board = model.boardID { Button("Unpin") { model.unpin(model.selectedItems, from: board) } }
         Divider()
         Button("Preview") { model.preview?(item) }.keyboardShortcut(.space, modifiers: [])
         if item.kind.isImage, let image = imagePreview(item) { ShareLink("Share…", item: Image(nsImage: image), preview: SharePreview(item.title ?? item.kind.title, image: Image(nsImage: image))) }

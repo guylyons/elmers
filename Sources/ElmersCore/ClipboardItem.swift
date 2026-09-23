@@ -189,6 +189,11 @@ public struct ClipboardItem: Codable, Identifiable, Equatable, Sendable {
     /// Text recognized in an image item; empty string records that recognition ran and found nothing.
     public var recognizedText: String? { didSet { refreshSearchKey() } }
     public var screenshot: ScreenshotOrigin?
+    /// False once the item has left Clipboard History (by age, Erase History or deletion there) while it stays pinned.
+    /// Paste 6.3.11 keeps pinned items in their pinboard "even when they're no longer part of your clipboard history".
+    public var inHistory = true
+    /// The item's place in its pinboard, lowest first; pinboards are ordered by hand, not by copy time.
+    public var pinPosition: Double = 0
     /// Decoded image identity, computed off the main thread for cross-source screenshot duplicates.
     public var imageDigest: String?
     private var cachedText = ""
@@ -207,10 +212,11 @@ public struct ClipboardItem: Codable, Identifiable, Equatable, Sendable {
     }
     init(id: UUID, payload: ClipboardPayload, source: String, sourceBundleID: String?, copiedAt: Date, boardIDs: Set<UUID>,
          title: String?, fingerprint: String, linkPreview: LinkPreview?, recognizedText: String?,
-         screenshot: ScreenshotOrigin?, imageDigest: String?) {
+         screenshot: ScreenshotOrigin?, imageDigest: String?, inHistory: Bool = true, pinPosition: Double = 0) {
         self.id = id; self.payload = payload; self.source = source; self.sourceBundleID = sourceBundleID
         self.copiedAt = copiedAt; self.boardIDs = boardIDs; self.title = title; self.fingerprint = fingerprint
         self.linkPreview = linkPreview; self.recognizedText = recognizedText; self.screenshot = screenshot; self.imageDigest = imageDigest
+        self.inHistory = inHistory; self.pinPosition = pinPosition
         refreshMetadata()
     }
     private mutating func refreshMetadata() {
@@ -226,7 +232,7 @@ public struct ClipboardItem: Codable, Identifiable, Equatable, Sendable {
     /// The folding search applies to both the items and the typed words.
     public static func fold(_ text: String) -> String { text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil) }
     // Optional additions preserve backwards decoding of the v1 archive.
-    private enum CodingKeys: String, CodingKey { case id, payload, source, sourceBundleID, copiedAt, boardIDs, title, fingerprint, linkPreview, recognizedText, screenshot, imageDigest }
+    private enum CodingKeys: String, CodingKey { case id, payload, source, sourceBundleID, copiedAt, boardIDs, title, fingerprint, linkPreview, recognizedText, screenshot, imageDigest, inHistory, pinPosition }
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         id = try values.decode(UUID.self, forKey: .id)
@@ -241,6 +247,8 @@ public struct ClipboardItem: Codable, Identifiable, Equatable, Sendable {
         recognizedText = try values.decodeIfPresent(String.self, forKey: .recognizedText)
         screenshot = try values.decodeIfPresent(ScreenshotOrigin.self, forKey: .screenshot)
         imageDigest = try values.decodeIfPresent(String.self, forKey: .imageDigest)
+        inHistory = try values.decodeIfPresent(Bool.self, forKey: .inHistory) ?? true
+        pinPosition = try values.decodeIfPresent(Double.self, forKey: .pinPosition) ?? 0
         refreshMetadata()
     }
 }

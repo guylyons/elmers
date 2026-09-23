@@ -82,16 +82,56 @@ final class HistoryTests {
         history.pin(pinned.id, to: board.id)
         history.prune(before: Date(timeIntervalSince1970: 200), limit: 100)
         XCTAssertEqual(history.items.map(\.text), ["keep"])
+        // Paste keeps pinned items in their pinboard "even when they're no longer part of your clipboard history".
+        XCTAssertTrue(history.filtered().isEmpty)
+        XCTAssertEqual(history.filtered(boardID: board.id).map(\.text), ["keep"])
+        XCTAssertEqual(history.filtered(query: "keep").map(\.text), ["keep"])
+        // Copying it again brings it back into history.
+        history.capture(.text("keep"), source: "Notes")
+        XCTAssertEqual(history.filtered().map(\.text), ["keep"])
     }
 
-    func testDeletingBoardPreservesClipboardItem() {
+    func testDeletingBoardRemovesItsItems() {
+        // Paste: "Deleting a pinboard also removes all items inside it."
         var history = History()
-        let item = history.capture(.text("keep"), source: "Notes")
+        let item = history.capture(.text("pinned"), source: "Notes")
+        let other = history.capture(.text("unpinned"), source: "Notes")
         let board = history.createBoard(name: "Saved")
         history.pin(item.id, to: board.id)
         history.deleteBoard(board.id)
-        XCTAssertEqual(history.items.count, 1)
-        XCTAssertTrue(history.items[0].boardIDs.isEmpty)
+        XCTAssertEqual(history.items.map(\.id), [other.id])
+    }
+
+    func testPinningMovesBetweenPinboardsAndOrdersByHand() {
+        var history = History()
+        let a = history.capture(.text("a"), source: "Notes"), b = history.capture(.text("b"), source: "Notes"), c = history.capture(.text("c"), source: "Notes")
+        let work = history.createBoard(name: "Work"), home = history.createBoard(name: "Home")
+        history.pin(a.id, to: work.id); history.pin(b.id, to: work.id); history.pin(c.id, to: work.id)
+        // Each newly pinned item goes to the front.
+        XCTAssertEqual(history.filtered(boardID: work.id).map(\.text), ["c", "b", "a"])
+        // "Each item can belong to one pinboard at a time. Moving an item to another pinboard simply moves it there."
+        history.pin(b.id, to: home.id)
+        XCTAssertEqual(history.filtered(boardID: work.id).map(\.text), ["c", "a"])
+        XCTAssertEqual(history.items.first { $0.id == b.id }?.boardIDs, [home.id])
+        // Items inside a pinboard are reordered by hand, independent of copy time.
+        history.movePinned(a.id, before: c.id, in: work.id)
+        XCTAssertEqual(history.filtered(boardID: work.id).map(\.text), ["a", "c"])
+        history.movePinned(a.id, before: nil, in: work.id)
+        XCTAssertEqual(history.filtered(boardID: work.id).map(\.text), ["c", "a"])
+    }
+
+    func testEraseHistoryKeepsPinnedItemsInTheirPinboards() {
+        var history = History()
+        let pinned = history.capture(.text("pinned"), source: "Notes")
+        history.capture(.text("gone"), source: "Notes")
+        let board = history.createBoard(name: "Saved")
+        history.pin(pinned.id, to: board.id)
+        history.eraseHistory()
+        XCTAssertTrue(history.filtered().isEmpty)
+        XCTAssertEqual(history.filtered(boardID: board.id).map(\.text), ["pinned"])
+        // Unpinned now, it has nowhere to live.
+        history.unpin(pinned.id, from: board.id)
+        XCTAssertTrue(history.items.isEmpty)
     }
 
     func testArchiveRoundTripPreservesBinaryFormatsAndBoards() throws {

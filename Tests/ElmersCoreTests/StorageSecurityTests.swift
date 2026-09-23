@@ -102,7 +102,9 @@ extension StorageSecurityTests {
         let url = directory.appendingPathComponent("history.sqlite")
         var db: OpaquePointer?
         XCTAssertEqual(sqlite3_open(url.path, &db), SQLITE_OK)
-        XCTAssertEqual(sqlite3_exec(db, "PRAGMA journal_mode = WAL; " + HistoryStore.migrations[1]! + "; PRAGMA user_version = 1;", nil, nil, nil), SQLITE_OK)
+        // A current-schema database, so the open below needs no migration (which would wait for the write lock).
+        let schema = (1...HistoryStore.schemaVersion).map { HistoryStore.migrations[$0]! }.joined(separator: "; ")
+        XCTAssertEqual(sqlite3_exec(db, "PRAGMA journal_mode = WAL; " + schema + "; PRAGMA user_version = \(HistoryStore.schemaVersion);", nil, nil, nil), SQLITE_OK)
         // Another process mid-write keeps VACUUM from running.
         XCTAssertEqual(sqlite3_exec(db, "BEGIN IMMEDIATE;", nil, nil, nil), SQLITE_OK)
         let history = try HistoryStore(directory: directory).load()

@@ -305,7 +305,8 @@ final class KeyboardInteractionChecks {
         let dragging = DragSupport.draggingItems(for: item, frame: NSRect(x: 0, y: 0, width: 235, height: 236), image: nil)
         let written = dragging.compactMap { $0.item as? NSPasteboardItem }
         guard written.count == 2,
-              Set(written[0].types.map(\.rawValue)) == ["public.utf8-plain-text", "public.rtf"],
+              Set(written[0].types.map(\.rawValue)) == ["public.utf8-plain-text", "public.rtf", DragSupport.itemIDsType.rawValue],
+              written[0].string(forType: DragSupport.itemIDsType) == item.id.uuidString, written[1].types.count == 1,
               written[0].data(forType: .rtf) == Data("{\\rtf1 dragged}".utf8),
               written[1].data(forType: .fileURL) == fileURL.dataRepresentation else {
             print("FAIL: drag items \(written.map { $0.types.map(\.rawValue) })"); fflush(stdout); exit(1)

@@ -165,7 +165,7 @@
 "Sound effects" = "음향 효과";
 "Statistics" = "통계";
 "Text" = "텍스트";
-"The Pinboard will be deleted. Its items stay in Clipboard History. You can undo this with ⌘Z." = "핀보드가 삭제됩니다. 항목은 클립보드 내역에 남습니다. ⌘Z로 실행 취소할 수 있습니다.";
+"The Pinboard and all its content will be deleted. You can undo this with ⌘Z." = "핀보드와 모든 콘텐츠가 삭제됩니다. ⌘Z로 실행 취소할 수 있습니다.";
 "The history shortcut is in use by another app. Quit Paste to use the same shortcut in Elmers." = "기록 단축키를 다른 앱이 사용하고 있습니다. Elmers에서 같은 단축키를 사용하려면 Paste를 종료하십시오.";
 "The original content could not be read, so this edit was not applied." = "원래 내용을 읽을 수 없어 편집 내용이 적용되지 않았습니다.";
 "The original screenshot file can’t be found. You can still copy or paste the image saved in Elmers." = "원본 스크린샷 파일을 찾을 수 없습니다. Elmers에 저장된 이미지는 계속 복사하거나 붙여넣을 수 있습니다.";

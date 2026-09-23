@@ -165,7 +165,7 @@
 "Sound effects" = "Effets sonores";
 "Statistics" = "Statistiques";
 "Text" = "Texte";
-"The Pinboard will be deleted. Its items stay in Clipboard History. You can undo this with ⌘Z." = "Le tableau d’affichage sera supprimé. Ses éléments restent dans l’historique du presse-papiers. Vous pouvez annuler avec ⌘Z.";
+"The Pinboard and all its content will be deleted. You can undo this with ⌘Z." = "Le tableau d'affichage et tout son contenu seront supprimés. Vous pouvez annuler avec ⌘Z.";
 "The history shortcut is in use by another app. Quit Paste to use the same shortcut in Elmers." = "Le raccourci de l’historique est utilisé par une autre app. Quittez Paste pour utiliser le même raccourci dans Elmers.";
 "The original content could not be read, so this edit was not applied." = "Le contenu d’origine n’a pas pu être lu ; la modification n’a donc pas été appliquée.";
 "The original screenshot file can’t be found. You can still copy or paste the image saved in Elmers." = "Le fichier de capture d’origine est introuvable. Vous pouvez toujours copier ou coller l’image enregistrée dans Elmers.";

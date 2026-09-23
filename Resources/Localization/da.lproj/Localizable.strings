@@ -165,7 +165,7 @@
 "Sound effects" = "Lydeffekter";
 "Statistics" = "Statistik";
 "Text" = "Tekst";
-"The Pinboard will be deleted. Its items stay in Clipboard History. You can undo this with ⌘Z." = "Pinboardet slettes. Dets emner bliver i udklipshistorikken. Du kan fortryde med ⌘Z.";
+"The Pinboard and all its content will be deleted. You can undo this with ⌘Z." = "Pinboardet og alt dets indhold vil blive slettet. Du kan fortryde med ⌘Z.";
 "The history shortcut is in use by another app. Quit Paste to use the same shortcut in Elmers." = "Genvejen til historikken bruges af en anden app. Afslut Paste for at bruge den samme genvej i Elmers.";
 "The original content could not be read, so this edit was not applied." = "Det oprindelige indhold kunne ikke læses, så ændringen blev ikke anvendt.";
 "The original screenshot file can’t be found. You can still copy or paste the image saved in Elmers." = "Det oprindelige skærmbilledarkiv kan ikke findes. Du kan stadig kopiere eller indsætte billedet, der er gemt i Elmers.";

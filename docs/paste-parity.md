@@ -1,5 +1,20 @@
 # Paste parity inventory
 
+## September 23 — pinboards as Paste documents them
+
+Source: Paste's Help Center, "Organize with Pinboards" (documented behavior; the Paste on this Mac was not driven for these). Quotes are from that page.
+
+| Behavior | Paste | Elmers status |
+|---|---|---|
+| One pinboard per item | "Each item can belong to one pinboard at a time. Moving an item to another pinboard simply moves it there." | **implemented**: pinning moves the item; it goes to the front of the pinboard. Existing multi-pinboard items are left as they are |
+| Deleting a pinboard | "Deleting a pinboard also removes all items inside it." Its alert: "The Pinboard and all its content will be deleted." | **implemented**, with one deliberate difference: Paste says it cannot be undone, and Elmers keeps ⌘Z (the undo record keeps the items, content included). The alert says so |
+| Pinned items after retention | "Pinned items are kept in your pinboards even when they're no longer part of your clipboard history." | **implemented**: aging out and Erase History take pinned items out of Clipboard History (`inHistory`) and leave them in their pinboard. Search still finds them. Copying one again brings it back into history, and unpinning one that has left history removes it |
+| Order inside a pinboard | "Items inside a pinboard can be reordered using drag and drop." | **implemented**: pinboards show a hand-made order (`pinPosition`); dropping a card on another card inside a pinboard moves it in front |
+| Pin by dragging | "drag-and-drop into a pinboard" | **implemented**: a card dropped on a pinboard pill is pinned there. Cards carry a private `app.elmers.item-ids` type that other apps ignore |
+| Unpin from either place | "Pinning an item doesn't take it out of your clipboard history — it stays there too, and you can unpin it from either place." | as before |
+
+Storage: schema version 2 (`items.in_history`, `pins.position`). The explicit migration is checked on a version-1 file with a pinned item, and a read-only open still reads version-1 files. An earlier Elmers build refuses a version-2 database rather than touching it; roll back with `ElmersCoreChecks --storage-backup-plist`. Checks: core 68/68, with new checks for deleting a pinboard, moving and ordering, Erase History, retention and the migration; `--check-interaction` passes in full (twice, on an idle Mac). **Not verified by hand:** dropping a card on a pill or another card with a real pointer, and Paste's own drop feedback.
+
 ## September 23 — paused menu bar icon
 
 Paste 6.3.11's asset catalog has a "StatusItem/paused" image: its logo with a pause sign ("II") cut into the bottom-right corner. It also has the 17-frame "StatusItem/0…16" animation, in which the logo drops, tilts and settles back; what triggers it is still unobserved. Elmers now marks a paused history with the same sign in the same place over its own character. The bars take the menu bar's text color and leave a clear gap around them, and the paused state gets its own accessibility description. It was rendered on light and dark menu bars through `--show-panel`, which now also writes `status-icons.png`. Not done: the capture animation, until its trigger is seen.
@@ -37,7 +52,7 @@ Source: `Paste.app/Contents/Resources/PastePackages_PasteLocalization.bundle` (6
 | Erase History | "Are you sure you want to erase your Clipboard History?" / "Pinned items and Pinboards won't be deleted. This action cannot be undone." | adopted |
 | Ignore Applications, empty | "No items" | adopted |
 | Writing Tools | Card menu "Writing Tools"; the editor toolbar has Writing Tools, Bold, Italic, Underline, Strikethrough, Rotate left/right (images), Discard/Save changes | menu item added. **Image rotate added**: Edit (⌘E or the menu) on an image opens the editor with Rotate left and Rotate right in place of the text tools; Save writes the turned image as PNG (`ImageRotation`, which moves pixels exactly). The editor's text area had been rendering one line tall with the footer near the top; it now fills the window. Paste's image editor itself has not been seen, so its layout is unverified |
-| Delete Pinboard | "The Pinboard and all its content will be deleted. This action cannot be undone." | **differs**: Elmers keeps the items in Clipboard History and supports ⌘Z. Paste's behavior needs a test pinboard to confirm |
+| Delete Pinboard | "The Pinboard and all its content will be deleted. This action cannot be undone." | **implemented September 23** (see "pinboards as Paste documents them") |
 | Delete selected items | "Delete selected items?" confirmation | **open**: when Paste asks (count threshold, buttons) is unobserved; Elmers deletes without asking |
 | Direct paste prompt | "Do you want to paste directly to %@?" · "Paste needs accessibility access to paste directly to other apps." · Not Now, Copy to Clipboard / Enable Accessibility Access | **implemented from the strings**: with "To active app" chosen and no Accessibility access, a sheet on the panel asks "Do you want to paste directly to <app>?" (Enable Accessibility Access opens the system prompt and the Privacy pane; Not Now, Copy to Clipboard shows the Copied overlay). The item is already on the clipboard either way. Paste's presentation is unobserved |
 | Onboarding (macOS) | Intro "A Better Way to Copy and Paste" · Get Started → Quick Start (Activation shortcut, Clipboard history with "Unlimited history may increase your disk space usage", iCloud sync, Run in background) → "Paste to Any App" accessibility request (Allow Access, I'll Do It Later, I'm Having an Issue, Open System Settings) → a Useful Links pinboard with Welcome Aboard, Keep, Organize and Search notes and help links | **open**: Elmers has no onboarding. Paste's first run cannot be replayed without resetting its data, so this rests on the strings |

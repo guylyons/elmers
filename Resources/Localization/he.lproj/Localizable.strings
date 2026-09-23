@@ -165,7 +165,7 @@
 "Sound effects" = "אפקטים קוליים";
 "Statistics" = "סטטיסטיקה";
 "Text" = "מלל";
-"The Pinboard will be deleted. Its items stay in Clipboard History. You can undo this with ⌘Z." = "לוח הפינלים יימחק. הפריטים שלו יישארו בהיסטוריית הלוח. ניתן לבטל עם ⌘Z.";
+"The Pinboard and all its content will be deleted. You can undo this with ⌘Z." = "לוח הסיכה וכל תוכנו יימחקו. ניתן לבטל עם ⌘Z.";
 "The history shortcut is in use by another app. Quit Paste to use the same shortcut in Elmers." = "קיצור המקשים של ההיסטוריה נמצא בשימוש של יישום אחר. צא מ־Paste כדי להשתמש באותו קיצור ב־Elmers.";
 "The original content could not be read, so this edit was not applied." = "לא ניתן היה לקרוא את התוכן המקורי, ולכן העריכה לא הוחלה.";
 "The original screenshot file can’t be found. You can still copy or paste the image saved in Elmers." = "קובץ צילום המסך המקורי לא נמצא. עדיין ניתן להעתיק או להדביק את התמונה השמורה ב־Elmers.";

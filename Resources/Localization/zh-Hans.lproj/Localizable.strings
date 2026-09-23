@@ -165,7 +165,7 @@
 "Sound effects" = "音效";
 "Statistics" = "统计信息";
 "Text" = "文本";
-"The Pinboard will be deleted. Its items stay in Clipboard History. You can undo this with ⌘Z." = "此 Pinboard 将被删除。其中的项目会保留在剪贴板历史记录中。你可以用 ⌘Z 撤销。";
+"The Pinboard and all its content will be deleted. You can undo this with ⌘Z." = "此 Pinboard 及其所有内容将被删除。你可以用 ⌘Z 撤销。";
 "The history shortcut is in use by another app. Quit Paste to use the same shortcut in Elmers." = "历史记录快捷键正被其他 App 使用。退出 Paste 即可在 Elmers 中使用相同的快捷键。";
 "The original content could not be read, so this edit was not applied." = "无法读取原始内容，因此未应用此编辑。";
 "The original screenshot file can’t be found. You can still copy or paste the image saved in Elmers." = "找不到原始截屏文件。你仍可以拷贝或粘贴存储在 Elmers 中的图像。";

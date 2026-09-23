@@ -107,7 +107,7 @@ final class HistoryStoreTests {
         history.renameItem(image.id, title: "Receipt, March")
         try store.save(history)
         XCTAssertEqual(store.lastSave, .init(itemsWritten: 1))
-        let board = history.boards[0]
+        let board = history.boards.first { image.boardIDs.contains($0.id) }!
         history.unpin(image.id, from: board.id)
         try store.save(history)
         XCTAssertEqual(store.lastSave, .init(itemsWritten: 1))
@@ -136,19 +136,21 @@ final class HistoryStoreTests {
         _ = try store.load()
         try store.save(history)
         let work = history.boards.first { $0.name == "Work" }!
-        let pinned = Set(history.items.filter { $0.boardIDs.contains(work.id) }.map(\.id))
+        let pinned = history.items.filter { $0.boardIDs.contains(work.id) }
         let workIndex = history.boards.firstIndex(of: work)!
         let receipt = history.items.first { $0.title == "Receipt" }!
+        // Deleting a pinboard deletes its items; undoing brings both back.
         history.deleteBoard(work.id); try store.save(history)
-        history.restoreBoard(work, at: workIndex, pinnedIDs: pinned); try store.save(history)
+        let afterDeletion = try HistoryStore(directory: directory).load()
+        XCTAssertNil(afterDeletion.items.first { $0.id == receipt.id })
+        history.restoreBoard(work, at: workIndex, items: pinned); try store.save(history)
         history.delete(receipt.id); try store.save(history)
-        let images = history.boards.first { $0.name == "Images" }!
-        history.deleteBoard(images.id); try store.save(history)
         history.restoreItems([receipt]); try store.save(history)
         let restored = try HistoryStore(directory: directory).load()
-        XCTAssertEqual(restored.items, history.items)
+        // Two fixture items share a copy time; restored rows are newer, so compare by identity rather than tie order.
+        XCTAssertEqual(restored.items.sorted { $0.id.uuidString < $1.id.uuidString }, history.items.sorted { $0.id.uuidString < $1.id.uuidString })
         XCTAssertEqual(restored.boards, history.boards)
-        XCTAssertEqual(restored.items.first { $0.id == receipt.id }?.boardIDs, [images.id, work.id])
+        XCTAssertEqual(restored.items.first { $0.id == receipt.id }?.boardIDs, [work.id])
     }
 
     func testLegacyArchiveIsConvertedOnceAndKept() throws {
@@ -617,5 +619,48 @@ final class HistoryStoreTests {
         try writer.save(history)
         let again = try HistoryStore(directory: directory, readOnly: true).load()
         XCTAssertEqual(again.boards.map(\.name), ["Notes", "Jobs", "Travel", "Home", "Kept"])
+    }
+}
+
+extension HistoryStoreTests {
+    /// A version 1 database, as the previous release left it, opens with every item still in history, its pins and
+    /// content intact, and is upgraded in place to version 2.
+    func testVersionOneDatabaseMigratesWithoutLoss() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("elmers-store-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent("history.sqlite")
+        var db: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(url.path, &db), SQLITE_OK)
+        let item = UUID().uuidString, board = UUID().uuidString
+        let sql = HistoryStore.migrations[1]! + """
+            ; INSERT INTO items (id, copied_at, source, fingerprint, payload_item_count) VALUES ('\(item)', 1000, 'Notes', 'fp', 1);
+            INSERT INTO representations (item_id, item_index, type, data) VALUES ('\(item)', 0, 'public.utf8-plain-text', CAST('kept' AS BLOB));
+            INSERT INTO boards (id, name, color_index, position) VALUES ('\(board)', 'Work', 3, 0);
+            INSERT INTO pins (item_id, board_id) VALUES ('\(item)', '\(board)');
+            PRAGMA user_version = 1;
+            """
+        XCTAssertEqual(sqlite3_exec(db, sql, nil, nil, nil), SQLITE_OK)
+        sqlite3_close(db)
+        // Read-only opens do not migrate, but still read the old file.
+        let readOnly = try HistoryStore(directory: directory, readOnly: true).load()
+        XCTAssertEqual(readOnly.items.map(\.text), ["kept"])
+        let store = HistoryStore(directory: directory)
+        var history = try store.load()
+        XCTAssertEqual(history.items.map(\.text), ["kept"])
+        XCTAssertTrue(history.items[0].inHistory)
+        XCTAssertEqual(history.items[0].boardIDs.map(\.uuidString), [board])
+        XCTAssertEqual(history.boards.map(\.name), ["Work"])
+        XCTAssertEqual(pragma(url, "user_version"), HistoryStore.schemaVersion)
+        // The new columns are written and read back.
+        history.eraseHistory(); try store.save(history)
+        let reloaded = try HistoryStore(directory: directory).load()
+        XCTAssertEqual(reloaded.items.map(\.inHistory), [false])
+        XCTAssertTrue(reloaded.filtered().isEmpty)
+    }
+    private func pragma(_ url: URL, _ name: String) -> Int {
+        var db: OpaquePointer?; sqlite3_open_v2(url.path, &db, SQLITE_OPEN_READONLY, nil); defer { sqlite3_close(db) }
+        var statement: OpaquePointer?; sqlite3_prepare_v2(db, "PRAGMA \(name)", -1, &statement, nil); defer { sqlite3_finalize(statement) }
+        return sqlite3_step(statement) == SQLITE_ROW ? Int(sqlite3_column_int64(statement, 0)) : -1
     }
 }

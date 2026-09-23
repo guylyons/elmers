@@ -25,7 +25,7 @@ public final class HistoryStore: @unchecked Sendable {
             }
         }
     }
-    public static let schemaVersion = 1
+    public static let schemaVersion = 2
     /// Representations up to this size are read with the item; larger ones stay in the database until used, so a
     /// long history of images does not have to fit in memory. Text types are always read, whatever their size,
     /// because titles, search and the item's type come from them.
@@ -236,6 +236,12 @@ public final class HistoryStore: @unchecked Sendable {
             item_id TEXT NOT NULL REFERENCES items (id) ON DELETE CASCADE, board_id TEXT NOT NULL,
             PRIMARY KEY (item_id, board_id)
         );
+        """,
+        // Version 2: pinned items can leave Clipboard History while staying in their pinboard, and pinboards keep a
+        // hand-made order. Existing items stay in history, in their current order.
+        2: """
+        ALTER TABLE items ADD COLUMN in_history INTEGER NOT NULL DEFAULT 1;
+        ALTER TABLE pins ADD COLUMN position REAL NOT NULL DEFAULT 0;
         """
     ]
 
@@ -264,17 +270,21 @@ public final class HistoryStore: @unchecked Sendable {
             }
         }
         let reader = RepresentationReader(url: database.url)
+        // A read-only open does not migrate, so a version 1 file is read without the version 2 columns.
+        let current = try database.integer("PRAGMA user_version") >= 2
         var pins: [String: Set<UUID>] = [:]
-        let pinRows = try database.prepare("SELECT item_id, board_id FROM pins")
+        var positions: [String: Double] = [:]
+        let pinRows = try database.prepare(current ? "SELECT item_id, board_id, position FROM pins" : "SELECT item_id, board_id, 0 FROM pins")
         while try pinRows.step() {
             guard let item = pinRows.text(0), let board = pinRows.text(1).flatMap(UUID.init(uuidString:)) else { throw StoreError.damaged("pin row") }
             pins[item, default: []].insert(board)
+            positions[item] = min(positions[item] ?? .infinity, pinRows.double(2))
         }
         let boards = try readBoards(database)
         var items: [ClipboardItem] = []
         let rows = try database.prepare("""
             SELECT id, copied_at, source, source_bundle_id, title, fingerprint, payload_item_count, recognized_text, image_digest,
-                   link_title, link_image, link_attempted, screenshot_url, screenshot_identity, screenshot_bookmark
+                   link_title, link_image, link_attempted, screenshot_url, screenshot_identity, screenshot_bookmark, \(current ? "in_history" : "1")
             FROM items ORDER BY copied_at DESC, rowid DESC
             """)
         while try rows.step() {
@@ -291,7 +301,8 @@ public final class HistoryStore: @unchecked Sendable {
             items.append(ClipboardItem(id: id, payload: payload, source: source, sourceBundleID: rows.text(3),
                                        copiedAt: Date(timeIntervalSinceReferenceDate: rows.double(1)), boardIDs: pins[key] ?? [],
                                        title: rows.text(4), fingerprint: fingerprint, linkPreview: preview,
-                                       recognizedText: rows.text(7), screenshot: screenshot, imageDigest: rows.text(8)))
+                                       recognizedText: rows.text(7), screenshot: screenshot, imageDigest: rows.text(8),
+                                       inHistory: rows.int(15) != 0, pinPosition: positions[key] ?? 0))
         }
         return History(items: items, boards: boards)
     }
@@ -318,17 +329,19 @@ public final class HistoryStore: @unchecked Sendable {
         }
         let upsert = try database.prepare("""
             INSERT INTO items (id, copied_at, source, source_bundle_id, title, fingerprint, payload_item_count, recognized_text,
-                               image_digest, link_title, link_image, link_attempted, screenshot_url, screenshot_identity, screenshot_bookmark)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                               image_digest, link_title, link_image, link_attempted, screenshot_url, screenshot_identity, screenshot_bookmark,
+                               in_history)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (id) DO UPDATE SET
                 copied_at = excluded.copied_at, source = excluded.source, source_bundle_id = excluded.source_bundle_id,
                 title = excluded.title, fingerprint = excluded.fingerprint, payload_item_count = excluded.payload_item_count,
                 recognized_text = excluded.recognized_text, image_digest = excluded.image_digest, link_title = excluded.link_title,
                 link_image = excluded.link_image, link_attempted = excluded.link_attempted, screenshot_url = excluded.screenshot_url,
-                screenshot_identity = excluded.screenshot_identity, screenshot_bookmark = excluded.screenshot_bookmark
+                screenshot_identity = excluded.screenshot_identity, screenshot_bookmark = excluded.screenshot_bookmark,
+                in_history = excluded.in_history
             """)
         let clearPins = try database.prepare("DELETE FROM pins WHERE item_id = ?")
-        let insertPin = try database.prepare("INSERT INTO pins (item_id, board_id) VALUES (?, ?)")
+        let insertPin = try database.prepare("INSERT INTO pins (item_id, board_id, position) VALUES (?, ?, ?)")
         let clearRepresentations = try database.prepare("DELETE FROM representations WHERE item_id = ?")
         let insertRepresentation = try database.prepare("INSERT INTO representations (item_id, item_index, type, data) VALUES (?, ?, ?, ?)")
         for item in history.items.reversed() {
@@ -351,12 +364,13 @@ public final class HistoryStore: @unchecked Sendable {
                 optional(item.title), .text(item.fingerprint), .int(item.payload.itemCount), optional(item.recognizedText),
                 optional(item.imageDigest), optional(item.linkPreview?.title), optional(item.linkPreview?.image),
                 item.linkPreview.map { .int($0.attempted ? 1 : 0) } ?? .null,
-                optional(item.screenshot?.originalURL.absoluteString), optional(item.screenshot?.fileIdentity), optional(item.screenshot?.bookmark)
+                optional(item.screenshot?.originalURL.absoluteString), optional(item.screenshot?.fileIdentity), optional(item.screenshot?.bookmark),
+                .int(item.inHistory ? 1 : 0)
             ])
             statistics.itemsWritten += 1
-            if previous?.boardIDs != item.boardIDs {
+            if previous?.boardIDs != item.boardIDs || previous?.pinPosition != item.pinPosition {
                 try clearPins.run([key])
-                for board in item.boardIDs { try insertPin.run([key, .text(board.uuidString)]) }
+                for board in item.boardIDs { try insertPin.run([key, .text(board.uuidString), .double(item.pinPosition)]) }
             }
             if previous?.fingerprint != item.fingerprint {
                 try clearRepresentations.run([key])
@@ -544,9 +558,11 @@ final class RepresentationReader: @unchecked Sendable {
 private struct StoredItem: Equatable {
     let fingerprint: String, source: String, sourceBundleID: String?, copiedAt: Date, boardIDs: Set<UUID>, title: String?
     let linkPreview: LinkPreview?, recognizedText: String?, screenshot: ScreenshotOrigin?, imageDigest: String?
+    let inHistory: Bool, pinPosition: Double
     init(_ item: ClipboardItem) {
         fingerprint = item.fingerprint; source = item.source; sourceBundleID = item.sourceBundleID; copiedAt = item.copiedAt
         boardIDs = item.boardIDs; title = item.title; linkPreview = item.linkPreview; recognizedText = item.recognizedText
         screenshot = item.screenshot; imageDigest = item.imageDigest
+        inHistory = item.inHistory; pinPosition = item.pinPosition
     }
 }
