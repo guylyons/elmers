@@ -230,6 +230,9 @@ final class AppModel: ObservableObject {
     /// Synthetic cards for hand checks such as a physical drag into another app. Demo mode only, so the
     /// real history is never read or written.
     private func seedDemoFixtures() {
+        // ELMERS_FIXTURE_COUNT adds that many text cards, so the row overflows and scrolls.
+        let extra = Int(ProcessInfo.processInfo.environment["ELMERS_FIXTURE_COUNT"] ?? "") ?? 0
+        for index in stride(from: extra, to: 0, by: -1) { history.capture(.text("Fixture card \(index)"), source: "Notes") }
         let files = (1...2).map { FileManager.default.temporaryDirectory.appendingPathComponent("Elmers drag fixture \($0).txt") }
         for file in files { try? Data("Elmers drag fixture file\n".utf8).write(to: file) }
         history.capture(.init(items: files.map { [NSPasteboard.PasteboardType.fileURL.rawValue: Data($0.absoluteString.utf8)] }), source: "Finder")

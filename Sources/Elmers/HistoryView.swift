@@ -53,7 +53,9 @@ struct HistoryView: View {
                     // Paste 6.3.11: cards start 8 pt below the 60-pt toolbar and end 24 pt above the panel's bottom
                     // edge. A taller scroll view would center them vertically instead.
                     .frame(height: CardView.height + 16)
-                    .scrollIndicators(.hidden)
+                    // `.hidden` still lets macOS show a scroller when scroll bars are set to always show (or a mouse
+                    // is connected); that scroller took the bottom of the card row and clipped the cards. Paste shows none.
+                    .scrollIndicators(.never)
                     .onChange(of: model.selectedID) { _, id in
                         if let id { withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo(id) } }
                     }
