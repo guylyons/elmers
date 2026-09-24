@@ -42,5 +42,5 @@ SwiftPM only (Swift 5.9, macOS 14+, no Xcode project, no third-party deps).
 
 ## Git
 
-- Commit directly on `main`, then push to both remotes: `origin` (sourcehut) and `github`.
+- Commit directly on `main`, then push to `github` only. The `origin` (sourcehut) remote is retired; never push to it.
 - Subject: imperative, sentence case, no prefix, no trailing period, describing behavior (e.g. "Never capture a blank copy"). Doc-only commits use `docs:`. The body is prose explaining cause and fix, citing Paste 6.3.11 measurements where relevant.

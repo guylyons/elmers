@@ -40,7 +40,7 @@
   encoded, so a screenshot needs a stored marker on `ClipboardItem`. Note `SearchQuery` already maps the
   word "screenshot" to the Image filter; that mapping moves to the new category.)
 
-- [implemented 2026-09-19; reference comparison pending] match Paste's card font sizes
+- [done 2026-09-24; approved by the user] match Paste's card font sizes
   (Restored the recorded Paste 6.3.11 measurements: title 15 semibold, time 12, body/link/file
   text 13, footer 12. Kept the 235×236 card and 50-pt header; inspected the synthetic panel render.
   Fresh same-state comparison with Paste remains pending because computer-use tools were unavailable.)
@@ -65,7 +65,7 @@
   Regression reproduced with a 150-pt offset before the fix and passed afterwards. Failed-paste
   re-show still preserves state. Physical global-shortcut verification remains pending.)
 
-- [fixed 2026-09-21; measured in a synthetic check, feel on real history pending] there is a bit of latency when scrolling images, we need to get this down
+- [fixed 2026-09-21; confirmed fast on real history by the user 2026-09-24] there is a bit of latency when scrolling images, we need to get this down
   (reported by the user: scrolling the history feels sluggish once image cards are on screen. Likely
   full-size image decoding on the main thread during scroll rather than cached, downsampled thumbnails.
   Measure first — instrument scroll-frame time with image-heavy history — then cache decoded
@@ -79,7 +79,7 @@
   not prewarmed) p95 7.4 ms, max 11.8 ms. Cards not yet decoded show an empty image area for a moment
   before the thumbnail appears. The Space preview, sharing and drags still use the full image.
 
-- [implemented 2026-09-21; listening check pending] Sound effects. Add a small set of UI sounds tied to clipboard actions:
+- [done 2026-09-24; approved by the user after listening] Sound effects. Add a small set of UI sounds tied to clipboard actions:
   a short double-click ("click-click") when an image is grabbed from the
   clipboard, and a distinct confirmation tone on copy. Needs a decision on the
   audio backend, where the asset files live, and a preference to mute them.
