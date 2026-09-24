@@ -98,3 +98,10 @@
   an image — still counts as content. Note: Paste 6.3.11 itself records empty and whitespace-only
   copies as cards (observed with marker content on 2026-09-22); dropping them is a deliberate
   departure at the user's request.)
+
+- [fixed 2026-09-23] the animation blinks/flickers when clicking search
+  (A 60 fps recording of the toolbar showed the focus ring vanishing for one frame as the field finished
+  growing, then closing in again from its soft halo over 0.2 s. The ring was held on until focus arrived, but
+  that hold was released two run-loop turns after focus was requested, before SwiftUI reported the field
+  focused. The hold now ends when focus is reported, with a 0.5 s fallback. Re-recorded after a real click on
+  the magnifier and after ⌘F: the ring stays on from mid-open into focus.)

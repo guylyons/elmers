@@ -95,7 +95,7 @@ struct SearchField: View {
             var instant = Transaction(); instant.disablesAnimations = true
             guard isExpanded else {
                 focused.wrappedValue = false
-                withTransaction(instant) { settled = false; ringArrived = false }
+                withTransaction(instant) { settled = false; ringArrived = false; awaitingFocus = false }
                 DispatchQueue.main.async { textShown = false }
                 return
             }
@@ -111,11 +111,16 @@ struct SearchField: View {
                         if let editor = NSApp.keyWindow?.firstResponder as? NSTextView {
                             editor.setSelectedRange(NSRange(location: (editor.string as NSString).length, length: 0))
                         }
-                        awaitingFocus = false
                     }
                 }
+                // Normally cleared when focus arrives (below); this only covers focus never arriving, e.g. the panel
+                // losing key status meanwhile, so the ring doesn't stay on an unfocused field.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { if !focused.wrappedValue { awaitingFocus = false } }
             }
         }
+        // FocusState reports the field's focus a few turns after it is requested. Clearing the wait any earlier left a
+        // frame with neither, and the ring blinked out and closed in again from its halo.
+        .onChange(of: focused.wrappedValue) { _, isFocused in if isFocused { awaitingFocus = false } }
     }
     /// Until the field settles and takes focus, the ring stands for the focus it is about to get.
     private var ringShown: Bool { expanded && ringArrived && (awaitingFocus || focused.wrappedValue) }
