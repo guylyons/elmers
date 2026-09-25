@@ -142,6 +142,13 @@ final class KeyboardInteractionChecks {
         view.cacheDisplay(in: view.bounds, to: rep)
         try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: directory).appendingPathComponent("\(name).png"))
     }
+    /// The first view under `root`, depth first, that satisfies `test`.
+    static func subview(of root: NSView?, where test: (NSView) -> Bool) -> NSView? {
+        guard let root else { return nil }
+        if test(root) { return root }
+        for child in root.subviews { if let found = subview(of: child, where: test) { return found } }
+        return nil
+    }
     /// Paste 6.3.11's search mode: ⌘F opens the field, a second ⌘F opens the filter chips, chips combine as tokens,
     /// and Escape steps back one layer at a time (popover, then query and tokens, then search mode).
     static func checkSearchMode(model: AppModel, controller: PanelController) {
@@ -161,8 +168,18 @@ final class KeyboardInteractionChecks {
             key(3, "f", .command)
             after(0.4) {
                 guard model.filtersOpen else { fail("a second ⌘F did not open the filter chips") }
+                // Paste 6.3.11 at 2560 pt: filter button 1572–1591, popover 1408–1874 (466 wide) with its arrow 173 pt in,
+                // on the button's center.
+                guard let button = (subview(of: controller.panel.contentView, where: { $0 is FilterPopoverAnchor.AnchorView }) as? FilterPopoverAnchor.AnchorView)?.buttonFrameOnScreen,
+                      let popoverWindow = NSApp.windows.first(where: { $0.isVisible && String(describing: type(of: $0)).contains("Popover") })
+                else { fail("could not find the filter button and its popover") }
+                let arrow = popoverWindow.responds(to: NSSelectorFromString("anchorPoint")) ? (popoverWindow.value(forKey: "anchorPoint") as? NSPoint)?.x ?? -1 : -1
+                print("filter button \(button.minX)–\(button.maxX), popover \(popoverWindow.frame.minX)–\(popoverWindow.frame.maxX), arrow \(arrow)")
+                guard popoverWindow.frame.width == 466, abs(popoverWindow.frame.minX - (button.midX - 173)) <= 2, abs(popoverWindow.frame.minX + arrow - button.midX) <= 2
+                else { fail("filter popover should sit with its arrow 173 pt in, on the button's center, as Paste's does") }
                 if let directory = ProcessInfo.processInfo.environment["ELMERS_CAPTURE_DIR"],
-                   let popover = NSApp.windows.first(where: { $0.isVisible && String(describing: type(of: $0)).contains("Popover") }), let view = popover.contentView,
+                   // The popover's frame view, which draws the chips; its content view alone came out without them.
+                   let view = popoverWindow.contentView?.superview ?? popoverWindow.contentView,
                    let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
                     view.cacheDisplay(in: view.bounds, to: rep)
                     try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: directory).appendingPathComponent("filter-popover.png"))

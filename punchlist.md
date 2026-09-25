@@ -20,7 +20,7 @@ Open items for 1:1 parity with Paste 6.3.11, compiled on 2026-09-25 from `docs/p
 
 ## Known differences
 
-- [ ] Filter popover sits 56 pt left of Paste's
+- [x] Filter popover sits 56 pt left of Paste's
 - [ ] Selected pinboard pill is flat; Paste's has a faint gradient
 - [ ] Search open: Paste's first-frame field jump and briefly hidden dots
 

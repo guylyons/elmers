@@ -69,13 +69,18 @@ struct SearchField: View {
                         .animation(expanded ? .easeOut(duration: 0.12) : .easeIn(duration: TimingCurve.searchCloseDuration)) { $0.opacity(expanded ? 1 : 0) }
                 }
                 .buttonStyle(.plain).foregroundStyle(.secondary).padding(.trailing, 7).help("Filters (⌘F)").accessibilityLabel("filter")
-                .popover(isPresented: $model.filtersOpen, arrowEdge: .top) { FilterPopover(model: model) }
                 .allowsHitTesting(expanded)
             }
         }
         .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading).frame(height: expanded ? Self.height : 34)
         .background(Capsule().fill(Color.primary.opacity(expanded ? 0.09 : hovered ? 0.07 : 0)))
         .clipShape(Capsule().inset(by: -6))
+        // The filter popover's anchor: the filter button's frame (19×34, 7 pt from the right end) extended to the right,
+        // outside the clip, which would otherwise hide the part NSPopover is positioned against.
+        .overlay(alignment: .trailing) {
+            FilterPopoverAnchor(model: model, isOpen: model.filtersOpen).frame(width: 19 + 2 * FilterPopoverAnchor.bodyOffset, height: 34)
+                .padding(.trailing, 7 - 2 * FilterPopoverAnchor.bodyOffset).accessibilityHidden(true)
+        }
         // The keyboard focus ring: 4 pt of the focus color hugging the outside of the capsule. As AppKit's focus ring
         // does in Paste, it arrives partway through opening, closing in on the still-growing field from 12 pt out, soft, as it
         // fades in, and is gone the moment search closes or the field loses focus (never trailing the shrinking field).
@@ -210,6 +215,75 @@ struct FilterIcon: View {
     }
 }
 
+/// Presents the filter popover from the filter button as Paste 6.3.11 does: the arrow on the button's center, 173 pt
+/// from the left of the 466-pt popover, so the body sits 60 pt right of centered (measured at 2560 pt: button
+/// 1572–1591, popover 1408–1874). SwiftUI's `.popover` can only center the body over its arrow, so this is an
+/// `NSPopover` positioned against a rect 60 pt right of the button, with its arrow then moved back onto the button.
+/// NSPopover refuses a rect outside its view, so the anchor view is the button's frame extended 120 pt to the right,
+/// and it lets every click through.
+struct FilterPopoverAnchor: NSViewRepresentable {
+    @ObservedObject var model: AppModel
+    let isOpen: Bool
+    /// How far right of the arrow Paste's popover body is centered: 466 / 2 − 173.
+    static let bodyOffset: CGFloat = 60
+
+    final class AnchorView: NSView {
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+        /// The filter button's own rect: the view less its extension.
+        var buttonRect: NSRect { NSRect(x: 0, y: 0, width: max(0, bounds.width - 2 * FilterPopoverAnchor.bodyOffset), height: bounds.height) }
+        var buttonFrameOnScreen: NSRect? { window?.convertToScreen(convert(buttonRect, to: nil)) }
+    }
+    final class Coordinator: NSObject, NSPopoverDelegate {
+        var model: AppModel?
+        weak var anchor: AnchorView?
+        private var moveObserver: NSObjectProtocol?
+        lazy var popover: NSPopover = {
+            let popover = NSPopover(); popover.behavior = .transient; popover.delegate = self; return popover
+        }()
+        /// NSPopover recenters its arrow whenever it repositions itself (it follows the button, even while opening), so
+        /// the arrow is moved back each time the popover's window moves.
+        func trackMoves() {
+            stopTracking()
+            guard let window = popover.contentViewController?.view.window else { return }
+            moveObserver = NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification, object: window, queue: .main) { [weak self] _ in
+                // The arrow is recentered after the move, so this waits a turn.
+                DispatchQueue.main.async { if let self, let anchor = self.anchor, self.popover.isShown { FilterPopoverAnchor.pointArrow(of: self.popover, at: anchor) } }
+            }
+        }
+        func stopTracking() { if let moveObserver { NotificationCenter.default.removeObserver(moveObserver); self.moveObserver = nil } }
+        func popoverDidClose(_ notification: Notification) {
+            stopTracking()
+            if model?.filtersOpen == true { model?.filtersOpen = false }
+        }
+    }
+    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeNSView(context: Context) -> AnchorView { AnchorView() }
+    func updateNSView(_ view: AnchorView, context: Context) {
+        let coordinator = context.coordinator, popover = coordinator.popover
+        coordinator.model = model; coordinator.anchor = view
+        if isOpen, !popover.isShown, view.window != nil {
+            // Sized up front: a hosting controller that sized the popover itself grew it after it was placed, off center.
+            let content = NSHostingController(rootView: FilterPopover(model: model)); content.sizingOptions = []
+            popover.contentViewController = content; popover.contentSize = FilterPopover.size
+            popover.show(relativeTo: view.buttonRect.offsetBy(dx: Self.bodyOffset, dy: 0), of: view, preferredEdge: .maxY)
+            coordinator.trackMoves()
+        } else if !isOpen, popover.isShown {
+            popover.performClose(nil)
+        }
+        if popover.isShown { Self.pointArrow(of: popover, at: view) }
+    }
+    /// Moves the popover's arrow onto the button's center. AppKit has no public setting for this: `anchorPoint` is the
+    /// popover window's own (private) property, so it is set only where it exists; otherwise the arrow stays centered,
+    /// 60 pt right of the button.
+    static func pointArrow(of popover: NSPopover, at view: AnchorView) {
+        guard let window = popover.contentViewController?.view.window, let button = view.buttonFrameOnScreen,
+              window.responds(to: NSSelectorFromString("setAnchorPoint:")), var anchor = window.value(forKey: "anchorPoint") as? NSPoint else { return }
+        let target = button.midX - window.frame.minX
+        guard abs(anchor.x - target) > 0.25 else { return }
+        anchor.x = target; window.setValue(NSValue(point: anchor), forKey: "anchorPoint")
+    }
+}
+
 /// Paste's filter popover: Type, App, Date and Device sections of chips, three to a row. Chips toggle; a chosen chip
 /// fills with the accent color and appears as a token in the search field.
 struct FilterPopover: View {
@@ -225,8 +299,10 @@ struct FilterPopover: View {
                 section("Device", [.device(AppModel.deviceName)])
             }.padding(.leading, 16).padding(.top, 10).padding(.bottom, 16).frame(width: 440, alignment: .leading)
         }
-        .frame(width: 440, height: 320)
+        .frame(width: Self.size.width, height: Self.size.height)
     }
+    /// Paste's scrolling list is 440×320 inside a 466×346 popover.
+    static let size = CGSize(width: 440, height: 320)
     /// Paste 6.3.11 lists Unknown, Image, Color, File, Link, Text. Elmers adds its Screenshot type after Image.
     static let kinds: [ContentKind] = [.other, .image, .screenshot, .color, .file, .link, .text]
 

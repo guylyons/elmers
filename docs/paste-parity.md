@@ -1,5 +1,16 @@
 # Paste parity inventory
 
+## September 25 — filter popover placement
+
+Reference: Paste 6.3.11 on macOS 27.0 (26A428), the September 23 accessibility frames at 2560×1440 pt, 1×, light appearance (no new Paste session). Elmers measured in `--demo --check-interaction` on the 1512-pt built-in display, from the popover window's frame, the filter button's screen frame and the popover's arrow position.
+
+| Surface | Observed in Paste 6.3.11 | Elmers status |
+|---|---|---|
+| Popover frame and arrow | Filter button 1572–1591 (center 1581.5); 466×346 popover at 1408–1874, arrow 173 pt from its left edge, on the button's center. The body is 60 pt right of centered on the arrow | **matched**: button 917–936 (center 926.5), popover 753–1219 (466 wide), arrow 173.5 pt in, at 926.5. Before: popover 697–1163 with its arrow centered at 233 pt, on 930, the center of the button plus its 7-pt trailing padding, so the body was 56 pt left and the arrow 3.5 pt right of Paste's. `FilterPopoverAnchor` presents an `NSPopover` against a rect 60 pt right of the button (from an anchor view extended to the right, outside the field's clip, that passes clicks through), then moves the arrow back onto the button through the popover window's `anchorPoint`, and again whenever the popover window moves. `anchorPoint` is private AppKit; where it is missing the body still lands right and the arrow stays centered |
+| Behavior | ⌘F twice opens it; Escape closes it first; chips toggle as tokens; a click outside closes it | implemented, unchanged: the popover is transient and its close clears `filtersOpen`. `filter-popover.png` now captures the popover's frame view (466×346, with chips) instead of its content view, which drew only the headers |
+
+Not compared: the open and close animation against Paste's after the change (the arrow is moved in the same turn as `show`, before the first frame); dark appearance; a popover pushed against a screen edge; clicking the filter button while the popover is open (the transient close and the button's toggle may reopen it). Checks: core 70/70; `--demo --check-interaction` passes twice in a row, and its search-mode step now asserts the popover is 466 wide, its left edge at the button's center − 173 pt and its arrow on the button's center, each within 2 pt. Lint is clean.
+
 ## September 25 — Paste as Plain Text in the card menu
 
 Reference: Paste 6.3.11's Help Center, which lists "Paste as Plain Text" among the item context menu's actions, and Paste's own string `general.action.paste-as-plain-text` ("Paste as Plain Text") in `PastePackages_PasteLocalization.bundle`. How Paste presents it (a separate row, or an alternate revealed by a modifier) was **not observed**; the Shift alternate below follows the macOS convention and Elmers' ⇧↩.
@@ -179,7 +190,7 @@ Hands-on, on the rebuilt `dist/Elmers.app` with real history (only the accessibi
 - A second ⌘F opens a 466×346 popover at y 775 (Paste: 776).
 - Escape closes the popover, then search mode, then the panel.
 
-**Known difference:** SwiftUI centers the popover over the filter button (x 1352–1818). Paste's popover sits 56 pt further right (x 1408–1874), with its arrow 173 pt from its left edge.
+**Known difference:** SwiftUI centers the popover over the filter button (x 1352–1818). Paste's popover sits 56 pt further right (x 1408–1874), with its arrow 173 pt from its left edge. Fixed September 25 (see "filter popover placement").
 
 Not compared: dark appearance; the popover's Liquid Glass material; chip hover and pressed states; what clicking a token does; a query plus a card click; whether Paste lists type chips for kinds absent from history (it showed Unknown and Color here, so it may list every type). An undiagnosed quirk seen during the session: Paste's panel sometimes closed by itself after a key press or popover click, so some clicks landed on the window behind it. Checks: core 55/55 (four new: widen/narrow semantics, date ranges, token order and toggling, Image including screenshots); `--check-interaction` gains "search mode: ⌘F, filter chips as tokens, and Escape one layer at a time", which passed 6 of 6 runs. On this loaded machine, alternating runs gave main 5/5 and this branch 4/5; the one failure was the existing "selection still pending" flake, which main also showed earlier. `--check-status-item` and `--check-screenshots` pass. Lint is clean.
 
