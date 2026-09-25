@@ -67,43 +67,46 @@ final class KeyboardInteractionChecks {
             } } }
         }
     }
-    /// Typing a content type word ("image") narrows results to that type and shows the filter in the search field.
+    /// Paste 6.3.11's filter suggestions: typing "im" offers the Image chip under the field while "im" stays search text;
+    /// Down highlights it, Return turns it into a token and drops the typed word, and Backspace removes the token.
     static func checkTypingCategory(model: AppModel, controller: PanelController) {
         let image = NSImage(size: NSSize(width: 160, height: 100), flipped: false) { rect in NSColor.systemTeal.setFill(); rect.fill(); return true }
         guard let tiff = image.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else { print("FAIL: category fixture image"); exit(1) }
         model.newItem(payload: ClipboardPayload(items: [["public.png": png, NSPasteboard.PasteboardType.string.rawValue: Data("Category fixture".utf8)]]))
         model.query = ""
         NotificationCenter.default.post(name: .elmersResults, object: nil)
-        let keys: [(String, UInt16)] = [("i", 34), ("m", 46), ("a", 0), ("g", 5), ("e", 14)]
-        func type(_ index: Int) {
-            guard index < keys.count else {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    guard model.query.isEmpty, model.filters.tokens == [.kind(.image)], !model.visibleItems.isEmpty,
-                          model.visibleItems.allSatisfy({ $0.kind == .image }) else {
-                        print("FAIL: typing 'image' left query '\(model.query)', filters \(model.filters.tokens), showing \(model.visibleItems.map(\.kind))"); fflush(stdout); exit(1)
-                    }
-                    capturePanel(controller, name: "search-image-filter")
-                    print("PASS: typing a type word becomes the type filter and clears the field")
-                    let backspace = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: controller.panel.windowNumber, context: nil, characters: "\u{7F}", charactersIgnoringModifiers: "\u{7F}", isARepeat: false, keyCode: 51)!
-                    NSApp.postEvent(backspace, atStart: false)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                        guard model.filters.isEmpty, model.query.isEmpty else {
-                            print("FAIL: Backspace left filters \(model.filters.tokens) and query '\(model.query)'"); fflush(stdout); exit(1)
-                        }
-                        capturePanel(controller, name: "search-after-backspace")
-                        print("PASS: Backspace on the empty field removes the type filter and its text")
-                        model.query = ""
-                        checkSearchMode(model: model, controller: controller)
-                    }
-                }
-                return
-            }
-            let (character, code) = keys[index]
+        func fail(_ message: String) { print("FAIL: \(message)"); fflush(stdout); exit(1) }
+        func key(_ character: String, _ code: UInt16) {
             let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: controller.panel.windowNumber, context: nil, characters: character, charactersIgnoringModifiers: character, isARepeat: false, keyCode: code)!
             NSApp.postEvent(event, atStart: false)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { type(index + 1) }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { type(0) }
+        func after(_ then: @escaping () -> Void) { DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: then) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            key("i", 34); after { key("m", 46); after {
+                guard model.query == "im", model.filters.isEmpty, model.filterSuggestions.first == .kind(.image), model.suggestionIndex == nil else {
+                    return fail("typing 'im' left query '\(model.query)', filters \(model.filters.tokens), suggestions \(model.filterSuggestions)")
+                }
+                capturePanel(controller, name: "search-suggestions")
+                print("PASS: typing the start of a chip title offers it and keeps the text")
+                key("", 125); after {
+                    guard model.suggestionIndex == 0, model.searchIsFocused else { return fail("Down did not highlight the first suggestion (index \(String(describing: model.suggestionIndex)))") }
+                    key("\r", 36); after {
+                        guard model.query.isEmpty, model.filters.tokens == [.kind(.image)], model.searchIsFocused, !model.visibleItems.isEmpty,
+                              model.visibleItems.allSatisfy({ $0.kind.isImage }) else {
+                            return fail("Down, Return left query '\(model.query)', filters \(model.filters.tokens), focused \(model.searchIsFocused), showing \(model.visibleItems.map(\.kind))")
+                        }
+                        capturePanel(controller, name: "search-image-filter")
+                        print("PASS: Down and Return turn the suggestion into a token and keep search focused")
+                        key("\u{7F}", 51); after {
+                            guard model.filters.isEmpty, model.query.isEmpty else { return fail("Backspace left filters \(model.filters.tokens) and query '\(model.query)'") }
+                            print("PASS: Backspace on the empty field removes the token")
+                            model.query = ""
+                            checkSearchMode(model: model, controller: controller)
+                        }
+                    }
+                }
+            } }
+        }
     }
     /// Writes a PNG of the panel to $ELMERS_CAPTURE_DIR when set, so a demo run can be inspected by eye without touching real history.
     static func capturePanel(_ controller: PanelController, name: String) {

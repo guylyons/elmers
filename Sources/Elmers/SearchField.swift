@@ -42,6 +42,7 @@ struct SearchField: View {
                         TextField("Search", text: $model.query).textFieldStyle(.plain).font(.system(size: 13)).focused(focused)
                             .onSubmit { focused.wrappedValue = false; model.searchIsFocused = false }
                             .accessibilityLabel("Search").accessibilityHidden(!settled)
+                            .background(GeometryReader { geometry in Color.clear.preference(key: SearchTextFrame.self, value: geometry.frame(in: .named(SearchTextFrame.space))) })
                             .opacity(settled ? 1 : 0).allowsHitTesting(settled)
                         Text(model.query.isEmpty ? String(localized: "Search") : model.query).font(.system(size: 13))
                             .foregroundStyle(model.query.isEmpty ? Color(nsColor: .placeholderTextColor) : .primary).lineLimit(1).fixedSize()
@@ -126,6 +127,54 @@ struct SearchField: View {
     private var ringShown: Bool { expanded && ringArrived && (awaitingFocus || focused.wrappedValue) }
 }
 
+/// Where the search field's text sits in the history view, so the filter suggestions can open under the typed word.
+struct SearchTextFrame: PreferenceKey {
+    static let space = "history"
+    static let defaultValue = CGRect.zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) { let next = nextValue(); if next != .zero { value = next } }
+}
+
+/// Paste 6.3.11's filter suggestions: a small list under the word being typed, one 24-pt row per chip whose title starts
+/// with the word. Measured from Paste: the row titles line up with the typed word (37.5 pt in from the list's edge),
+/// the list is at least 120 pt wide with 5 pt of padding, the typed part of each title is brighter than the rest, and
+/// the highlight (Down, Up or the pointer) fills the row with the accent color.
+struct FilterSuggestionList: View {
+    @ObservedObject var model: AppModel
+    let suggestions: [SearchFilter]
+    static let titleInset: CGFloat = 37.5
+    var body: some View {
+        let word = String(FilterSuggestions.word(in: model.query))
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(suggestions.enumerated()), id: \.element) { index, filter in
+                let highlighted = model.suggestionIndex == index
+                HStack(spacing: 0) {
+                    FilterIcon(filter: filter, icon: model.sourceIcon(for: filter), size: 13).frame(width: 16)
+                        .foregroundStyle(highlighted ? Color.white : Color.primary)
+                    title(filter.title, typed: word.count, highlighted: highlighted).padding(.leading, Self.titleInset - 5 - 8 - 16)
+                    Spacer(minLength: 20)
+                }
+                .padding(.leading, 8).frame(height: 24)
+                .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(highlighted ? Color.accentColor : Color.clear))
+                .contentShape(Rectangle())
+                .onHover { inside in if inside { model.suggestionIndex = index } else if model.suggestionIndex == index { model.suggestionIndex = nil } }
+                .onTapGesture { model.acceptSuggestion(filter) }
+                .accessibilityElement(children: .ignore).accessibilityLabel(filter.title)
+                .accessibilityAddTraits(highlighted ? [.isButton, .isSelected] : .isButton).accessibilityAction { model.acceptSuggestion(filter) }
+            }
+        }
+        .padding(5).frame(minWidth: 120, alignment: .leading).fixedSize()
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.2), radius: 8, y: 3)
+    }
+    /// The typed part of the title in full strength, the rest dimmed, as Paste draws it; white throughout when highlighted.
+    private func title(_ title: String, typed: Int, highlighted: Bool) -> Text {
+        let split = title.index(title.startIndex, offsetBy: min(typed, title.count))
+        return (Text(verbatim: String(title[..<split])).foregroundColor(highlighted ? .white : .primary)
+            + Text(verbatim: String(title[split...])).foregroundColor(highlighted ? .white : .secondary)).font(.system(size: 13))
+    }
+}
+
 /// A capsule drawn `spread` points outside its frame; the spread animates, so the ring can close in on the field.
 private struct FocusRing: Shape {
     var spread: CGFloat
@@ -171,7 +220,7 @@ struct FilterPopover: View {
         ScrollView(.vertical) {
             VStack(alignment: .leading, spacing: 0) {
                 section("Type", Self.kinds.map(SearchFilter.kind))
-                section("App", apps.map(SearchFilter.app))
+                section("App", model.filterApps.map(SearchFilter.app))
                 section("Date", DateRangeFilter.allCases.map(SearchFilter.date))
                 section("Device", [.device(AppModel.deviceName)])
             }.padding(.leading, 16).padding(.top, 10).padding(.bottom, 16).frame(width: 440, alignment: .leading)
@@ -180,7 +229,6 @@ struct FilterPopover: View {
     }
     /// Paste 6.3.11 lists Unknown, Image, Color, File, Link, Text. Elmers adds its Screenshot type after Image.
     static let kinds: [ContentKind] = [.other, .image, .screenshot, .color, .file, .link, .text]
-    private var apps: [String] { Array(Set(model.history.items.map(\.source))).sorted { $0.localizedStandardCompare($1) == .orderedAscending } }
 
     private func section(_ title: LocalizedStringKey, _ chips: [SearchFilter]) -> some View {
         VStack(alignment: .leading, spacing: 10) {

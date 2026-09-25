@@ -26,12 +26,11 @@ final class ColorTests {
         XCTAssertNil(HexColor("#12345"))
     }
 
-    func testColorIsAFilterAndATypedKeyword() {
+    func testColorIsAFilter() {
         var history = History()
         let color = history.capture(.text("#00AAFF"), source: "Fixture")
         _ = history.capture(.text("plain"), source: "Fixture")
         XCTAssertEqual(history.items.filter { SearchFilters([.kind(.color)]).matches($0) }.map(\.id), [color.id])
-        XCTAssertEqual(SearchQuery("Colors blue").kind, .color)
     }
 }
 

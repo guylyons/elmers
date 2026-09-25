@@ -339,6 +339,20 @@ final class PanelController: NSObject, NSWindowDelegate {
         }
         let context: KeyboardContext = model.searchIsFocused ? .search : .results
         if context == .search, stroke == KeyStroke(51), model.removeLastFilter() { return nil }
+        // Paste 6.3.11's filter suggestions: Down and Up move the highlight, Return accepts the highlighted chip, and
+        // Escape closes the list. Return with nothing highlighted ends editing without pasting; Tab behaves as usual.
+        if context == .search, !model.filterSuggestions.isEmpty, stroke.modifiers.isEmpty {
+            switch stroke.keyCode {
+            case 125: model.moveSuggestion(1); return nil
+            case 126: model.moveSuggestion(-1); return nil
+            case 36, 76:
+                if let index = model.suggestionIndex, model.filterSuggestions.indices.contains(index) { model.acceptSuggestion(model.filterSuggestions[index]) }
+                else { focusResults() }
+                return nil
+            case 53: model.suggestionsDismissed = true; return nil
+            default: break
+            }
+        }
         if let action = KeyboardRouter.command(for: stroke, context: context, settings: model.shortcuts) {
             switch action {
             case let .move(offset, extend):

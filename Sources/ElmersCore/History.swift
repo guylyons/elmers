@@ -41,7 +41,6 @@ public struct History: Codable, Sendable {
     /// Clipboard History (`boardID` nil) shows the items still in history, newest first; a pinboard shows its items in
     /// their hand-made order. A query searches every item, pinned ones included, as Paste does.
     public func filtered(query: String = "", kind: ContentKind? = nil, boardID: UUID? = nil) -> [ClipboardItem] {
-        // Type words are consumed by the search field before the query reaches here (see SearchQuery).
         let tokens = query.split(whereSeparator: \.isWhitespace).map { Array(ClipboardItem.fold(String($0)).utf8) }
         let matches = items.filter { item in
             (kind == nil || item.kind == kind || (kind == .image && item.kind.isImage)) &&

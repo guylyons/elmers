@@ -142,7 +142,6 @@ final class ScreenshotTests {
         let marked = try JSONDecoder().decode(ClipboardItem.self, from: JSONSerialization.data(withJSONObject: object))
         XCTAssertEqual(marked.kind.rawValue, "Screenshot")
         try XCTAssertEqual(try JSONDecoder().decode(ClipboardItem.self, from: JSONEncoder().encode(marked)).kind.rawValue, "Screenshot")
-        XCTAssertEqual(SearchQuery("SCREENSHOTS error").kind?.rawValue, "Screenshot")
         var edited = marked
         edited.payload = .text("changed")
         XCTAssertEqual(edited.kind, .text)

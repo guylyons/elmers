@@ -49,28 +49,35 @@ final class HistoryTests {
         XCTAssertTrue(history.filtered(query: "recipe", kind: .link).isEmpty)
     }
 
-    func testTypingCategoryKeywordsFiltersByKind() {
+    func testFilterSuggestions() {
+        // Paste 6.3.11's chips in popover order, with an app and the device.
+        let chips: [(filter: SearchFilter, title: String)] = [
+            (.kind(.image), "Image"), (.kind(.link), "Link"), (.kind(.text), "Text"), (.app("Messages"), "Messages"), (.app("Safari"), "Safari"),
+            (.date(.today), "Today"), (.date(.thisWeek), "This week"), (.date(.lastWeek), "Last week"), (.device("MacBook Pro"), "MacBook Pro"),
+        ]
+        func offered(_ query: String, chosen: SearchFilters = SearchFilters()) -> [SearchFilter] { FilterSuggestions.matching(query, among: chips, excluding: chosen) }
+        XCTAssertEqual(offered("li"), [.kind(.link)])
+        XCTAssertEqual(offered("LI"), [.kind(.link)])
+        XCTAssertEqual(offered("t"), [.kind(.text), .date(.today), .date(.thisWeek)])
+        XCTAssertEqual(offered("me"), [.app("Messages")])
+        XCTAssertEqual(offered("mac"), [.device("MacBook Pro")])
+        // Only the start of the whole title counts, plurals are not titles, and a finished word offers nothing.
+        XCTAssertTrue(offered("week").isEmpty)
+        XCTAssertTrue(offered("pro").isEmpty)
+        XCTAssertTrue(offered("links").isEmpty)
+        XCTAssertTrue(offered("link ").isEmpty)
+        XCTAssertTrue(offered("").isEmpty)
+        // The last word is the one offered for, and a chip already in the field is not offered again.
+        XCTAssertEqual(offered("foo li"), [.kind(.link)])
+        XCTAssertTrue(offered("li", chosen: SearchFilters([.kind(.link)])).isEmpty)
+        // Accepting drops the typed word and keeps what came before it.
+        XCTAssertEqual(FilterSuggestions.accepting("foo li"), "foo ")
+        XCTAssertEqual(FilterSuggestions.accepting("li"), "")
+        // The word stays search text: "link" searches for "link", it does not filter by type.
         var history = History()
-        let image = history.capture(ClipboardPayload(items: [["public.png": Data([0, 1, 255])]]), source: "Preview")
-        _ = history.capture(.text("An image of a cat"), source: "Notes")
-        _ = history.capture(.text("https://example.com/cat.png"), source: "Safari")
-        history.renameItem(image.id, title: "Cat photo")
-        func typed(_ raw: String) -> [ClipboardItem] {
-            let parsed = SearchQuery(raw)
-            return history.filtered(query: parsed.remainder, kind: parsed.kind)
-        }
-        XCTAssertEqual(typed("Image").map(\.id), [image.id])
-        XCTAssertEqual(typed("IMAGES").map(\.id), [image.id])
-        XCTAssertEqual(typed("link").map(\.kind), [.link])
-        XCTAssertEqual(typed("image cat").map(\.id), [image.id])
-        XCTAssertTrue(typed("image dog").isEmpty)
-        // With a type already chosen, the word stays an ordinary search term.
-        XCTAssertNil(SearchQuery("image", recognizeKind: false).kind)
-        XCTAssertEqual(history.filtered(query: "image", kind: .text).map(\.text), ["An image of a cat"])
-        XCTAssertEqual(SearchQuery("Photos cat").kind, .image)
-        XCTAssertEqual(SearchQuery("Photos cat").kindWord, "Photos")
-        XCTAssertEqual(SearchQuery("Photos cat").remainder, "cat")
-        XCTAssertNil(SearchQuery("imagery").kind)
+        _ = history.capture(.text("https://example.com"), source: "Safari")
+        let note = history.capture(.text("a link to the slides"), source: "Notes")
+        XCTAssertEqual(history.filtered(query: "link").map(\.id), [note.id])
     }
 
     func testRetentionPreservesPinnedItems() {

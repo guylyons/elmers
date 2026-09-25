@@ -68,6 +68,9 @@ struct HistoryView: View {
             }
             Spacer(minLength: 0)
         }
+        .overlay(alignment: .topLeading) { suggestions }
+        .coordinateSpace(name: SearchTextFrame.space)
+        .onPreferenceChange(SearchTextFrame.self) { searchTextFrame = $0 }
         .onChange(of: searchFocused) { _, focused in model.searchIsFocused = focused }
         .onChange(of: model.query) { _, _ in model.reconcileSelection() }
         .onChange(of: model.filters) { _, _ in model.reconcileSelection() }
@@ -95,6 +98,17 @@ struct HistoryView: View {
             Button("Cancel", role: .cancel) {}
         } message: { Text("The Pinboard and all its content will be deleted. You can undo this with ⌘Z.") }
         .sheet(isPresented: $helpVisible) { KeyboardHelp() }
+    }
+    @State private var searchTextFrame = CGRect.zero
+    /// Paste's filter suggestions, just under the search field with their titles lined up with the typed word.
+    @ViewBuilder private var suggestions: some View {
+        let offered = model.filterSuggestions
+        if !offered.isEmpty, searchTextFrame != .zero {
+            let before = FilterSuggestions.accepting(model.query) as NSString
+            let wordX = searchTextFrame.minX + before.size(withAttributes: [.font: NSFont.systemFont(ofSize: 13)]).width
+            FilterSuggestionList(model: model, suggestions: offered)
+                .offset(x: wordX - FilterSuggestionList.titleInset, y: searchTextFrame.midY + SearchField.height / 2)
+        }
     }
     private var searching: Bool { model.searchOpen || model.hasSearch }
     /// Follows `searching` without animation: Paste drops the pill names, the selection capsule and the + on the first

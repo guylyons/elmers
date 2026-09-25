@@ -9,6 +9,7 @@
 
 - [done 2026-09-16] I should be able to start typing by category and have it work. For instance, "Image" caps or not caps.
   (a type word — image/photo/screenshot, link/url, file, text, singular or plural, any case — turns into a pill in the search field, the field clears, and further typing searches within that type; Backspace on the empty field removes the pill and gives the word back)
+  (replaced 2026-09-25 at the user's request with Paste's behavior: typing the start of any chip title offers it in a list under the field, and Down + Return or a click turns it into a token; the word itself stays search text)
 
 - [fixed 2026-09-22; real-pointer drags verified on the demo build] drag and drop does not work
   (Reproduced with physical cliclick drags against a `--demo --demo-fixtures` panel. Pinboard pills never

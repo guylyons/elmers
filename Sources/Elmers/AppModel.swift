@@ -7,10 +7,13 @@ import ElmersCore
 @MainActor
 final class AppModel: ObservableObject {
     @Published private(set) var history = History() { didSet { refreshVisibleItems() } }
-    @Published var query = "" { didSet { refreshVisibleItems(); if !absorbingTypedFilter { DispatchQueue.main.async { self.absorbTypedFilter() } } } }
-    /// Chips chosen in the filter popover or typed as a type word, shown as tokens in the search field.
+    @Published var query = "" { didSet { refreshVisibleItems(); if query != oldValue { suggestionIndex = nil; suggestionsDismissed = false } } }
+    /// Chips chosen in the filter popover or accepted from the suggestions, shown as tokens in the search field.
     @Published var filters = SearchFilters() { didSet { refreshVisibleItems() } }
-    private var absorbingTypedFilter = false
+    /// The highlighted row of the filter suggestions under the search field; none until Down or the pointer picks one.
+    @Published var suggestionIndex: Int?
+    /// Escape closes the suggestions until the query changes.
+    @Published var suggestionsDismissed = false
     /// Paste's search mode: the field is open and the pinboard pills shrink to their icons.
     @Published var searchOpen = false
     /// Paste's first run leaves a Useful Links pinboard with a welcome note, three short guides and help links. Elmers
@@ -146,19 +149,29 @@ final class AppModel: ObservableObject {
         selection.reconcile(in: visibleItems.map(\.id))
     }
     var selected: ClipboardItem? { visibleItems.first { $0.id == selectedID } }
-    /// A type word in the query becomes the type filter and leaves the field, so what follows searches within that type.
-    /// Runs one turn after the edit: the text field ignores a binding change made inside its own update.
-    private func absorbTypedFilter() {
-        guard !absorbingTypedFilter else { return }
-        let parsed = SearchQuery(query)
-        guard let typed = parsed.kind, !filters.contains(.kind(typed)) else { return }
-        absorbingTypedFilter = true
-        filters.add(.kind(typed))
-        query = parsed.remainder
-        absorbingTypedFilter = false
+    /// Every chip of the filter popover, in its order: Type, App, Date, Device.
+    var filterChips: [SearchFilter] {
+        FilterPopover.kinds.map(SearchFilter.kind) + filterApps.map(SearchFilter.app) + DateRangeFilter.allCases.map(SearchFilter.date) + [.device(Self.deviceName)]
     }
-    /// Backspace on an empty field removes the last token and its text entirely, typed type words included (the
-    /// user's request, September 23). Returns false when there is nothing to remove.
+    var filterApps: [String] { Array(Set(history.items.map(\.source))).sorted { $0.localizedStandardCompare($1) == .orderedAscending } }
+    /// The chips offered under the search field for the word being typed (Paste 6.3.11), shown while the field has focus.
+    var filterSuggestions: [SearchFilter] {
+        guard searchIsFocused, !suggestionsDismissed, !filtersOpen, !FilterSuggestions.word(in: query).isEmpty else { return [] }
+        return FilterSuggestions.matching(query, among: filterChips.map { ($0, $0.title) }, excluding: filters)
+    }
+    /// Down highlights the first row, then the next; Up the previous. Both stop at the ends, as Paste's do.
+    func moveSuggestion(_ offset: Int) {
+        let count = filterSuggestions.count
+        guard count > 0 else { return }
+        suggestionIndex = suggestionIndex.map { min(max($0 + offset, 0), count - 1) } ?? (offset > 0 ? 0 : nil)
+    }
+    /// The chosen chip becomes a token and the typed word leaves the field; the text before it stays.
+    func acceptSuggestion(_ filter: SearchFilter) {
+        filters.add(filter)
+        query = FilterSuggestions.accepting(query)
+    }
+    /// Backspace on an empty field removes the last token (the user's request, September 23). Returns false when there
+    /// is nothing to remove.
     @discardableResult func removeLastFilter() -> Bool {
         guard query.isEmpty, !filters.isEmpty else { return false }
         filters.removeLast()
@@ -166,9 +179,7 @@ final class AppModel: ObservableObject {
     }
     /// Clears the query and every token, as Paste's clear button and second Escape do.
     func clearSearch() {
-        absorbingTypedFilter = true
         query = ""; filters.removeAll()
-        absorbingTypedFilter = false
     }
     var hasSearch: Bool { !query.isEmpty || !filters.isEmpty }
     /// The name Paste shows for this Mac in the Device section: its model name, such as "MacBook Pro".
