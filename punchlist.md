@@ -63,9 +63,9 @@ Deliberate departures, kept by your decision: blank copies are ignored, Return i
 
 - [ ] VoiceOver audit
 - [ ] Native-speaker review of Elmers-only translations
-- [ ] Storage: leftover `-wal`/`-shm` next to a missing database
-- [ ] Storage: a 0-byte database treated as fresh
-- [ ] Storage: history folder permissions enforced only on creation
+- [x] Storage: leftover `-wal`/`-shm` next to a missing database (moved into a retained `history-orphaned-*` folder, September 25)
+- [x] Storage: a 0-byte database treated as fresh (now rejected untouched as damaged, September 25)
+- [x] Storage: history folder permissions enforced only on creation (reset to 0700 on every read-write open, September 25)
 - [ ] Listening check of the deletion sound
 - [ ] Fix the "typing into a fresh search" flake in `--check-interaction`
 - [ ] Remove test items (`#123456`, `FF8800`, …) from Paste's history (needs your OK)

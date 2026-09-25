@@ -55,12 +55,22 @@ public final class HistoryStore: @unchecked Sendable {
     /// it cannot convert.
     public func load() throws -> History {
         let files = FileManager.default
+        // Elmers builds a database beside this path and moves it into place, so an empty file here is not one it
+        // wrote: rejected untouched like any other unreadable database, where SQLite would quietly start a new one in it.
+        if (try? files.attributesOfItem(atPath: databaseURL.path)[.size] as? NSNumber)?.intValue == 0 {
+            throw StoreError.damaged("the database file is empty")
+        }
+        // The folder is created private, but may have been loosened since; every writer puts it back.
+        if !readOnly, files.fileExists(atPath: directory.path) {
+            try files.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
+        }
         if !readOnly, files.fileExists(atPath: databaseURL.path), files.fileExists(atPath: legacyArchiveURL.path) {
             try recoverReappearedArchive()
         }
         if !files.fileExists(atPath: databaseURL.path) {
-            guard !readOnly else { throw StoreError.notLoaded }
+            guard !readOnly else { throw CocoaError(.fileReadNoSuchFile, userInfo: [NSURLErrorKey: databaseURL, NSFilePathErrorKey: databaseURL.path]) }
             try files.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            try setAsideOrphanedJournals()
             let legacy = files.fileExists(atPath: legacyArchiveURL.path) ? Self.canonical(try Archive(url: legacyArchiveURL).load()) : nil
             try build(legacy ?? History())
             createdEmptyDatabase = legacy == nil
@@ -82,6 +92,18 @@ public final class HistoryStore: @unchecked Sendable {
         dataVersion = try? database.integer("PRAGMA data_version")
         if !readOnly { try retireLegacyArchive() }
         return history
+    }
+
+    /// SQLite pairs a `-wal` or `-journal` file with whatever database next appears at its path, so leftovers of a
+    /// database that is gone could replay old pages into the new one. They are moved, never deleted, into a new
+    /// `history-orphaned-*` folder, and the shared-memory index goes with its WAL.
+    private func setAsideOrphanedJournals() throws {
+        let files = FileManager.default
+        let orphans = ["-wal", "-shm", "-journal"].map { URL(fileURLWithPath: databaseURL.path + $0) }.filter { files.fileExists(atPath: $0.path) }
+        guard !orphans.isEmpty else { return }
+        let backup = directory.appendingPathComponent("history-orphaned-" + UUID().uuidString)
+        try files.createDirectory(at: backup, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        for orphan in orphans { try files.moveItem(at: orphan, to: backup.appendingPathComponent(orphan.lastPathComponent)) }
     }
 
     /// Keeps clipboard history, and every backup kept beside it, out of Time Machine so deleted items do not

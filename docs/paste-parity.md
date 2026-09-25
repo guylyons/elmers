@@ -1,5 +1,16 @@
 # Paste parity inventory
 
+## September 25 — storage edge cases (Elmers-internal)
+
+No Paste reference: these are `HistoryStore` robustness items left open by the September 22 storage review.
+
+- **Empty database file.** A 0-byte `history.sqlite` used to open as a brand-new database, since SQLite accepts an empty file. Elmers never leaves one (it builds a database beside the path and moves it into place), so `load()` now rejects it as `damaged("the database file is empty")` in both read-write and read-only opens, before the reappeared-plist merge, and leaves the folder exactly as it was. This follows the existing "damaged databases are rejected untouched" policy; the app shows its usual "History could not be opened" message and keeps every file.
+- **Leftover `-wal`, `-shm` or `-journal` beside a missing database.** SQLite would pair them with the next file at that path. Before creating or converting a database, `setAsideOrphanedJournals()` moves them, never deletes them, into a new `history-orphaned-<UUID>` folder (0700), which joins the retained backups.
+- **Folder permissions.** Every read-write open now sets the history folder back to 0700; before, only creating the folder did. Read-only opens leave it alone.
+- A read-only open of a missing database now throws the system's "no such file" error rather than reusing `notLoaded` ("has not been opened"), so no new string was needed.
+
+Not compared: no Paste surface. Checks: core 74/74 (new "store rejects an empty database file untouched", "stale journal files beside a missing database are set aside", "history folder is made private on every open", "read-only open of a missing database says the file is missing"). Lint is clean.
+
 ## September 25 — quick paste numbers while ⌘ is held
 
 Reference: Paste 6.3.11 on the 1512-pt built-in display at 2×, dark appearance. Evidence: the user's window-bound 2× capture of Paste's panel with ⌘ held, reduced to the pixel extents below (not committed), and the user's note that pressing ⌘ brings the numbers up. This settles the September 23 "≡ 1" marker: it is the Quick Paste number.

@@ -78,6 +78,77 @@ final class HistoryStoreTests {
         try XCTAssertEqual(try Data(contentsOf: store.legacyArchiveURL), legacy)
     }
 
+    func testEmptyDatabaseFileIsRejectedAndLeftUntouched() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let files = FileManager.default
+        let store = HistoryStore(directory: directory)
+        try files.createDirectory(at: directory, withIntermediateDirectories: true)
+        let legacy = Data("legacy archive stays put".utf8)
+        try legacy.write(to: store.legacyArchiveURL)
+        XCTAssertTrue(files.createFile(atPath: store.databaseURL.path, contents: Data()))
+        let before = try files.contentsOfDirectory(atPath: directory.path).sorted()
+        for readOnly in [false, true] {
+            do { _ = try HistoryStore(directory: directory, readOnly: readOnly).load(); XCTAssertTrue(false) }
+            catch { XCTAssertEqual(error as? HistoryStore.StoreError, .damaged("the database file is empty")) }
+        }
+        try XCTAssertEqual(try files.contentsOfDirectory(atPath: directory.path).sorted(), before)
+        try XCTAssertEqual(try Data(contentsOf: store.databaseURL), Data())
+        try XCTAssertEqual(try Data(contentsOf: store.legacyArchiveURL), legacy)
+    }
+
+    func testStaleJournalFilesBesideAMissingDatabaseAreSetAside() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let files = FileManager.default
+        let store = HistoryStore(directory: directory)
+        try files.createDirectory(at: directory, withIntermediateDirectories: true)
+        var orphans: [String: Data] = [:]
+        for suffix in ["-wal", "-shm", "-journal"] {
+            let name = store.databaseURL.lastPathComponent + suffix
+            orphans[name] = Data("orphan \(suffix) \(UUID().uuidString)".utf8)
+            try orphans[name]!.write(to: directory.appendingPathComponent(name))
+        }
+        let history = try store.load()
+        XCTAssertTrue(history.items.isEmpty && store.createdEmptyDatabase)
+        let backups = try files.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix("history-orphaned-") }
+        XCTAssertEqual(backups.count, 1)
+        guard let backup = backups.first else { return }
+        try XCTAssertEqual(try permissions(backup), 0o700)
+        for (name, bytes) in orphans {
+            try XCTAssertEqual(try contentsIfPresent(backup.appendingPathComponent(name)), bytes)
+            let left = try contentsIfPresent(directory.appendingPathComponent(name))
+            XCTAssertTrue(left != bytes)
+        }
+        var changed = history
+        changed.capture(.text("fresh"), source: "Notes")
+        try store.save(changed)
+        try XCTAssertEqual(try HistoryStore(directory: directory, readOnly: true).load().items.map(\.text), ["fresh"])
+    }
+
+    func testHistoryFolderIsMadePrivateOnEveryOpen() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let files = FileManager.default
+        try files.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o755])
+        _ = try HistoryStore(directory: directory).load()
+        try XCTAssertEqual(try permissions(directory), 0o700)
+        try files.setAttributes([.posixPermissions: 0o755], ofItemAtPath: directory.path)
+        _ = try HistoryStore(directory: directory, readOnly: true).load()
+        try XCTAssertEqual(try permissions(directory), 0o755)
+        _ = try HistoryStore(directory: directory).load()
+        try XCTAssertEqual(try permissions(directory), 0o700)
+    }
+
+    func testReadOnlyOpenOfAMissingDatabaseSaysTheFileIsMissing() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        do { _ = try HistoryStore(directory: directory, readOnly: true).load(); XCTAssertTrue(false) }
+        catch { XCTAssertEqual((error as? CocoaError)?.code, .fileReadNoSuchFile) }
+        XCTAssertTrue(!FileManager.default.fileExists(atPath: directory.path))
+    }
+
     func testRoundTripPreservesEveryField() throws {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
