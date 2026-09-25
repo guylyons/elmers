@@ -106,3 +106,5 @@
   that hold was released two run-loop turns after focus was requested, before SwiftUI reported the field
   focused. The hold now ends when focus is reported, with a 0.5 s fallback. Re-recorded after a real click on
   the magnifier and after ⌘F: the ring stays on from mid-open into focus.)
+
+  - [open] after a while of using the app it seems like sound stops working
