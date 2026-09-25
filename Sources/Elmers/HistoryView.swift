@@ -26,6 +26,7 @@ struct HistoryView: View {
                         LazyHStack(spacing: 24) {
                             ForEach(Array(model.visibleItems.enumerated()), id: \.element.id) { index, item in
                                 CardView(item: item, selected: model.selection.ids.contains(item.id), ringDimmed: hoveredID != nil && hoveredID != item.id, index: index,
+                                         quickPasteNumber: model.quickPasteNumbersShown && index < 9 ? index + 1 : nil,
                                          renaming: model.renamingID == item.id, onRename: { model.finishRenaming(item, title: $0) },
                                          onBeginRename: { if model.canEdit { model.renamingID = item.id } })
                                     .id(item.id)

@@ -83,6 +83,7 @@ let checks: [(String, () throws -> Void)] = [
     ("custom shortcut persistence, routing, and conflicts", interaction.testCustomShortcutsRoundTripAndConflicts),
     ("Paste default shortcuts", interaction.testPasteDefaultGlobalAndModifierBindings),
     ("Paste keyboard command routing", interaction.testPasteKeyboardMap),
+    ("quick paste numbers follow the modifier", interaction.testQuickPasteNumbersFollowTheModifier),
     ("search and editor keyboard boundaries", interaction.testSearchReturnPastesAndTextEditingKeepsItsKeys),
     ("range and toggle selection", interaction.testRangeSelectionCanExpandAndContract),
     ("metadata edit and reload", interaction.testCachedMetadataRefreshesWhenEditingAndReloading),

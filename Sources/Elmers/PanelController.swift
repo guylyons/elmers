@@ -40,6 +40,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     private var previousApp: NSRunningApplication?
     private var localMonitor: Any?
     private var outsideMonitor: Any?
+    private var flagsMonitor: Any?
     private var deliveryGeneration = 0
     /// Screen frame of the menu bar item that toggles the panel. Clicks there are handled by the
     /// status item action, so the outside-click monitor must not hide the panel first.
@@ -78,6 +79,10 @@ final class PanelController: NSObject, NSWindowDelegate {
             MainActor.assumeIsolated { result = self?.handle(event) }
             return result
         }
+        flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            MainActor.assumeIsolated { self?.updateQuickPasteNumbers(event.modifierFlags) }
+            return event
+        }
         outsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             Task { @MainActor in
                 guard let self, self.panel.attachedSheet == nil else { return }
@@ -87,6 +92,11 @@ final class PanelController: NSObject, NSWindowDelegate {
         }
     }
     func toggle() { isShown ? hide() : show() }
+    /// Paste numbers the first nine cards while the Quick Paste modifier is held, as the keys ⌘1…⌘9 paste them.
+    func updateQuickPasteNumbers(_ flags: NSEvent.ModifierFlags) {
+        let shown = isShown && model.shortcuts.showsQuickPasteNumbers(KeyModifiers(flags))
+        if model.quickPasteNumbersShown != shown { model.quickPasteNumbersShown = shown }
+    }
     /// The glass is only the panel's background, with the history view layered above it rather than inside it:
     /// an `NSGlassEffectView.contentView` is drawn vibrant, which turned the toolbar's 85 % label color pure white
     /// and brightened pinboard colors, unlike Paste's.
@@ -172,10 +182,12 @@ final class PanelController: NSObject, NSWindowDelegate {
         panel.makeKeyAndOrderFront(nil)
         slide(visible: true)
         focusResults()
+        updateQuickPasteNumbers(NSEvent.modifierFlags)
     }
     func hide(restoreFocus: Bool = true) {
         guard isShown else { return }
         isShown = false
+        model.quickPasteNumbersShown = false
         transitionGeneration += 1
         let generation = transitionGeneration
         panel.ignoresMouseEvents = true

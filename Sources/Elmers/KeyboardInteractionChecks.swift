@@ -30,6 +30,33 @@ final class KeyboardInteractionChecks {
             (18, .command, { deliveries == [false, false, true, false] }, "Command-1 quick pastes"),
             (18, [.command, .shift], { deliveries == [false, false, true, false, true] }, "Shift-Command-1 quick pastes plain text")
         ]
+        // Holding ⌘ numbers the first nine cards; letting go takes the numbers away.
+        func modifiers(_ flags: NSEvent.ModifierFlags, code: UInt16) {
+            let event = NSEvent.keyEvent(with: .flagsChanged, location: .zero, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: controller.panel.windowNumber, context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: code)!
+            NSApp.postEvent(event, atStart: false)
+        }
+        func checkQuickPasteNumbers(then next: @escaping () -> Void) {
+            func wait(_ condition: @escaping () -> Bool, _ description: String, then body: @escaping () -> Void) {
+                let deadline = Date().addingTimeInterval(1.5)
+                func check() {
+                    if condition() { print("PASS: \(description)"); body(); return }
+                    guard Date() < deadline else { print("FAIL: \(description)"); fflush(stdout); exit(1) }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.02, execute: check)
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: check)
+            }
+            modifiers(.command, code: 55)
+            wait({ model.quickPasteNumbersShown }, "holding Command numbers the cards", then: {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    capturePanel(controller, name: "quick-paste-numbers")
+                    modifiers([.command, .option], code: 58)
+                    wait({ !model.quickPasteNumbersShown }, "Command-Option hides the numbers", then: {
+                        modifiers([], code: 55)
+                        wait({ !model.quickPasteNumbersShown }, "releasing Command hides the numbers", then: next)
+                    })
+                }
+            })
+        }
         func step(_ index: Int) {
             guard index < steps.count else { checkTypingIntoSearch(model: model, controller: controller); return }
             let (code, flags, verify, description) = steps[index]
@@ -47,7 +74,7 @@ final class KeyboardInteractionChecks {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.08, execute: check)
         }
-        step(0)
+        checkQuickPasteNumbers { step(0) }
     }
     /// Typing while results have focus must produce the whole word: the first letter opens the search field and
     /// the following letters go into it without replacing a select-all.

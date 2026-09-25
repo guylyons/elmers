@@ -28,6 +28,10 @@ public struct ShortcutSettings: Codable, Equatable, Sendable {
     public var quickPasteModifier: KeyModifiers = .command
     public var plainTextModifier: KeyModifiers = .shift
     public init() {}
+    /// Paste numbers the first nine cards while the Quick Paste modifier is held, alone or with the Plain Text modifier.
+    public func showsQuickPasteNumbers(_ held: KeyModifiers) -> Bool {
+        held == quickPasteModifier || held == quickPasteModifier.union(plainTextModifier)
+    }
     public var validationError: String? {
         if quickPasteModifier == plainTextModifier { return String(localized: "Quick Paste and Plain Text mode need different modifiers.") }
         let bindings = [activation, stack, nextBoard, previousBoard].compactMap { $0 }
@@ -67,7 +71,7 @@ public enum KeyboardRouter {
         if stroke == settings.nextBoard { return .nextBoard }
         if stroke == settings.previousBoard { return .previousBoard }
         let numbers: [UInt16] = [18,19,20,21,23,22,26,28,25]
-        if let number = numbers.firstIndex(of: key), modifiers == settings.quickPasteModifier || modifiers == settings.quickPasteModifier.union(settings.plainTextModifier) { return .quickPaste(number, plain: plain) }
+        if let number = numbers.firstIndex(of: key), settings.showsQuickPasteNumbers(modifiers) { return .quickPaste(number, plain: plain) }
         if key == 53 && modifiers.isEmpty { return .escape }
         if key == 48 && (modifiers.isEmpty || modifiers == .shift) { return .move(modifiers == .shift ? -1 : 1, extend: false) }
         // Return pastes the selection even while the search field has focus.

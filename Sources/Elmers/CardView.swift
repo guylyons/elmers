@@ -9,6 +9,8 @@ struct CardView: View {
     /// Paste turns the selected card's ring gray while the pointer rests on a different card.
     var ringDimmed = false
     let index: Int
+    /// Shown in the bottom-right corner while the Quick Paste modifier is held (Paste: "≡ 1" … "≡ 9").
+    var quickPasteNumber: Int? = nil
     /// Renaming happens in place, in the title: Paste's "click the item's title and type a new one".
     var renaming = false
     var onRename: (String?) -> Void = { _ in }
@@ -62,6 +64,9 @@ struct CardView: View {
                     .foregroundStyle(color.luminance > 0.18 ? Color.black.opacity(0.85) : Color.white.opacity(0.9))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color(.sRGB, red: color.red, green: color.green, blue: color.blue))
+                    .overlay(alignment: .bottomTrailing) {
+                        quickPasteBadge.foregroundStyle(color.luminance > 0.18 ? Color.black.opacity(0.65) : Color.white.opacity(0.65))
+                    }
             } else {
                 VStack(spacing: 0) {
                     preview
@@ -73,11 +78,13 @@ struct CardView: View {
                         if !item.boardIDs.isEmpty { Image(systemName: "pin.fill").font(.system(size: 9)).padding(.bottom, 3) }
                         if item.kind == .link {
                             Text(footer).lineLimit(2).truncationMode(.tail).multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.trailing, quickPasteNumber == nil ? 0 : Self.badgeWidth)
                         } else {
                             Text(footer).lineLimit(1).frame(maxWidth: .infinity)
                         }
                     }
                     .font(.system(size: 12)).foregroundStyle(.secondary).padding(.horizontal, 13).padding(.bottom, 10).padding(.top, 4)
+                    .overlay(alignment: .bottomTrailing) { quickPasteBadge.foregroundStyle(Self.badgeInk) }
                 }.background(item.kind == .link && item.linkPreview == nil ? Self.linkBodyColor : Self.bodyColor)
             }
         }
@@ -97,6 +104,23 @@ struct CardView: View {
         .accessibilityValue(selected ? String(localized: "Selected") : "")
         .help(index < 9 ? String(localized: "\(item.source) · \(item.kind.title) · ⌘\(index + 1) to paste") : "\(item.source) · \(item.kind.title)")
     }
+    /// Measured on Paste 6.3.11: a 10-pt `text.justify.left` glyph, then the number on the footer's baseline, 12.5 pt in
+    /// from the card's right edge, in 65 % ink (#ACACAC on a dark card, brighter than the 55 % footer). It sits over the
+    /// centered count without moving it; a link address stops short of it.
+    @ViewBuilder private var quickPasteBadge: some View {
+        if let number = quickPasteNumber {
+            HStack(spacing: 3.5) {
+                Image(systemName: "text.justify.left").font(.system(size: 10))
+                Text(verbatim: "\(number)").font(.system(size: 12)).monospacedDigit()
+            }
+            .padding(.trailing, 11.5).padding(.bottom, 10)
+            .accessibilityHidden(true)
+        }
+    }
+    static let badgeWidth: CGFloat = 30
+    static let badgeInk = Color(nsColor: NSColor(name: nil) { appearance in
+        NSColor(white: appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? 1 : 0, alpha: 0.65)
+    })
     /// Paste's wording: "now", "30 seconds ago", "5 minutes ago", "3 hours ago", "yesterday", "2 weeks ago".
     static func relativeTime(_ date: Date, now: Date = Date()) -> String {
         let seconds = now.timeIntervalSince(date)

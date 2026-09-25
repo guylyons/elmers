@@ -10,7 +10,7 @@ Open items for 1:1 parity with Paste 6.3.11, compiled on 2026-09-25 from `docs/p
 - [ ] Pause: "Paused until …" label and "Paste Paused" / "Paste Resumed" notices
 - [ ] Menu bar icon animation (17 frames; observe its trigger)
 - [ ] Resizable panel (drag the top edge) and Compact Mode at small heights
-- [ ] "≡ 1" card marker (find out what it means)
+- [x] "≡ 1" card marker: Quick Paste numbers while ⌘ is held (September 25)
 - [ ] Highlighted matches in search results
 - [ ] "Show in" item on search results
 - [ ] "Paste as Plain Text" in the context menu (probably a Shift alternate)

@@ -16,6 +16,8 @@ final class AppModel: ObservableObject {
     @Published var suggestionsDismissed = false
     /// Paste's search mode: the field is open and the pinboard pills shrink to their icons.
     @Published var searchOpen = false
+    /// True while the Quick Paste modifier (⌘ by default) is held with the panel up: the first nine cards show their numbers.
+    @Published var quickPasteNumbersShown = false
     /// Paste's first run leaves a Useful Links pinboard with a welcome note, three short guides and help links. Elmers
     /// adapts the wording (it has no sync) and links to its own guide and issue tracker.
     func seedUsefulLinks() {

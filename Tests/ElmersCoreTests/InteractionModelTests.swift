@@ -40,6 +40,18 @@ final class InteractionModelTests {
         settings.activation = KeyStroke(43, .command)
         XCTAssertEqual(settings.validationError, "This shortcut cannot be used because it is already used by the menu item ‘Settings…’.")
     }
+    func testQuickPasteNumbersFollowTheModifier() {
+        var settings = ShortcutSettings()
+        XCTAssertTrue(settings.showsQuickPasteNumbers(.command))
+        XCTAssertTrue(settings.showsQuickPasteNumbers([.command, .shift]))
+        XCTAssertTrue(!settings.showsQuickPasteNumbers([]))
+        XCTAssertTrue(!settings.showsQuickPasteNumbers(.shift))
+        XCTAssertTrue(!settings.showsQuickPasteNumbers([.command, .option]))
+        settings.quickPasteModifier = .option; settings.plainTextModifier = .control
+        XCTAssertTrue(!settings.showsQuickPasteNumbers(.command))
+        XCTAssertTrue(settings.showsQuickPasteNumbers(.option))
+        XCTAssertTrue(settings.showsQuickPasteNumbers([.option, .control]))
+    }
     func testPasteKeyboardMap() {
         let cases: [(KeyStroke, KeyboardCommand)] = [
             (.init(124), .move(1, extend: false)), (.init(123), .move(-1, extend: false)),

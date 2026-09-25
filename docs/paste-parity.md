@@ -1,5 +1,16 @@
 # Paste parity inventory
 
+## September 25 — quick paste numbers while ⌘ is held
+
+Reference: Paste 6.3.11 on the 1512-pt built-in display at 2×, dark appearance. Evidence: the user's window-bound 2× capture of Paste's panel with ⌘ held, reduced to the pixel extents below (not committed), and the user's note that pressing ⌘ brings the numbers up. This settles the September 23 "≡ 1" marker: it is the Quick Paste number.
+
+| Surface | Observed in Paste 6.3.11 | Elmers status |
+|---|---|---|
+| When numbers show | While the Quick Paste modifier (⌘) is held with the panel up, the first cards read "≡ 1", "≡ 2", … in order from the left | **matched**: `ShortcutSettings.showsQuickPasteNumbers` (the Quick Paste modifier alone or with the Plain Text modifier, the same rule ⌘1…⌘9 use); `PanelController.updateQuickPasteNumbers` from a local `.flagsChanged` monitor and on `show()`; cleared on `hide()`. Numbers 1–9 only. Following a custom Quick Paste modifier is Elmers' reading; Paste with another modifier is unobserved |
+| Badge | A `text.justify.left` glyph 10 pt wide, then the number, on the footer's baseline; the number ends 12.5 pt from the card's right edge. Ink #ADADAD on a #141414 card (65 % white, brighter than the 55 % "185 characters" footer). On the orange Color card the ink is 65 % black. The centered count does not move; a link address is cut about 5.5 pt before the glyph | **matched** on a dark text card: glyph 972–991 × 557–573 px against Paste's 971–990 × 556–572, digit 1003–1014 against 1002–1014, ink #ADADAD against #ADADAD (`CardView.quickPasteBadge`, `badgeInk`). Color cards use 65 % black or white by luminance; link footers reserve 30 pt (`badgeWidth`) |
+
+Not compared: light appearance; Color and link card badges measured against Paste; whether Paste numbers the first nine cards of the list or of the scrolled view (Elmers numbers the list, as ⌘1…⌘9 already did); whether the numbers stay up while search has focus. Checks: core 70/70 (new "quick paste numbers follow the modifier"); `--check-interaction` passes, with new steps for holding ⌘, ⌘⌥ and releasing, and writes `quick-paste-numbers.png`. Lint is clean.
+
 ## September 25 — filter suggestions while typing
 
 Reference: Paste 6.3.11 on macOS 27.0 (26A428), 1512-pt built-in display at 2×, dark appearance. Keys posted to Paste's process as CGEvents with an empty TextEdit document frontmost (so no stray paste could land anywhere), suggestion rows read from the accessibility tree, and window-bound 2× captures reduced to the numbers below (not committed). Harmless probe words only.
@@ -121,7 +132,7 @@ Reference: Paste 6.3.11, same display and appearance as the search-mode section.
 | Card | Title "Color" in the usual app-colored header. The body, footer area included, is filled with exactly the color (#FF8800 measured #FF8800). The value is centered in 18-pt monospaced type (10.8-pt glyph pitch, 13-px cap height) in near-black (#2B1202 on orange). `FF8800` is shown as `#FF8800`. There is no "N characters" footer | implemented. Measured on Elmers: body #FF8800, text #2B1202, the same pitch and cap height. Text turns light on dark colors (luminance ≤ 0.18), which is an Elmers choice, not yet compared with Paste's dark swatch |
 | Filter | The Color chip in the popover's Type section, after Image | implemented, with Elmers' Screenshot between Image and Color. Typing "color" or "colors" also becomes the token |
 
-**Open:** a "≡ 1" marker (a text-justify icon and a number) appears in the bottom-right corner of some Paste cards, text and color alike, and not on others. Its meaning was not established, so Elmers does not draw it. Checks: core 58/58 (three new color checks); `--check-interaction` shows only the copied color for the Color chip and writes `color-card.png`.
+**Open:** a "≡ 1" marker (a text-justify icon and a number) appears in the bottom-right corner of some Paste cards, text and color alike, and not on others. Its meaning was not established, so Elmers does not draw it. (Corrected September 25: it is the Quick Paste number shown while ⌘ is held; see that section.) Checks: core 58/58 (three new color checks); `--check-interaction` shows only the copied color for the Color chip and writes `color-card.png`.
 
 ## September 23 — search mode and the filter popover
 
