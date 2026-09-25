@@ -196,6 +196,22 @@ final class KeyboardInteractionChecks {
                       model.visibleItems.allSatisfy({ [.text, .link].contains($0.kind) && $0.copiedAt >= start }),
                       model.visibleItems.contains(where: { $0.kind == .link }) else { fail("Text + Link + Today did not show today's text and links: \(model.visibleItems.map(\.kind))") }
                 capturePanel(controller, name: "search-tokens")
+                // A click on the filter button closes the open popover and must not reopen it; a second click opens it again.
+                func clickFilterButton() {
+                    let point = controller.panel.convertPoint(fromScreen: NSPoint(x: button.midX, y: button.midY))
+                    for type: NSEvent.EventType in [.leftMouseDown, .leftMouseUp] {
+                        NSApp.postEvent(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: controller.panel.windowNumber,
+                                                           context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0)!, atStart: false)
+                    }
+                }
+                clickFilterButton()
+                after(0.5) {
+                guard !model.filtersOpen, !NSApp.windows.contains(where: { $0.isVisible && String(describing: type(of: $0)).contains("Popover") })
+                else { fail("clicking the filter button should close the open filter popover, not reopen it") }
+                clickFilterButton()
+                after(0.5) {
+                guard model.filtersOpen else { fail("clicking the filter button again should reopen the filter popover") }
+                print("PASS: clicking the filter button closes the open popover and a second click reopens it")
                 key(53, "\u{1B}")
                 after(0.3) {
                     guard !model.filtersOpen, model.filters.tokens.count == 3, model.searchOpen else { fail("first Escape should only close the filter chips") }
@@ -210,6 +226,8 @@ final class KeyboardInteractionChecks {
                             checkInlineRename(model: model, controller: controller)
                         }
                     }
+                }
+                }
                 }
             }
         }

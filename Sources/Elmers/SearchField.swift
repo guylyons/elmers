@@ -251,9 +251,30 @@ struct FilterPopoverAnchor: NSViewRepresentable {
             }
         }
         func stopTracking() { if let moveObserver { NotificationCenter.default.removeObserver(moveObserver); self.moveObserver = nil } }
+        /// A transient popover closes on any mouse-down outside it, which would clear `filtersOpen` just before the filter
+        /// button's own toggle set it again and reopened the popover. A press on the button is left to that toggle.
+        func popoverShouldClose(_ popover: NSPopover) -> Bool {
+            guard let event = NSApp.currentEvent, event.type == .leftMouseDown, let anchor, event.window === anchor.window else { return true }
+            return !anchor.buttonRect.contains(anchor.convert(event.locationInWindow, from: nil))
+        }
+        /// Set while a close asked for by `filtersOpen` animates out, during which the popover still reports itself shown.
+        var closingOnRequest = false
+        func show(from view: AnchorView) {
+            guard let model, view.window != nil else { return }
+            // Sized up front: a hosting controller that sized the popover itself grew it after it was placed, off center.
+            let content = NSHostingController(rootView: FilterPopover(model: model)); content.sizingOptions = []
+            popover.contentViewController = content; popover.contentSize = FilterPopover.size
+            popover.show(relativeTo: view.buttonRect.offsetBy(dx: FilterPopoverAnchor.bodyOffset, dy: 0), of: view, preferredEdge: .maxY)
+            trackMoves()
+        }
         func popoverDidClose(_ notification: Notification) {
             stopTracking()
-            if model?.filtersOpen == true { model?.filtersOpen = false }
+            // A close the popover made itself (an outside click) clears the flag; after one `filtersOpen` asked for, the
+            // flag may already be set again (the filter button pressed twice), and the popover then comes back.
+            if closingOnRequest {
+                closingOnRequest = false
+                if model?.filtersOpen == true, let anchor { show(from: anchor) }
+            } else if model?.filtersOpen == true { model?.filtersOpen = false }
         }
     }
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -261,14 +282,12 @@ struct FilterPopoverAnchor: NSViewRepresentable {
     func updateNSView(_ view: AnchorView, context: Context) {
         let coordinator = context.coordinator, popover = coordinator.popover
         coordinator.model = model; coordinator.anchor = view
-        if isOpen, !popover.isShown, view.window != nil {
-            // Sized up front: a hosting controller that sized the popover itself grew it after it was placed, off center.
-            let content = NSHostingController(rootView: FilterPopover(model: model)); content.sizingOptions = []
-            popover.contentViewController = content; popover.contentSize = FilterPopover.size
-            popover.show(relativeTo: view.buttonRect.offsetBy(dx: Self.bodyOffset, dy: 0), of: view, preferredEdge: .maxY)
-            coordinator.trackMoves()
-        } else if !isOpen, popover.isShown {
-            popover.performClose(nil)
+        if isOpen, !popover.isShown {
+            coordinator.show(from: view)
+        } else if !isOpen, popover.isShown, !coordinator.closingOnRequest {
+            // `close()` skips `popoverShouldClose`, which would refuse while the filter button's click is still current.
+            coordinator.closingOnRequest = true
+            popover.close()
         }
         if popover.isShown { Self.pointArrow(of: popover, at: view) }
     }

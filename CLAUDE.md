@@ -31,7 +31,7 @@ SwiftPM only (Swift 5.9, macOS 14+, no Xcode project, no third-party deps).
 
 - Keep pure logic in `ElmersCore` (testable by the runner). AppKit/SwiftUI and OS integration live in `Elmers`, `@MainActor`, with check code behind `#if DEBUG`.
 - Store: `~/Library/Application Support/Elmers/history.sqlite` (0600, `secure_delete`, excluded from Time Machine). The README's `history.plist` is stale. Migrations are explicit: bump `HistoryStore.schemaVersion` and add to `migrations`. Newer or damaged databases are rejected untouched. Multiple writers are expected (`PRAGMA data_version`).
-- Never delete retained backups (`history.plist.migrated`, `.pre-sqlite`, `.recovered`, `history-recovery-*`) unless the user asks.
+- Never delete retained backups (`history.plist.migrated`, `.pre-sqlite`, `.recovered`, `history-recovery-*`, `history-orphaned-*`) unless the user asks.
 - Direct paste needs Accessibility and otherwise falls back to "Copied. Press ⌘V". Only one app can own ⇧⌘V, so quit Paste before testing the shortcut.
 
 ## Hands-on UI testing
