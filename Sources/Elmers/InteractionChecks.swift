@@ -83,10 +83,37 @@ final class InteractionChecks {
                     guard deliveries == 1 else { print("FAIL: double click did not deliver exactly once (\(deliveries))"); fflush(stdout); exit(1) }
                     print("PASS: double click delivers exactly once")
                     observation = nil
+                    checkPlainTextAlternate(model: model, controller: controller)
                     KeyboardInteractionChecks.run(model: model, controller: controller)
                 }
             }
         }
+    }
+    /// The card menu's Paste item has a Plain Text-modifier alternate that pastes the whole selection as plain text.
+    static func checkPlainTextAlternate(model: AppModel, controller: PanelController) {
+        guard #available(macOS 15, *) else { print("SKIP: Paste as Plain Text alternate needs macOS 15"); return }
+        func fail(_ message: String) -> Never { print("FAIL: \(message)"); fflush(stdout); exit(1) }
+        let saved = model.deliver
+        defer { model.deliver = saved }
+        var deliveries: [(Int, Bool)] = []
+        model.deliver = { item, plain in deliveries.append((item.payload.items.count, plain)) }
+        model.selectAll()
+        let location = NSPoint(x: 365, y: 130)
+        guard let event = NSEvent.mouseEvent(with: .rightMouseDown, location: location, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: controller.panel.windowNumber, context: nil, eventNumber: 3, clickCount: 1, pressure: 1),
+              let root = controller.panel.contentView else { fail("could not build a right-click on a card") }
+        var view = root.hitTest(root.convert(location, from: nil)); var menu: NSMenu?
+        while let current = view, menu == nil { menu = current.menu(for: event); view = current.superview }
+        guard let menu else { fail("right-clicking a card produced no menu") }
+        guard let index = menu.items.firstIndex(where: { $0.title == String(localized: "Paste as Plain Text") }), index > 0 else { fail("card menu has no Paste as Plain Text item: \(menu.items.map(\.title))") }
+        let alternate = menu.items[index], primary = menu.items[index - 1]
+        guard alternate.isAlternate, alternate.keyEquivalentModifierMask == primary.keyEquivalentModifierMask.union(.shift), alternate.keyEquivalent == primary.keyEquivalent else {
+            fail("Paste as Plain Text is not the ⇧ alternate of \(primary.title) (alternate \(alternate.isAlternate), mask \(alternate.keyEquivalentModifierMask.rawValue))")
+        }
+        menu.performActionForItem(at: index)
+        guard deliveries.count == 1, deliveries[0].1, deliveries[0].0 == model.selectedItems.count, model.selectedItems.count > 1 else { fail("Paste as Plain Text delivered \(deliveries)") }
+        menu.performActionForItem(at: index - 1)
+        guard deliveries.count == 2, !deliveries[1].1 else { fail("Paste after the alternate delivered \(deliveries)") }
+        print("PASS: holding ⇧ in the card menu offers Paste as Plain Text, which pastes the selection as plain text")
     }
 }
 #endif

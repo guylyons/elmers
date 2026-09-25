@@ -1,5 +1,15 @@
 # Paste parity inventory
 
+## September 25 — Paste as Plain Text in the card menu
+
+Reference: Paste 6.3.11's Help Center, which lists "Paste as Plain Text" among the item context menu's actions, and Paste's own string `general.action.paste-as-plain-text` ("Paste as Plain Text") in `PastePackages_PasteLocalization.bundle`. How Paste presents it (a separate row, or an alternate revealed by a modifier) was **not observed**; the Shift alternate below follows the macOS convention and Elmers' ⇧↩.
+
+| Surface | Observed in Paste 6.3.11 | Elmers status |
+|---|---|---|
+| Paste as Plain Text in the card menu | Documented, not observed: the context menu offers Paste as Plain Text | **implemented**: in `HistoryView.itemMenu`, holding the Plain Text modifier (⇧ by default, following Settings › Shortcuts › Plain Text mode) swaps "Paste to <app>" / "Paste" for "Paste as Plain Text" with ↩ plus that modifier as its hint (SwiftUI `modifierKeyAlternate`, which becomes an `NSMenuItem` with `isAlternate`). It calls `AppModel.activate(plainText: true)`, so it pastes the whole selection as one plain-text delivery, like ⇧↩. macOS 14 keeps the menu without the alternate. Localized with Paste's translation of `general.action.paste-as-plain-text` in all 16 languages |
+
+Not compared: Paste's actual menu (whether the item is an alternate, which modifier reveals it, its shortcut hint and position); whether Paste also offers "Copy as Plain Text" there (its bundle has `general.action.copy-as-plain-text`; Elmers does not add it). Checks: core 70/70; `--demo --check-interaction` passes, with the new step "holding ⇧ in the card menu offers Paste as Plain Text, which pastes the selection as plain text" (reads the card's real `NSMenu` via `menu(for:)`, checks the alternate's key equivalent and modifier mask against Paste's row, and performs both items on a two-card selection). Lint is clean.
+
 ## September 25 — storage edge cases (Elmers-internal)
 
 No Paste reference: these are `HistoryStore` robustness items left open by the September 22 storage review.

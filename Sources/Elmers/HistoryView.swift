@@ -243,7 +243,12 @@ struct HistoryView: View {
             Button("Copy File") { model.useScreenshotOriginal(item, copyFile: true) }
             Divider()
         }
-        Button(model.directPaste ? "Paste to \(model.destinationApp ?? "current app")" : "Paste") { model.activate() }.keyboardShortcut(.return, modifiers: [])
+        let paste = Button(model.directPaste ? "Paste to \(model.destinationApp ?? "current app")" : "Paste") { model.activate() }.keyboardShortcut(.return, modifiers: [])
+        // Holding the Plain Text modifier (⇧ by default) swaps Paste for Paste as Plain Text, the menu form of ⇧↩.
+        if #available(macOS 15, *) {
+            let plain = EventModifiers(model.shortcuts.plainTextModifier)
+            paste.modifierKeyAlternate(plain) { Button("Paste as Plain Text") { model.activate(plainText: true) }.keyboardShortcut(.return, modifiers: plain) }
+        } else { paste }
         Button("Copy") { if let aggregate = model.selectedAggregate(), model.copy(aggregate) { model.showCopied?() } }.keyboardShortcut("c")
         Divider()
         Button("Edit") { model.openEditor?(item) }.keyboardShortcut("e").disabled((item.text.isEmpty && !item.kind.isImage) || !model.canEdit)
@@ -269,6 +274,16 @@ struct HistoryView: View {
         if item.kind.isImage, let image = imagePreview(item) { ShareLink("Share…", item: Image(nsImage: image), preview: SharePreview(item.title ?? item.kind.title, image: Image(nsImage: image))) }
         else if let url = urls.first, item.kind == .link { ShareLink("Share…", item: url) }
         else if !item.text.isEmpty { ShareLink("Share…", item: item.text) }
+    }
+}
+
+extension EventModifiers {
+    init(_ modifiers: KeyModifiers) {
+        self = []
+        if modifiers.contains(.command) { insert(.command) }
+        if modifiers.contains(.shift) { insert(.shift) }
+        if modifiers.contains(.option) { insert(.option) }
+        if modifiers.contains(.control) { insert(.control) }
     }
 }
 

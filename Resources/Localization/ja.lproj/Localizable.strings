@@ -128,6 +128,7 @@
 "Organize" = "整理";
 "Paste" = "貼り付け";
 "Paste Items" = "アイテムを貼り付ける";
+"Paste as Plain Text" = "書式なしテキストとして貼り付け";
 "Paste as plain text" = "プレーンテキストとして貼り付け";
 "Paste selected items" = "選択した項目を貼り付け";
 "Paste selected items directly to the application you are currently using." = "現在使用中のアプリケーションに選択したアイテムを直接貼り付けます。";

@@ -128,6 +128,7 @@
 "Organize" = "Организация";
 "Paste" = "Вставить";
 "Paste Items" = "Вставка";
+"Paste as Plain Text" = "Вставить как обычный текст";
 "Paste as plain text" = "Вставить как простой текст";
 "Paste selected items" = "Вставить выбранные элементы";
 "Paste selected items directly to the application you are currently using." = "Вставлять выбранные элементы непосредственно в приложение, которое используется в данный момент.";

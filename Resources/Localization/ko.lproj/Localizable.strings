@@ -128,6 +128,7 @@
 "Organize" = "정리";
 "Paste" = "붙여넣기";
 "Paste Items" = "항목 붙여넣기";
+"Paste as Plain Text" = "일반 텍스트로 붙여넣기";
 "Paste as plain text" = "일반 텍스트로 붙여넣기";
 "Paste selected items" = "선택한 항목 붙여넣기";
 "Paste selected items directly to the application you are currently using." = "선택한 항목을 현재 사용 중인 애플리케이션에 바로 붙여넣습니다.";

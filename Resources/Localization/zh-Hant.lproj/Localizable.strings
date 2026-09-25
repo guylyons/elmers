@@ -128,6 +128,7 @@
 "Organize" = "組織";
 "Paste" = "粘貼";
 "Paste Items" = "粘貼項目";
+"Paste as Plain Text" = "以純文本貼上";
 "Paste as plain text" = "貼上為純文字";
 "Paste selected items" = "貼上所選項目";
 "Paste selected items directly to the application you are currently using." = "將所選項目直接粘貼到當前使用的應用程序中。";

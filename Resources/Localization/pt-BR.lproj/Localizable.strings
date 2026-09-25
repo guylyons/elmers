@@ -128,6 +128,7 @@
 "Organize" = "Organizar";
 "Paste" = "Colar";
 "Paste Items" = "Colar Itens";
+"Paste as Plain Text" = "Colar como Texto Sem Formatação";
 "Paste as plain text" = "Colar como texto simples";
 "Paste selected items" = "Colar itens selecionados";
 "Paste selected items directly to the application you are currently using." = "Cole os itens selecionados diretamente no aplicativo que você está usando no momento.";
