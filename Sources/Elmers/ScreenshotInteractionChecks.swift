@@ -89,9 +89,12 @@ enum ScreenshotInteractionChecks {
                 require(imagePreview(screenshot) != nil, "screenshot uses real image preview")
                 model.filters = SearchFilters([.kind(.image)])
                 require(model.visibleItems.contains { $0.id == screenshot.id }, "Images includes screenshot cards")
+                // A typed type word stays search text (the chip is only offered) and finds the type by name, as in Paste;
+                // a screenshot is also an image.
                 model.clearSearch(); model.query = "SCREENSHOT"
-                await until("Screenshot query becomes dedicated type filter") { model.filters.tokens == [.kind(.screenshot)] && model.query.isEmpty }
-                require(model.removeLastFilter() && model.query.isEmpty && model.filters.isEmpty, "Backspace removes the screenshot token and its text")
+                await until("typing screenshot finds screenshot cards by their type") { model.visibleItems.contains { $0.id == screenshot.id } && model.filters.isEmpty }
+                model.query = "imag"
+                await until("typing the start of image finds screenshot cards") { model.visibleItems.contains { $0.id == screenshot.id } }
                 model.clearSearch()
                 let count = model.history.items.count
                 model.paused = true; model.ingestScreenshot(captures[1]); model.paused = false

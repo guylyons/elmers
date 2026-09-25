@@ -40,13 +40,42 @@ final class HistoryTests {
         XCTAssertEqual(again.boardIDs, [board.id])
     }
 
-    func testSearchMatchesTextAndSourceCaseInsensitivelyAndFiltersType() {
+    func testSearchMatchesTextCaseInsensitivelyAndFiltersType() {
         var history = History()
         _ = history.capture(.text("Café recipe"), source: "Notes")
         _ = history.capture(.text("https://example.com"), source: "Safari")
         XCTAssertEqual(history.filtered(query: "CAFE").count, 1)
-        XCTAssertEqual(history.filtered(query: "safari").first?.kind, .link)
         XCTAssertTrue(history.filtered(query: "recipe", kind: .link).isEmpty)
+    }
+    /// Measured on Paste 6.3.11 (September 25): "link" and "lin" find every link, and texts with a word starting so;
+    /// "ink" and "olor" find nothing; "links" is not the type; app names ("signal", "safari") find nothing.
+    func testSearchMatchesWordStartsAndTypeNamesAsPaste() {
+        var history = History()
+        let link = history.capture(.text("https://example.com/page"), source: "Safari")
+        let note = history.capture(.text("a link to the slides"), source: "Notes")
+        let color = history.capture(.text("#FF8800"), source: "Notes")
+        let plural = history.capture(.text("useful links"), source: "Notes")
+        func found(_ query: String) -> [UUID] { history.filtered(query: query).map(\.id) }
+        XCTAssertEqual(found("link"), [plural.id, note.id, link.id])
+        XCTAssertEqual(found("LIN"), [plural.id, note.id, link.id])
+        XCTAssertEqual(found("links"), [plural.id])
+        XCTAssertTrue(found("ink").isEmpty)
+        XCTAssertEqual(found("col"), [color.id])
+        XCTAssertTrue(found("olor").isEmpty)
+        XCTAssertTrue(found("safari").isEmpty)
+        XCTAssertTrue(found("notes").isEmpty)
+        // Words start after punctuation too: host and path parts of an address.
+        XCTAssertEqual(found("example"), [link.id])
+        XCTAssertEqual(found("page"), [link.id])
+        XCTAssertTrue(found("xample").isEmpty)
+        // Every word must match; a word starting with a symbol matches anywhere.
+        XCTAssertEqual(found("link slides"), [note.id])
+        XCTAssertEqual(found("#ff88"), [color.id])
+        XCTAssertEqual(found("text link"), [plural.id, note.id])
+        XCTAssertTrue(found("color link").isEmpty)
+        // Chinese and Japanese characters each start a word.
+        let chinese = history.capture(.text("我喜欢北京烤鸭"), source: "Notes")
+        XCTAssertEqual(found("北京"), [chinese.id])
     }
 
     func testFilterSuggestions() {
@@ -73,11 +102,12 @@ final class HistoryTests {
         // Accepting drops the typed word and keeps what came before it.
         XCTAssertEqual(FilterSuggestions.accepting("foo li"), "foo ")
         XCTAssertEqual(FilterSuggestions.accepting("li"), "")
-        // The word stays search text: "link" searches for "link", it does not filter by type.
+        // The word stays search text rather than becoming a filter, and search text matches type names as in Paste:
+        // "link" finds the note that says it and every link.
         var history = History()
-        _ = history.capture(.text("https://example.com"), source: "Safari")
+        let link = history.capture(.text("https://example.com"), source: "Safari")
         let note = history.capture(.text("a link to the slides"), source: "Notes")
-        XCTAssertEqual(history.filtered(query: "link").map(\.id), [note.id])
+        XCTAssertEqual(history.filtered(query: "link").map(\.id), [note.id, link.id])
     }
 
     func testRetentionPreservesPinnedItems() {

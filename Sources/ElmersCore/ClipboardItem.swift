@@ -6,6 +6,27 @@ public enum ContentKind: String, Codable, CaseIterable, Identifiable, Sendable {
     case text = "Text", link = "Link", image = "Image", screenshot = "Screenshot", file = "File", color = "Color", other = "Content"
     public var id: String { rawValue }
     public var isImage: Bool { self == .image || self == .screenshot }
+    /// The names search matches the type by: English, as in Paste's index, and the card title in the user's language.
+    /// A screenshot is also an image, which is what Paste calls it.
+    public var searchNames: [String] {
+        let english: [String]
+        switch self {
+        case .other: english = ["Unknown"]
+        case .screenshot: english = ["Screenshot", "Image"]
+        default: english = [rawValue]
+        }
+        let localized: String
+        switch self {
+        case .text: localized = String(localized: "Text")
+        case .link: localized = String(localized: "Link")
+        case .image: localized = String(localized: "Image")
+        case .screenshot: localized = String(localized: "Screenshot")
+        case .file: localized = String(localized: "File")
+        case .color: localized = String(localized: "Color")
+        case .other: localized = String(localized: "Unknown")
+        }
+        return english.contains(localized) ? english : english + [localized]
+    }
 }
 
 /// Where a stored payload's large representations live, and how to read them back.
@@ -188,7 +209,7 @@ public struct ClipboardItem: Codable, Identifiable, Equatable, Sendable {
     public var linkPreview: LinkPreview? { didSet { refreshSearchKey() } }
     /// Text recognized in an image item; empty string records that recognition ran and found nothing.
     public var recognizedText: String? { didSet { refreshSearchKey() } }
-    public var screenshot: ScreenshotOrigin?
+    public var screenshot: ScreenshotOrigin? { didSet { refreshSearchKey() } }
     /// False once the item has left Clipboard History (by age, Erase History or deletion there) while it stays pinned.
     /// Paste 6.3.11 keeps pinned items in their pinboard "even when they're no longer part of your clipboard history".
     public var inHistory = true
@@ -199,8 +220,10 @@ public struct ClipboardItem: Codable, Identifiable, Equatable, Sendable {
     private var cachedText = ""
     private var cachedKind: ContentKind = .other
     private var cachedByteCount = 0
-    /// Everything search matches (text, source, title, recognized text, link title), folded for case and
+    /// Everything search matches (text, title, recognized text, link title and the type's names), folded for case and
     /// diacritics once per change, so a search compares bytes instead of folding every item on every keystroke.
+    /// Paste 6.3.11 searches through Spotlight with its own `pasteType` attribute: typing "link" or "lin" finds every
+    /// link, but the source app's name ("safari") finds nothing, so the source is not part of the key.
     public private(set) var searchKey: [UInt8] = []
     public var text: String { cachedText }
     public var kind: ContentKind { cachedKind == .image && screenshot != nil ? .screenshot : cachedKind }
@@ -226,7 +249,7 @@ public struct ClipboardItem: Codable, Identifiable, Equatable, Sendable {
         refreshSearchKey()
     }
     private mutating func refreshSearchKey() {
-        let fields = [cachedText, source, title ?? "", recognizedText ?? "", linkPreview?.title ?? ""]
+        let fields = [cachedText, title ?? "", recognizedText ?? "", linkPreview?.title ?? ""] + kind.searchNames
         searchKey = Array(Self.fold(fields.joined(separator: "\u{0}")).utf8)
     }
     /// The folding search applies to both the items and the typed words.

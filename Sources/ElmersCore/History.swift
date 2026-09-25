@@ -45,17 +45,48 @@ public struct History: Codable, Sendable {
         let matches = items.filter { item in
             (kind == nil || item.kind == kind || (kind == .image && item.kind.isImage)) &&
             (boardID.map { item.boardIDs.contains($0) } ?? (item.inHistory || !tokens.isEmpty)) &&
-            tokens.allSatisfy { token in Self.contains(item.searchKey, token) }
+            tokens.allSatisfy { token in Self.containsWord(item.searchKey, startingWith: token) }
         }
         guard boardID != nil else { return matches }
         return matches.enumerated().sorted { ($0.element.pinPosition, $0.offset) < ($1.element.pinPosition, $1.offset) }.map(\.element)
     }
-    /// Byte search of a folded token in a folded key. The key joins fields with NUL, so a token never spans two.
-    static func contains(_ haystack: [UInt8], _ needle: [UInt8]) -> Bool {
+    /// Whether a folded token starts a word of a folded key. The key joins fields with NUL, so a token never spans two.
+    /// Paste 6.3.11 matches words from their start ("lin" and "link" find "link", "ink" finds nothing), as its Spotlight
+    /// query's word-based comparison does. A token that starts with a symbol ("#ff") may match anywhere; Chinese and
+    /// Japanese characters, written without spaces, each start a word.
+    static func containsWord(_ haystack: [UInt8], startingWith needle: [UInt8]) -> Bool {
         guard !needle.isEmpty else { return true }
+        let anywhere = !isWordCharacter(needle, at: 0) || isEachCharacterAWord(needle, at: 0)
         return haystack.withUnsafeBytes { key in needle.withUnsafeBytes { word in
-            memmem(key.baseAddress, key.count, word.baseAddress, word.count) != nil
+            guard let base = key.baseAddress else { return false }
+            var offset = 0
+            while offset + word.count <= key.count, let found = memmem(base + offset, key.count - offset, word.baseAddress, word.count) {
+                let start = base.distance(to: found)
+                if anywhere || start == 0 { return true }
+                // The character before the match: step back over UTF-8 continuation bytes to its first byte.
+                var previous = start - 1
+                while previous > 0, haystack[previous] & 0xC0 == 0x80 { previous -= 1 }
+                if !isWordCharacter(haystack, at: previous) || isEachCharacterAWord(haystack, at: previous) { return true }
+                offset = start + 1
+            }
+            return false
         } }
+    }
+    private static func scalar(_ bytes: [UInt8], at index: Int) -> Unicode.Scalar? {
+        var end = index + 1
+        while end < bytes.count, bytes[end] & 0xC0 == 0x80 { end += 1 }
+        return String(decoding: bytes[index..<end], as: UTF8.self).unicodeScalars.first
+    }
+    private static func isWordCharacter(_ bytes: [UInt8], at index: Int) -> Bool {
+        let byte = bytes[index]
+        if byte < 0x80 { return (byte >= 0x30 && byte <= 0x39) || (byte >= 0x41 && byte <= 0x5A) || (byte >= 0x61 && byte <= 0x7A) }
+        guard let scalar = scalar(bytes, at: index) else { return false }
+        return scalar.properties.isAlphabetic || scalar.properties.numericType != nil
+    }
+    private static func isEachCharacterAWord(_ bytes: [UInt8], at index: Int) -> Bool {
+        guard bytes[index] >= 0x80, let scalar = scalar(bytes, at: index) else { return false }
+        if scalar.properties.isIdeographic { return true }
+        return (0x3040...0x30FF).contains(scalar.value) // Hiragana and Katakana
     }
     @discardableResult public mutating func createBoard(name: String) -> Pinboard {
         let board = Pinboard(name: name.trimmingCharacters(in: .whitespacesAndNewlines), colorIndex: boards.count % Pinboard.colorCount)

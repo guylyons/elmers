@@ -16,7 +16,7 @@ Open items for 1:1 parity with Paste 6.3.11, compiled on 2026-09-25 from `docs/p
 - [x] "Paste as Plain Text" in the context menu: the ⇧ alternate of Paste, following the Plain Text modifier (September 25; Paste's own presentation not yet observed)
 - [ ] Show in Menu Bar setting (probably conditional; find out when it appears)
 - [ ] Right-to-left mirroring for Hebrew (check whether Paste mirrors)
-- [ ] Search result ranking
+- [x] Search result ranking: Paste does not rank; it matches type names and word starts, now matched (September 25)
 
 ## Known differences
 
