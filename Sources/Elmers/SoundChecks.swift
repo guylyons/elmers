@@ -46,6 +46,20 @@ enum SoundChecks {
         expect(deleteSamples != rendered[.paste] && confirmationSamples != copySamples,
                "delete, paste, confirmation, and copy feedback should remain distinct")
 
+        // Switching the output device, plugging in headphones or sleeping stops the engine behind our back;
+        // the next effect must still reach the output rather than going silent for the rest of the session.
+        func reachesOutput(_ effect: SoundEffects.Effect) -> Bool {
+            let played = PlayedFlag()
+            SoundEffects.shared.enabled = true
+            SoundEffects.shared.play(effect) { played.set() }
+            let deadline = Date().addingTimeInterval(2)
+            while !played.value && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
+            return played.value
+        }
+        expect(reachesOutput(.paste), "an effect should reach the audio output")
+        SoundEffects.shared.stopEngineForCheck()
+        expect(reachesOutput(.paste), "an effect should still play after the audio engine was stopped by a configuration change")
+
         if let directory = ProcessInfo.processInfo.environment["ELMERS_CAPTURE_DIR"] {
             for (effect, samples) in rendered {
                 let url = URL(fileURLWithPath: directory).appendingPathComponent("sound-\(effect).wav")
@@ -56,6 +70,12 @@ enum SoundChecks {
         if failures.isEmpty { print("PASS: sound routing and \(SoundEffects.Effect.allCases.count) synthesized effects") }
         else { failures.forEach { print("FAIL: \($0)") } }
         fflush(stdout); exit(failures.isEmpty ? 0 : 1)
+    }
+
+    private final class PlayedFlag: @unchecked Sendable {
+        private let lock = NSLock(); private var played = false
+        var value: Bool { lock.withLock { played } }
+        func set() { lock.withLock { played = true } }
     }
 
     /// Start times of energy bursts: 2 ms windows whose RMS jumps above a third of the loudest window

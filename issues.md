@@ -107,4 +107,12 @@
   focused. The hold now ends when focus is reported, with a 0.5 s fallback. Re-recorded after a real click on
   the magnifier and after ⌘F: the ring stays on from mid-open into focus.)
 
-  - [open] after a while of using the app it seems like sound stops working
+- [fixed 2026-09-28; automated check passed, not yet heard by ear] after a while of using the app it seems like sound stops working
+  (Reproduced outside the app with the same AVAudioEngine setup: switching the default output device
+  (MacBook Pro Speakers → BlackHole 2ch → back) posts two configuration-change notifications and leaves the
+  engine stopped, while the player still reports playing. `SoundEffects` started the engine once behind a
+  `started` flag and never again, so every later effect was scheduled into a stopped engine and never reached
+  the output. Headphones, AirPods, sleep, or a call app taking over the device all do the same. `play` now
+  checks `engine.isRunning` and, when it has stopped, stops the player, restarts the engine and plays again;
+  restarting the engine alone was not enough, the player had to be reset too. `--check-sounds` now stops the
+  engine and requires the next effect to reach playback: it failed before the fix and passes after.)

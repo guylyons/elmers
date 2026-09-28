@@ -21,21 +21,31 @@ final class SoundEffects {
     private let player = AVAudioPlayerNode()
     private let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 2)!
     private lazy var buffers: [Effect: AVAudioPCMBuffer] = Dictionary(uniqueKeysWithValues: Effect.allCases.map { ($0, render(Self.samples(for: $0))) })
-    private var started = false
 
     private init() {
         engine.attach(player)
         engine.connect(player, to: engine.mainMixerNode, format: format)
     }
 
-    func play(_ effect: Effect) {
+    func play(_ effect: Effect) { play(effect, playedBack: nil) }
+
+    /// `playedBack` runs on an audio thread once the effect has reached the output.
+    func play(_ effect: Effect, playedBack: (@Sendable () -> Void)?) {
         guard enabled, let buffer = buffers[effect] else { return }
-        if !started {
-            do { try engine.start(); started = true } catch { return }
+        // An audio configuration change (another output device, headphones, sleep) stops the engine and leaves
+        // the player holding stale state, so every later effect went silent; restart both when that happens.
+        if !engine.isRunning {
+            player.stop()
+            do { try engine.start() } catch { return }
         }
         if !player.isPlaying { player.play() }
-        player.scheduleBuffer(buffer, at: nil, options: .interrupts)
+        player.scheduleBuffer(buffer, at: nil, options: .interrupts, completionCallbackType: .dataPlayedBack) { _ in playedBack?() }
     }
+
+    #if DEBUG
+    /// Leaves the engine as an audio configuration change does: stopped, with the player still marked playing.
+    func stopEngineForCheck() { engine.stop() }
+    #endif
 
     private func render(_ samples: [Float]) -> AVAudioPCMBuffer {
         let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count))!
