@@ -32,3 +32,27 @@ public struct TimingCurve: Equatable, Sendable {
         return 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t
     }
 }
+
+/// The menu bar character's "gulp" when an item lands in history: it squashes down as if swallowing, springs up
+/// taller and narrower, then settles with a small wobble. Scales are applied about the icon's bottom center.
+public enum GulpAnimation {
+    public static let duration = 0.5
+    public static let framesPerSecond = 60.0
+    /// (time fraction, horizontal scale, vertical scale).
+    static let keyframes: [(Double, Double, Double)] = [(0, 1, 1), (0.24, 1.12, 0.82), (0.52, 0.92, 1.10), (0.76, 1.03, 0.97), (1, 1, 1)]
+
+    /// Horizontal and vertical scale at elapsed fraction `t` (clamped to 0...1), eased between keyframes.
+    public static func scale(at t: Double) -> (x: Double, y: Double) {
+        let t = min(max(t, 0), 1)
+        guard let upper = keyframes.firstIndex(where: { $0.0 >= t }), upper > 0 else { return (1, 1) }
+        let a = keyframes[upper - 1], b = keyframes[upper]
+        let local = (t - a.0) / (b.0 - a.0), eased = local * local * (3 - 2 * local)
+        return (a.1 + (b.1 - a.1) * eased, a.2 + (b.2 - a.2) * eased)
+    }
+
+    /// One scale per display frame, ending at rest.
+    public static var frames: [(x: Double, y: Double)] {
+        let count = Int((duration * framesPerSecond).rounded())
+        return (1...count).map { scale(at: Double($0) / Double(count)) }
+    }
+}

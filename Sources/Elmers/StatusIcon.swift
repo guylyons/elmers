@@ -1,4 +1,5 @@
 import AppKit
+import ElmersCore
 
 /// Builds the menu bar image from the bundled toolbar artwork.
 ///
@@ -35,6 +36,20 @@ enum StatusIcon {
         }
         image.accessibilityDescription = String(localized: "Elmers clipboard history, paused")
         return image
+    }
+
+    /// The capture "gulp" (see `GulpAnimation`), one image per display frame. The canvas leaves room for the squash
+    /// to widen and the stretch to rise; the icon's bottom edge stays where the resting icon's is.
+    static func gulpFrames(of icon: NSImage) -> [NSImage] {
+        GulpAnimation.frames.map { scale in
+            let image = NSImage(size: NSSize(width: 24, height: 22), flipped: false) { _ in
+                let width = 20 * scale.x, height = 20 * scale.y
+                icon.draw(in: NSRect(x: 12 - width / 2, y: 1, width: width, height: height))
+                return true
+            }
+            image.accessibilityDescription = accessibilityDescription
+            return image
+        }
     }
 
     static func template(from source: NSImage, pointSize: CGFloat) -> NSImage? { render(source, pointSize: pointSize, template: true) }

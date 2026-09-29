@@ -49,6 +49,7 @@ let lazy = LazyPayloadTests()
 let stackTests = PasteStackTests()
 let checks: [(String, () throws -> Void)] = [
     ("panel timing curves match Paste's recorded motion", motion.testPanelCurvesMatchPasteRecordings),
+    ("the menu bar gulp squashes, stretches and settles", motion.testGulpSquashesStretchesAndSettles),
     ("deleted and replaced content leaves no trace on disk", security.testDeletedAndReplacedContentLeavesNoTraceOnDisk),
     ("an existing database is scrubbed when opened", security.testExistingDatabaseIsScrubbedWhenOpened),
     ("the history folder is excluded from backups", security.testHistoryFolderIsExcludedFromBackups),

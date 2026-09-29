@@ -19,7 +19,8 @@ enum StatusItemChecks {
             menu.performActionForItem(at: index)
             presented = nil
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { gulp(delegate: delegate, fail: fail) { clicks() } }
+        func clicks() {
             click(delegate: delegate, right: true) {
                 guard !delegate.panelController.isShown else { fail("right-click opened history") }
                 choose("Settings…")
@@ -35,6 +36,20 @@ enum StatusItemChecks {
                         print("PASS: status-item right-click shows Paste's menu (Settings… opens Settings); left-click opens history"); fflush(stdout); exit(0)
                     }
                 }
+            }
+        }
+    }
+
+    /// A captured item plays the gulp on the menu bar button, then the resting icon comes back.
+    private static func gulp(delegate: AppDelegate, fail: @escaping (String) -> Never, completion: @escaping @MainActor () -> Void) {
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { print("SKIP: gulp (Reduce Motion is on)"); completion(); return }
+        let button = delegate.statusItem.button!
+        delegate.model.itemCaptured?()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            guard button.image?.size == NSSize(width: 24, height: 22) else { fail("a capture did not start the menu bar gulp") }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                guard let image = button.image, image.size != NSSize(width: 24, height: 22) else { fail("the menu bar gulp did not settle back to the resting icon") }
+                print("PASS: a capture gulps in the menu bar and settles"); completion()
             }
         }
     }

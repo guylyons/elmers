@@ -120,6 +120,8 @@ final class AppModel: ObservableObject {
     var openWritingTools: ((ClipboardItem) -> Void)?
     /// Every accepted copy, before history merges duplicates (Paste Stack takes each one).
     var onCapture: ((ClipboardPayload, String) -> Void)?
+    /// Called when a copied item lands in history (not for screenshots found on disk).
+    var itemCaptured: (() -> Void)?
     var isDemo: Bool { ProcessInfo.processInfo.arguments.contains("--demo") }
     private let defaults: UserDefaults
     private let store: HistoryStore
@@ -298,7 +300,7 @@ final class AppModel: ObservableObject {
                     captureImage(payload, source: sourceName, sourceID: sourceID)
                 } else {
                     let item = history.capture(payload, source: sourceName, sourceBundleID: sourceID)
-                    SoundEffects.effect(forCaptured: item.kind).map(SoundEffects.shared.play)
+                    SoundEffects.effect(forCaptured: item.kind).map(SoundEffects.shared.play); itemCaptured?()
                     if selectedID == nil { selectedID = item.id }
                     prune(); persist()
                     if item.kind == .link { fetchLinkPreviews() }
@@ -358,7 +360,7 @@ final class AppModel: ObservableObject {
                 self.pendingImageCaptures -= 1
                 guard self.captureEpoch == epoch, self.captureAllowed else { return }
                 let item = self.history.capture(payload, source: source, sourceBundleID: sourceID, at: capturedAt, imageDigest: digest)
-                SoundEffects.effect(forCaptured: item.kind).map(SoundEffects.shared.play)
+                SoundEffects.effect(forCaptured: item.kind).map(SoundEffects.shared.play); self.itemCaptured?()
                 if self.selectedID == nil { self.selectedID = item.id }
                 self.prune(); self.persist(); self.recognizeImageText()
             }

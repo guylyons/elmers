@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import ElmersCore
 import WebKit
 
 @MainActor
@@ -24,7 +25,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.toolTip = String(localized: "Elmers — Shift-Command-V · Right-click for more")
         }
         panelController.statusItemFrame = { [weak self] in self?.statusItem.button?.window?.frame }
-        pausedObserver = model.$paused.removeDuplicates().sink { [weak self] paused in self?.statusItem.button?.image = StatusIcon.make(paused: paused) }
+        pausedObserver = model.$paused.removeDuplicates().sink { [weak self] paused in self?.gulpTimer?.invalidate(); self?.statusItem.button?.image = StatusIcon.make(paused: paused) }
+        model.itemCaptured = { [weak self] in self?.gulp() }
         shortcut.onActivate = { [weak self] in self?.panelController.toggle() }
         stackController = StackController(model: model)
         stackShortcut.onActivate = { [weak self] in self?.stackController.toggle() }
@@ -170,6 +172,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if let tiff = sheet.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
                     try? png.write(to: URL(fileURLWithPath: directory).appendingPathComponent("status-icons.png"))
                 }
+                // Every frame of the capture gulp at 4× on a dark bar, left to right, with the resting icon's baseline marked.
+                let frames = self.gulpFrames
+                let strip = NSImage(size: NSSize(width: CGFloat(frames.count) * 100, height: 92), flipped: false) { bounds in
+                    NSColor(white: 0.15, alpha: 1).setFill(); bounds.fill()
+                    for (index, frame) in frames.enumerated() { frame.draw(in: NSRect(x: CGFloat(index) * 100 + 2, y: 2, width: 96, height: 88)) }
+                    NSColor.systemRed.setFill(); NSRect(x: 0, y: 6, width: bounds.width, height: 1).fill()
+                    return true
+                }
+                if let tiff = strip.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
+                    try? png.write(to: URL(fileURLWithPath: directory).appendingPathComponent("status-gulp.png"))
+                }
                 exit(0)
             }
             return
@@ -234,6 +247,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         panelController.show()
+    }
+    private var gulpTimer: Timer?
+    private lazy var gulpFrames = StatusIcon.gulpFrames(of: StatusIcon.make())
+    /// Plays the character's gulp in the menu bar; a capture during one restarts it.
+    func gulp() {
+        guard !model.paused, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion, let button = statusItem.button else { return }
+        gulpTimer?.invalidate()
+        var index = 0
+        let timer = Timer(timeInterval: 1 / GulpAnimation.framesPerSecond, repeats: true) { [weak self] timer in
+            MainActor.assumeIsolated {
+                guard let self else { timer.invalidate(); return }
+                if index < self.gulpFrames.count { button.image = self.gulpFrames[index]; index += 1 }
+                else { timer.invalidate(); button.image = StatusIcon.make(paused: self.model.paused) }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common); gulpTimer = timer
     }
     @objc func statusItemClicked() {
         if NSApp.currentEvent?.type == .rightMouseUp { presentStatusMenu(statusMenu()) }

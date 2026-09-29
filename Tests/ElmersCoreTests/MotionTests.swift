@@ -29,3 +29,17 @@ struct MotionTests {
         for step in 1...100 { let value = show.value(at: Double(step) / 100); XCTAssertTrue(value >= previous - 1e-9); previous = value }
     }
 }
+
+extension MotionTests {
+    func testGulpSquashesStretchesAndSettles() {
+        XCTAssertTrue(GulpAnimation.scale(at: 0) == (1, 1)); XCTAssertTrue(GulpAnimation.scale(at: 1) == (1, 1))
+        XCTAssertTrue(GulpAnimation.scale(at: -1) == (1, 1)); XCTAssertTrue(GulpAnimation.scale(at: 2) == (1, 1))
+        let squash = GulpAnimation.scale(at: 0.24), stretch = GulpAnimation.scale(at: 0.52)
+        XCTAssertTrue(squash.x > 1.1 && squash.y < 0.85); XCTAssertTrue(stretch.x < 0.95 && stretch.y > 1.05)
+        let frames = GulpAnimation.frames
+        XCTAssertEqual(frames.count, 30); XCTAssertTrue(frames.last! == (1, 1))
+        // No jumps between frames large enough to read as a glitch at 20 pt.
+        var previous = (x: 1.0, y: 1.0)
+        for frame in frames { XCTAssertTrue(abs(frame.x - previous.x) < 0.05 && abs(frame.y - previous.y) < 0.05); previous = frame }
+    }
+}
