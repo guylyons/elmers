@@ -32,7 +32,11 @@
   scripts/build-app.sh now bundles the artwork; bundled bytes verified against the source.
   Manual About-window appearance check remains pending.)
 
-- [open 2026-09-17] capture OS screenshots into the history as their own "Screenshot" category
+- [implemented 2026-09-21; automated checks passed, not yet tried with a real screenshot] capture OS screenshots into the history as their own "Screenshot" category
+  (Status corrected 2026-09-28; built in 7ecddb5. Elmers watches the folder macOS saves screenshots to and adds
+  only new files marked as screen captures, stored with a `ScreenshotOrigin` marker as the Screenshot type; the
+  original file stays where macOS put it. Details in docs/paste-parity.md › September 21. `--check-screenshots`
+  passes. Not yet checked by taking a real screenshot with the running app.)
   (requested by the user: when macOS takes a screenshot it should land in Elmers' history like a copied
   image, but categorized as Screenshot rather than Image, and it must still be written to the user's
   normal screenshots folder — Elmers observes, it does not replace `screencapture`. Design open: how to
