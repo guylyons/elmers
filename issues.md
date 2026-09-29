@@ -132,3 +132,12 @@
 - [open 2026-09-28] `--check-scroll-performance` fails: p95 about 19 ms over the 16.7 ms budget (21 of 183 steps)
   (Fails the same way with the file-card change stashed: three runs with it, two without, median about 4.5 ms. Not yet investigated:
   it may be a regression or this machine's state.)
+
+- [fixed 2026-09-28] a link card with a fetched preview sits its header, and so the source app's icon, a few points
+  higher than the cards beside it
+  (The preview's image has a fixed 108-pt height, so image, title and a two-line address came to more than the
+  182-pt body. The preview's `maxHeight: .infinity` frame had no `minHeight`, so it took its content's height
+  instead of clipping; the overflowing column was centered in the 232-pt card and the top 7 pt of the 50-pt
+  header were clipped off (9 pt for an image-only preview). The frame now has `minHeight: 0`, so the preview
+  takes what the footer leaves and clips. New `--check-card-layout` renders link cards offscreen and measures
+  the header tint down the left margin: 43 and 41 pt before, 50 pt for every case after.)

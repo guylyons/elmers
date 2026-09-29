@@ -62,6 +62,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ScrollPerformanceChecks.run(model: model, controller: panelController)
             return
         }
+        if ProcessInfo.processInfo.arguments.contains("--check-card-layout") {
+            CardLayoutChecks.run()
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--check-sounds") {
             SoundChecks.run()
             return

@@ -69,8 +69,10 @@ struct CardView: View {
                     }
             } else {
                 VStack(spacing: 0) {
+                    // minHeight 0 lets a tall preview (a link's fixed-height image, title and two-line address) clip
+                    // instead of overflowing the card, which would center the overflow and lift the header off the top.
                     preview
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .frame(maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
                         .clipped()
                     // Paste's footer sits on the bottom edge: counts are centered on one line, link addresses are
                     // left-aligned and may wrap onto a second line that grows upward.
