@@ -11,7 +11,7 @@ Parity inventory: `docs/paste-parity.md`. Latest checkpoint and next steps: `doc
 SwiftPM only (Swift 5.9, macOS 14+, no Xcode project, no third-party deps).
 
 - Never call bare `swift`; use `./scripts/swift.sh <args>`. It keeps caches in `.build/`, disables the SwiftPM sandbox, and pins `SDKROOT` to the macOS 26 SDK because the CLT macOS 27 SDK lacks SwiftUI's `@State` macro plugin.
-- Build the app bundle: `./scripts/build-app.sh` (or `release`) → ad-hoc signed `dist/Elmers.app`.
+- Build the app bundle: `./scripts/build-app.sh` (or `release`) → `dist/Elmers.app`, signed with the self-signed "Elmers Development" identity in the login keychain (ad-hoc, with a warning, if it's missing). Keep that identity: an ad-hoc signature pins the Accessibility grant to one build's cdhash, so direct paste silently degrades to copy after every rebuild while System Settings still shows Elmers enabled.
 - Relaunch after a rebuild: quit the running Elmers, then `open dist/Elmers.app`. Leave `/Applications/Elmers.app` (the daily-use copy) alone.
 - Lint: `./scripts/lint.sh [paths]` (swift-format rules in `.swift-format`; layout diagnostics are filtered out). Never run `swift-format format`; it would rewrite the deliberately dense style (4-space indent, `;`-joined statements, long lines).
 - Core tests: `./scripts/test.sh`. This is a hand-rolled runner (`ElmersCoreChecks`), not XCTest: there is no single-test filter, and a new check must be registered in the `checks` array in `Tests/ElmersCoreTests/main.swift`.

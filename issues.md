@@ -141,3 +141,10 @@
   header were clipped off (9 pt for an image-only preview). The frame now has `minHeight: 0`, so the preview
   takes what the footer leaves and clips. New `--check-card-layout` renders link cards offscreen and measures
   the header tint down the left margin: 43 and 41 pt before, 50 pt for every case after.)
+- [fixed 2026-09-29] active paste to direct app not working
+  (Not a code bug: the Accessibility grant was pinned to the cdhash of a Sept 17 ad-hoc build. Neither the running
+  `dist` build nor `/Applications/Elmers.app` matched it, so `AXIsProcessTrusted()` was false and every pick fell back
+  to copy + the Copied overlay, while System Settings still showed Elmers switched on. `build-app.sh` now signs with a
+  local self-signed "Elmers Development" identity, whose designated requirement is the bundle ID plus certificate leaf,
+  and the grant was reset and re-granted against it. `/Applications/Elmers.app` is still ad-hoc and stays without
+  direct paste until it is replaced with a build signed this way.)

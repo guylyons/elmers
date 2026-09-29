@@ -24,5 +24,13 @@ if [[ ! -f "$icns" || Resources/AppIcon.png -nt "$icns" ]]; then
   iconutil -c icns "$iconset" -o "$icns"
 fi
 cp "$icns" "$app_bundle/Contents/Resources/AppIcon.icns"
-codesign --force --sign - "$app_bundle"
+# An ad-hoc signature's designated requirement is its cdhash, so every rebuild silently voids the Accessibility
+# grant (System Settings still shows Elmers switched on). A stable local identity keeps the grant across builds.
+identity="${ELMERS_SIGN_IDENTITY:-Elmers Development}"
+if security find-certificate -c "$identity" >/dev/null 2>&1; then
+  codesign --force --sign "$identity" "$app_bundle"
+else
+  printf 'warning: no "%s" certificate; signing ad-hoc, so Accessibility must be re-granted after each build\n' "$identity" >&2
+  codesign --force --sign - "$app_bundle"
+fi
 printf 'Built %s\n' "$app_bundle"
