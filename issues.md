@@ -129,9 +129,14 @@
   selected nothing. Both now read the file-URL representations. Checked with an image file copied in Finder
   into the built app. Details in docs/paste-parity.md › September 28, file cards.)
 
-- [open 2026-09-28] `--check-scroll-performance` fails: p95 about 19 ms over the 16.7 ms budget (21 of 183 steps)
+- [fixed 2026-09-29; not a regression] `--check-scroll-performance` fails: p95 about 19 ms over the 16.7 ms budget (21 of 183 steps)
   (Fails the same way with the file-card change stashed: three runs with it, two without, median about 4.5 ms. Not yet investigated:
   it may be a regression or this machine's state.)
+  (Machine state, not code. On 2026-09-29, `main` at 3d0d24a passed 10 of 10 runs, 4 of them at a load average of about 13:
+  median 1.1–2.3 ms, p95 6.5–12 ms. 249a316, the commit that recorded the failure, built in a worktree and alternated with
+  `main`, measured the same: p95 7–15 ms against 6.6–12 ms. The Sep 28 median of 4.5 ms was 2–4× both builds' median today, so
+  that machine was busy. One run of the older build printed no result and could not be reproduced. The check is unchanged; rerun
+  it before investigating a p95 failure whose median is also high.)
 
 - [fixed 2026-09-28] a link card with a fetched preview sits its header, and so the source app's icon, a few points
   higher than the cards beside it

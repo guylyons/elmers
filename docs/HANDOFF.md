@@ -1,5 +1,7 @@
 # Checkpoint — September 15, 2026
 
+The latest checkpoint is **September 29**, at the end of this file. Sections run oldest first; the September 15 ones describe the project before it was committed, under its old `glue` path.
+
 Repository: `/Users/guy/github/glue`. The built app is still named Elmers. Full Paste parity is unfinished. Reference inspected: Paste 6.3.11 on macOS 26.5.
 
 ## What changed
@@ -194,3 +196,33 @@ Next, needing Paste on screen (run only while the Mac is idle, with `obs.sh`-sty
 2. Resizable panel and Compact Mode (Paste saves `NSWindow Frame PasteAppMainWindow` with a 332-pt height).
 3. The context menu with Shift held (Paste as Plain Text), search highlighting, the "≡ 1" card marker, the Nothing found layout, image card footers, the Space preview, and the "Delete selected items?" confirmation. Deleting the test items left in Paste's history on September 23 (`#123456`, `FF8800`, `rgb(…)` and similar) cleans them up at the same time.
 4. Popover horizontal offset; dark appearance; Hebrew right-to-left.
+
+## September 29 — checkpoint (0.2.1, build 3)
+
+All work is on `main`, pushed to `github`. `origin` (sourcehut) is retired. Details of each change are in `docs/paste-parity.md` (newest sections first) and `issues.md`.
+
+What changed since September 23:
+
+- **Search as Paste matches it**: filter chips are offered in a list under the field as you type (Down + Return or a click makes a token); text matches type names and word starts, not source apps; results stay newest first, since Paste does not rank.
+- **Filter popover** opens with its arrow 173 pt in, on the button, and closes when the button is clicked again.
+- **Card menu**: holding ⇧ offers Paste as Plain Text. **Quick Paste numbers** show on the first nine cards while ⌘ is held.
+- **Cards**: file cards show the file's Quick Look thumbnail over its path, as Paste does; a link card with a tall preview keeps its header in line; Nothing found is one faint 26-pt line, no icon.
+- **Menu bar** icon gulps when a copy is captured. Sound effects survive an audio device change.
+- **Storage**: an empty database file is refused untouched; orphaned `-wal`/`-shm`/`-journal` files are set aside in `history-orphaned-*`; the history folder is reset to 0700 on every open.
+- **Signing**: `build-app.sh` signs with the self-signed "Elmers Development" identity so the Accessibility grant survives rebuilds. Direct paste had been degrading to copy after every rebuild.
+- **Scroll check**: the September 28 `--check-scroll-performance` failure was machine load, not a regression (see `issues.md`).
+- Version 0.2.1 (3).
+
+Verification: `./scripts/test.sh` 77/77. `--demo --check-scroll-performance` passes 10/10 on `main` (p95 6.5–12 ms), and the September 28 commit measures the same. `--check-card-layout` and `--check-screenshots` passed when their changes landed. `--check-interaction` needs an idle Mac; it was last run in full on September 25.
+
+`/Applications/Elmers.app` is still an ad-hoc build, so direct paste there falls back to copy until the user replaces it with a build signed by the new identity.
+
+Remaining work, in priority order (the full list is `punchlist.md`):
+
+1. With Paste on screen and the Mac idle (guard every scripted click): observe and build the resizable panel with Compact Mode, highlighted matches in search results, the "Show in" item on results, and the "Delete selected items?" confirmation.
+2. Pause: "Paused until …" and the Paused/Resumed notices; the in-app tips; Show in Menu Bar.
+3. Compare built surfaces with Paste: Paste Stack window and a real ⌘V, the Space preview, onboarding, rename field, image editor, light appearance.
+4. Direct paste into browsers, Electron apps and terminals, with Accessibility denied, and after the destination quits.
+5. A real ⌘⇧3/4/5 screenshot into history; the About window.
+6. Right-to-left for Hebrew, a VoiceOver audit, native-speaker review of Elmers-only strings.
+7. iCloud sync (blocked on signing, entitlements and a second device).
