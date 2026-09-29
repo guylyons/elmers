@@ -1,5 +1,19 @@
 # Paste parity inventory
 
+## September 28 — file cards
+
+Reference: Paste 6.3.11 on macOS 27.0 (26A428), 1512-pt built-in display at 2×, dark appearance. Evidence: the binary (`PasteCoreUI.FileItemContentView` with a `QuickLookView`/`PreviewItem`, `QLThumbnailImageCreate` with `kQLThumbnailOptionIconModeKey`, `iconForFile:`, the flag `isFileItemQLThumbnailImageEnabled`) and window-bound 2× captures of Paste's panel filtered by searching "Elmers", which showed the file card for the drag fixture `Elmers drag fixture.txt` in `$TMPDIR` and, partly, an image-file card; reduced to the numbers below (not committed). Elmers was captured the same way from `--demo --demo-fixtures --show-panel` and, for an image file copied in Finder, from `dist/Elmers.app`.
+
+| Surface | Observed in Paste 6.3.11 | Elmers status |
+|---|---|---|
+| File card body | The file's Quick Look thumbnail in icon mode (the page or picture Finder shows, rounded, with a soft shadow), centered. A portrait text page measures 164×218 px (82×109 pt), its top 16.5 pt below the header; a 3:2 picture measures 109×72.5 pt, centered on the same line (71 pt below the header). No file name in the body | **matched** for one file: `CardFileThumbnail` draws `ThumbnailCache.thumbnail(forFileAt:)`, a `QLThumbnailGenerator` request in icon mode at 122.5 pt (icon mode pads the page, so the text page renders 163×217 px, top 17 pt below the header; a 3:2 PNG 71.5 pt tall). Falls back to `NSWorkspace.icon(forFile:)` when Quick Look fails; remade when the file's modification date changes. Was a generic orange `doc.fill` symbol and the name |
+| File card footer | The file's full path, left-aligned in the footer's gray (#AAAAAA on the body), wrapping at `/` onto two lines whose second line sits on the count footer's baseline; the rest is cut without an ellipsis ("/var/folders/hc/" / "t61…0gn/"). No count | **matched**: same two pixel rows (528–548, 556–576 px in the capture), same wrap, clipped to two lines of 12-pt text (`CardView.twoFooterLines`) |
+| File URLs of a Finder copy | Finder writes each file's name as plain text beside its file URL | fixed: cards and Reveal in Finder read `ClipboardPayload.fileURLs` (the `public.file-url` representations). Both used to parse `item.text`, which for a Finder copy is the name, so real copies showed no path and Reveal in Finder selected nothing |
+| File card body color | #282828 against #191919 for a text card in the same capture | unexplored in light mode; Elmers keeps the text body color (#141414 dark) |
+| Several files | Not seen | Elmers shows the first file's thumbnail and the "%d files" count, unverified |
+
+Not compared: light appearance; a multi-file card; a missing or unreadable file (Elmers draws Quick Look's generic icon); a folder; how Paste ranks a thumbnail against its `QLPreviewView`. The first thumbnail after launch appeared between 2 and 4 s after the panel opened (Quick Look's first connection); later ones within 1 s. Checks: core 76/76 (new "file URLs come from file-url representations, not text"); `--check-interaction` 47 steps pass (new "file card thumbnail shows the file's picture", which also runs under `--check-editor`). `--check-scroll-performance` fails with p95 ≈19 ms, and fails the same way with this change stashed (logged in issues.md). Lint is clean.
+
 ## September 28 — empty search and the capture size limit
 
 Reference: Paste 6.3.11 on macOS 27.0 (26A428), 1512-pt built-in display at 2×, dark appearance, panel 1512×332 at y 650. Evidence: the accessibility tree (frames, and text only where it contained a probe word) and one window-bound 2× capture of the card area (8,710 1496×264) while it held nothing but the empty state, reduced to the numbers below (not committed). Elmers was captured the same way on the same display through `--demo --open-panel-later` with the new debug-only `ELMERS_DEMO_QUERY`.

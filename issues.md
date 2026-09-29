@@ -120,3 +120,15 @@
   checks `engine.isRunning` and, when it has stopped, stops the player, restarts the engine and plays again;
   restarting the engine alone was not enough, the player had to be reset too. `--check-sounds` now stops the
   engine and requires the next effect to reach playback: it failed before the fix and passes after.)
+
+- [fixed 2026-09-28] copying an image file in Finder shows a generic file icon on its card instead of a thumbnail
+  (File cards always drew an orange `doc.fill` symbol and the name. Paste 6.3.11 draws the file's Quick Look
+  thumbnail in icon mode over its full path. Cards now ask `QLThumbnailGenerator` for that thumbnail at Paste's
+  measured size and show the path in the footer. Finder also puts the file's name on the clipboard as plain text,
+  so file URLs parsed from the item's text were names: real Finder copies had no path, and Reveal in Finder
+  selected nothing. Both now read the file-URL representations. Checked with an image file copied in Finder
+  into the built app. Details in docs/paste-parity.md › September 28, file cards.)
+
+- [open 2026-09-28] `--check-scroll-performance` fails: p95 about 19 ms over the 16.7 ms budget (21 of 183 steps)
+  (Fails the same way with the file-card change stashed: three runs with it, two without, median about 4.5 ms. Not yet investigated:
+  it may be a regression or this machine's state.)
