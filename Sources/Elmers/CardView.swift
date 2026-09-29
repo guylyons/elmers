@@ -76,7 +76,12 @@ struct CardView: View {
                     // left-aligned and may wrap onto a second line that grows upward.
                     HStack(alignment: .bottom, spacing: 5) {
                         if !item.boardIDs.isEmpty { Image(systemName: "pin.fill").font(.system(size: 9)).padding(.bottom, 3) }
-                        if item.kind == .link {
+                        if let path = filePath {
+                            // Paste 6.3.11 shows a single file's full path on up to two lines, cut without an ellipsis.
+                            Text(verbatim: path).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, maxHeight: Self.twoFooterLines, alignment: .topLeading).clipped()
+                                .padding(.trailing, quickPasteNumber == nil ? 0 : Self.badgeWidth)
+                        } else if item.kind == .link {
                             Text(footer).lineLimit(2).truncationMode(.tail).multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.trailing, quickPasteNumber == nil ? 0 : Self.badgeWidth)
                         } else {
@@ -139,7 +144,13 @@ struct CardView: View {
     static let linkBodyColor = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? NSColor(white: 0.14, alpha: 1) : NSColor(red: 0.953, green: 0.957, blue: 0.969, alpha: 1)
     })
+    static let twoFooterLines = NSLayoutManager().defaultLineHeight(for: .systemFont(ofSize: 12)) * 2
     private var symbol: String { item.kind.symbolName }
+    private var filePath: String? {
+        guard item.kind == .file else { return nil }
+        let urls = item.payload.fileURLs
+        return urls.count == 1 ? urls[0].path : nil
+    }
     private var footer: String {
         switch item.kind {
         case .text: return String(localized: "\(item.text.count) characters") // Paste: "1 character", "41 characters" (plural rules)
@@ -167,6 +178,11 @@ struct CardView: View {
         } else if item.kind == .link {
             Image(systemName: "safari").font(.system(size: 34, weight: .thin)).foregroundStyle(.tertiary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if item.kind == .file, let url = item.payload.fileURLs.first {
+            // Measured on Paste 6.3.11: centered, the page's top 16.5 pt below the header.
+            CardFileThumbnail(url: url)
+                .frame(width: ThumbnailCache.fileThumbnailSide, height: ThumbnailCache.fileThumbnailSide)
+                .frame(maxWidth: .infinity).padding(.top, 10)
         } else if item.kind == .file {
             VStack(alignment: .leading, spacing: 8) {
                 Image(systemName: "doc.fill").font(.system(size: 40)).foregroundStyle(.orange)
@@ -196,6 +212,20 @@ func imageData(of item: ClipboardItem) -> Data? {
         }
     }
     return nil
+}
+
+/// A file card's Quick Look thumbnail, made off the main thread.
+private struct CardFileThumbnail: View {
+    let url: URL
+    @State private var loaded: NSImage?
+    var body: some View {
+        ZStack {
+            if let image = loaded ?? ThumbnailCache.shared.cached(fileAt: url) {
+                Image(nsImage: image).resizable().interpolation(.high).scaledToFit()
+            }
+        }
+        .task(id: url) { loaded = await ThumbnailCache.shared.thumbnail(forFileAt: url) }
+    }
 }
 
 /// Full-resolution image for previews, sharing and drags; cards use `CardThumbnail` instead.

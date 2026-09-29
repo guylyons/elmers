@@ -119,6 +119,7 @@ let checks: [(String, () throws -> Void)] = [
     ("Erase History keeps pinned items in their pinboards", history.testEraseHistoryKeepsPinnedItemsInTheirPinboards),
     ("binary archive round trip", history.testArchiveRoundTripPreservesBinaryFormatsAndBoards),
     ("corrupt archive protection", history.testCorruptArchiveIsRejectedAndNeverOverwrittenByLoad),
+    ("file URLs come from file-url representations, not text", pasteboard.testFileURLsComeFromFileURLRepresentationsNotText),
     ("multi-item format round trip", pasteboard.testMultiItemRoundTripPreservesEveryRepresentation),
     ("plain-text transformation", pasteboard.testPlainTextDeliveryStripsRichRepresentations),
     ("confidential content exclusion", pasteboard.testConfidentialMarkerPreventsCapture),

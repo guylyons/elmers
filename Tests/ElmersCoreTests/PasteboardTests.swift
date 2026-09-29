@@ -3,6 +3,18 @@ import Foundation
 import ElmersCore
 
 final class PasteboardTests {
+    /// Finder puts each file's name on the pasteboard as plain text beside its file URL, so the item's text is the name;
+    /// file cards must still find the original files.
+    func testFileURLsComeFromFileURLRepresentationsNotText() {
+        let payload = ClipboardPayload(items: [
+            ["public.utf8-plain-text": Data("Photo one.png".utf8), "public.file-url": Data("file:///Users/test/Desktop/Photo%20one.png".utf8)],
+            ["public.utf8-plain-text": Data("notes.txt".utf8), "public.file-url": Data("file:///tmp/notes.txt".utf8)],
+            ["public.utf8-plain-text": Data("not a file".utf8)],
+        ])
+        XCTAssertEqual(payload.fileURLs.map(\.path), ["/Users/test/Desktop/Photo one.png", "/tmp/notes.txt"])
+        XCTAssertEqual(ClipboardPayload.text("/tmp/notes.txt").fileURLs, [])
+    }
+
     func testMultiItemRoundTripPreservesEveryRepresentation() throws {
         let board = NSPasteboard(name: .init("ElmersTests-" + UUID().uuidString))
         defer { board.releaseGlobally() }

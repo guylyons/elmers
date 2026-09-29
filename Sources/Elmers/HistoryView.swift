@@ -235,7 +235,7 @@ struct HistoryView: View {
             Divider()
         }
         if item.kind == .file {
-            Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting(urls); model.dismiss?() }
+            Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting(item.payload.fileURLs); model.dismiss?() }
             Divider()
         }
         if item.screenshot != nil {

@@ -397,8 +397,32 @@ final class KeyboardInteractionChecks {
         guard let rotated = model.history.items.first(where: { $0.id == picture.id }).flatMap(imagePreview), let rep = rotated.representations.first,
               rep.pixelsWide == 100, rep.pixelsHigh == 160 else { print("FAIL: Rotate left twice and right once should save the image turned a quarter"); fflush(stdout); exit(1) }
         print("PASS: image editor rotates and saves the turned image")
-        if editorOnly { print("PASS: editor checks"); fflush(stdout); exit(0) }
-        checkDrag(model: model, controller: controller)
+        checkFileThumbnail {
+            if editorOnly { print("PASS: editor checks"); fflush(stdout); exit(0) }
+            checkDrag(model: model, controller: controller)
+        }
+    }
+    /// A file card shows the file itself: an image file's thumbnail must carry the picture, not a generic icon.
+    /// Like the editor checks, this needs no keyboard focus.
+    static func checkFileThumbnail(then next: @escaping @MainActor () -> Void) {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("Elmers thumbnail check.png")
+        let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 300, pixelsHigh: 200, bitsPerSample: 8, samplesPerPixel: 4,
+                                      hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+        NSGraphicsContext.saveGraphicsState(); NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
+        NSColor(srgbRed: 1, green: 0, blue: 0, alpha: 1).setFill(); NSRect(x: 0, y: 0, width: 300, height: 200).fill()
+        NSGraphicsContext.restoreGraphicsState()
+        try? bitmap.representation(using: .png, properties: [:])?.write(to: url)
+        Task { @MainActor in
+            let image = await ThumbnailCache.shared.thumbnail(forFileAt: url)
+            try? FileManager.default.removeItem(at: url)
+            guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+                  let center = NSBitmapImageRep(cgImage: cg).colorAt(x: cg.width / 2, y: cg.height / 2)?.usingColorSpace(.sRGB),
+                  center.redComponent > 0.8, center.greenComponent < 0.3, center.blueComponent < 0.3 else {
+                print("FAIL: an image file's card thumbnail does not show the picture"); fflush(stdout); exit(1)
+            }
+            print("PASS: file card thumbnail shows the file's picture")
+            next()
+        }
     }
     /// A card drag must carry every stored item with every representation, and file URLs must be the originals.
     static func checkDrag(model: AppModel, controller: PanelController) {

@@ -136,6 +136,11 @@ public struct ClipboardPayload: Codable, Equatable, Sendable {
         }.joined(separator: "\n")
     }
     public var kind: ContentKind { kind(for: text) }
+    /// The files this payload refers to, in order. Read from the file-URL representations rather than `text`, which
+    /// holds the plain-text name Finder writes beside each file. Text types always stay in memory.
+    public var fileURLs: [URL] {
+        loaded.compactMap { $0["public.file-url"].flatMap { String(data: $0, encoding: .utf8) }.flatMap(URL.init(string:)) }.filter(\.isFileURL)
+    }
     /// True when pasting the payload would produce nothing visible: every representation is empty, or is
     /// text that contains only whitespace. Any other non-empty representation counts as content.
     /// Paste records such copies; Elmers drops them by user decision (2026-09-22).
