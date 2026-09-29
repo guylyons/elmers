@@ -1,5 +1,17 @@
 # Paste parity inventory
 
+## September 28 — empty search and the capture size limit
+
+Reference: Paste 6.3.11 on macOS 27.0 (26A428), 1512-pt built-in display at 2×, dark appearance, panel 1512×332 at y 650. Evidence: the accessibility tree (frames, and text only where it contained a probe word) and one window-bound 2× capture of the card area (8,710 1496×264) while it held nothing but the empty state, reduced to the numbers below (not committed). Elmers was captured the same way on the same display through `--demo --open-panel-later` with the new debug-only `ELMERS_DEMO_QUERY`.
+
+| Surface | Observed in Paste 6.3.11 | Elmers status |
+|---|---|---|
+| "Nothing found" | One line of regular-weight text, no icon or subtitle. Text frame 675.5,809 161.5×32 pt, centered on the panel (x 756); ink 312×47 px (156×23.5 pt) from 166 pt below the panel's top edge, #83878E over a #4E5560 material (about 30 % white). The frame's middle (y 825) is above the middle of the card area (y 842) | **matched**: `HistoryView.emptyState` draws 26-pt regular text in `.tertiary`, 100 pt below the toolbar; was an 18-pt semibold line under a 32-pt magnifier. Ink 311×47 px at the same rows (212–258) and 1 px right; about 28 % white over its own background. Text frame 676.25,809 159.5×30 |
+| "History is empty", "Pinboard is empty" | Not seen: the user's history and pinboards are not empty | implemented with the same view as "Nothing found", unverified |
+| Capture size limit | Unknown. With Paste freshly launched, neither a small marker text nor a 40 MB marker text (both `pbcopy`) could be found by searching Paste, and no card held the marker, so the probe was inconclusive; repeating it was stopped by a tool permission | unexplored: Elmers still refuses captures over 32 MB (`PasteboardCodec`, `ScreenshotImage.maximumBytes`), a limit of its own from the first commit, not a Paste observation |
+
+Not compared: light appearance; the two other empty states; the empty state with the message banner showing. Checks: core 75/75; `--check-interaction` passes. Lint is clean.
+
 ## September 25 — what search matches
 
 Reference: Paste 6.3.11 on macOS 27.0 (26A428), 1512-pt built-in display at 2×, dark appearance, English. Evidence: the binary's strings (search runs through Core Spotlight: `PasteSearch.SpotlightIndex`, attributes `textContent`, `title`, `contentType` and Paste's own `pasteType`, `pasteApp`, `pasteDevice`; query fragments `title == "…"cd` and `textContent == "*…*"cwdt`), the schema of Paste's store (no search table of its own), and harmless words typed into Paste's search with guarded CGEvents after ⌘F, reading only the type titles of the six cards on screen. Paste's history then held 41 texts, 14 links, 4 colors and 1 other item. Nothing in Paste was changed.
@@ -151,7 +163,7 @@ Source: `Paste.app/Contents/Resources/PastePackages_PasteLocalization.bundle` (6
 | Surface | Paste wording | Elmers status |
 |---|---|---|
 | Card count footer | Plurals: "%d character(s)", "File" / "%d files", "%d item(s)", "%d line(s)", "%d word(s)" | fixed: "1 character" was "1 characters". Where Paste uses the files, lines and words plurals has not been seen |
-| Empty states | "History is empty", "Pinboard is empty", "Nothing found" (no subtitles in the table) | wording adopted, and Elmers' own subtitles removed; the icon and layout have not been compared |
+| Empty states | "History is empty", "Pinboard is empty", "Nothing found" (no subtitles in the table) | wording adopted, and Elmers' own subtitles removed. Corrected September 28: "Nothing found" layout **matched** and the icon removed (see September 28) |
 | Erase History | "Are you sure you want to erase your Clipboard History?" / "Pinned items and Pinboards won't be deleted. This action cannot be undone." | adopted |
 | Ignore Applications, empty | "No items" | adopted |
 | Writing Tools | Card menu "Writing Tools"; the editor toolbar has Writing Tools, Bold, Italic, Underline, Strikethrough, Rotate left/right (images), Discard/Save changes | menu item added. **Image rotate added**: Edit (⌘E or the menu) on an image opens the editor with Rotate left and Rotate right in place of the text tools; Save writes the turned image as PNG (`ImageRotation`, which moves pixels exactly). The editor's text area had been rendering one line tall with the footer near the top; it now fills the window. Paste's image editor itself has not been seen, so its layout is unverified |

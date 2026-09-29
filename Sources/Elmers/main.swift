@@ -151,7 +151,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if ProcessInfo.processInfo.arguments.contains("--show-panel"), let directory = ProcessInfo.processInfo.environment["ELMERS_CAPTURE_DIR"] {
             // Writes the demo panel as panel.png and quits, e.g. to check a translation. Requires --demo.
             precondition(model.isDemo, "Panel captures require --demo")
-            model.start(); panelController.show()
+            model.start(); panelController.show(); applyDemoQuery()
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                 KeyboardInteractionChecks.capturePanel(self.panelController, name: "panel")
                 // The menu bar icon, normal and paused, at 4× on a light and a dark bar.
@@ -179,7 +179,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // app is frontmost by then (Elmers stays inactive, as in daily use).
             precondition(model.isDemo, "--open-panel-later requires --demo")
             model.start()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { self.panelController.show() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { self.panelController.show(); self.applyDemoQuery() }
             return
         }
         if ProcessInfo.processInfo.arguments.contains("--show-settings") {
@@ -255,6 +255,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func settings() { panelController.openSettings() }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { panelController.show(); return true }
     func applicationWillTerminate(_ notification: Notification) { model.flush() }
+    #if DEBUG
+    /// For side-by-side captures of search states: `ELMERS_DEMO_QUERY` opens the demo panel's search with that text.
+    func applyDemoQuery() {
+        guard let query = ProcessInfo.processInfo.environment["ELMERS_DEMO_QUERY"] else { return }
+        model.searchOpen = true; model.query = query
+    }
+    #endif
 }
 MainActor.assumeIsolated {
     let app = NSApplication.shared

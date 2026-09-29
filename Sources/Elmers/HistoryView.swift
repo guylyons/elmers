@@ -220,13 +220,13 @@ struct HistoryView: View {
         .hoverHighlight(Capsule(), suppressed: selected && !collapsed)
         .help(collapsed ? name : "")
     }
-    /// Paste 6.3.11's wording: "History is empty", "Pinboard is empty", "Nothing found". Its strings table has no
-    /// subtitles for these states; the icon and layout are not yet compared with Paste.
+    /// Paste 6.3.11's wording: "History is empty", "Pinboard is empty", "Nothing found". Measured on "Nothing found":
+    /// one line of 26-pt regular text in a faint gray, no icon, centered across the panel, its glyphs starting 106 pt
+    /// below the toolbar (a little above the middle of where cards would be).
     private var emptyState: some View {
-        VStack(spacing: 10) {
-            Image(systemName: !model.hasSearch ? "doc.on.clipboard" : "magnifyingglass").font(.system(size: 32, weight: .light)).foregroundStyle(.secondary)
-            Text(model.hasSearch ? "Nothing found" : model.boardID == nil ? "History is empty" : "Pinboard is empty").font(.system(size: 18, weight: .semibold))
-        }.frame(maxWidth: .infinity, maxHeight: .infinity)
+        Text(model.hasSearch ? "Nothing found" : model.boardID == nil ? "History is empty" : "Pinboard is empty")
+            .font(.system(size: 26)).foregroundStyle(.tertiary)
+            .padding(.top, 100).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
     @ViewBuilder private func itemMenu(_ item: ClipboardItem) -> some View {
         let urls = item.text.components(separatedBy: "\n").compactMap { URL(string: $0) }.filter { ["http", "https", "file"].contains($0.scheme ?? "") }
