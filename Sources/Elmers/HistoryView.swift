@@ -221,12 +221,12 @@ struct HistoryView: View {
         .help(collapsed ? name : "")
     }
     /// Paste 6.3.11's wording: "History is empty", "Pinboard is empty", "Nothing found". Measured on "Nothing found":
-    /// one line of 26-pt regular text in a faint gray, no icon, centered across the panel, its glyphs starting 106 pt
-    /// below the toolbar (a little above the middle of where cards would be).
+    /// one line of 26-pt regular text in a faint gray, no icon, centered across the panel. Vertically it sits 17 pt above
+    /// the middle of the card area at any panel height (159 pt below the panel top at 332, 199 at 412).
     private var emptyState: some View {
         Text(model.hasSearch ? "Nothing found" : model.boardID == nil ? "History is empty" : "Pinboard is empty")
             .font(.system(size: 26)).foregroundStyle(.tertiary)
-            .padding(.top, 100).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .frame(maxWidth: .infinity, maxHeight: .infinity).offset(y: -17)
     }
     @ViewBuilder private func itemMenu(_ item: ClipboardItem) -> some View {
         let urls = item.text.components(separatedBy: "\n").compactMap { URL(string: $0) }.filter { ["http", "https", "file"].contains($0.scheme ?? "") }
@@ -256,7 +256,7 @@ struct HistoryView: View {
             Button("Writing Tools") { model.openWritingTools?(item) }.keyboardShortcut("e", modifiers: [.command, .shift]).disabled(item.text.isEmpty || !model.canEdit)
         }
         Button("Rename") { model.select(item.id); model.renamingID = item.id }.keyboardShortcut("r").disabled(!model.canEdit)
-        Button("Delete") { model.deleteItems(model.selectedItems) }.keyboardShortcut(.delete, modifiers: []).disabled(!model.canEdit)
+        Button("Delete") { model.deleteSelection() }.keyboardShortcut(.delete, modifiers: []).disabled(!model.canEdit)
         Divider()
         Menu("Pin") {
             ForEach(model.history.boards) { board in

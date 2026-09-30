@@ -12,6 +12,7 @@ final class CopiedHUD {
     static let size: CGFloat = 200
     static let bottomInset: CGFloat = 140
     static let duration: TimeInterval = 1.0
+    static let fadeDuration: TimeInterval = 0.5
 
     init() {
         panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: Self.size, height: Self.size), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -45,8 +46,9 @@ final class CopiedHUD {
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.duration, execute: work)
     }
     private func fadeOut() {
+        // Paste 6.3.11 (logged September 30): opaque for about 1.0 s, then alpha 0.65, 0.40, 0.19, 0.05, 0 at 0.1-s steps.
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.25
+            context.duration = Self.fadeDuration
             panel.animator().alphaValue = 0
         }, completionHandler: { [weak self] in
             Task { @MainActor in

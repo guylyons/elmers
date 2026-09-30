@@ -44,6 +44,7 @@
 "Date" = "Data";
 "Day" = "Dia";
 "Delete" = "Excluir";
+"Delete selected items?" = "Você tem certeza de que deseja excluir os itens selecionados?";
 "Delete “%@”?" = "Você tem certeza de que deseja excluir \"%@\"?";
 "Delete…" = "Apagar…";
 "Device" = "Dispositivo";

@@ -67,6 +67,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         model.deliver = { [weak self] item, plain in self?.paste(item, plainText: plain) }
         model.dismiss = { [weak self] in self?.hide() }
         model.showCopied = { [weak self] in self?.showCopied() }
+        model.confirmDeletion = { [weak self] in self?.confirmDeletion() ?? false }
         copiedHUD.openSettings = { [weak self] in self?.openSettings() }
         model.showSettings = { [weak self] in self?.openSettings() }
         model.preview = { [weak self] in self?.openPreview($0) }
@@ -240,6 +241,19 @@ final class PanelController: NSObject, NSWindowDelegate {
             } else { self.showCopied() }
         }
     }
+    /// Paste 6.3.11 asks before deleting several items (observed September 30 with ⌘A then Delete): an app-modal
+    /// alert centered on the screen with the app icon, "Delete selected items?", no message, and Cancel to the left of
+    /// the default Delete. Paste activates itself for it and its panel stays up behind it.
+    private func confirmDeletion() -> Bool {
+        let alert = NSAlert()
+        alert.messageText = String(localized: "Delete selected items?")
+        alert.addButton(withTitle: String(localized: "Delete"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
+        NSApp.activate()
+        let confirmed = alert.runModal() == .alertFirstButtonReturn
+        panel.makeKey()
+        return confirmed
+    }
     /// Paste confirms a copy with a HUD near the bottom of the screen instead of a message in the panel.
     func showCopied() {
         SoundEffects.shared.play(.copy)
@@ -390,7 +404,7 @@ final class PanelController: NSObject, NSWindowDelegate {
             case .edit: NotificationCenter.default.post(name: .elmersEdit, object: nil)
             case .writingTools: if let item = model.selected, !item.text.isEmpty { openWritingTools(item) }
             case .newText: if model.canEdit { NotificationCenter.default.post(name: .elmersNewText, object: nil) }
-            case .delete: model.deleteItems(model.selectedItems)
+            case .delete: model.deleteSelection()
             case .undo: model.undo()
             case .redo: model.redo()
             case .focusSearch: NotificationCenter.default.post(name: .elmersSearch, object: nil)

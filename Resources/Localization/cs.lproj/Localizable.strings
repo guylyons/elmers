@@ -44,6 +44,7 @@
 "Date" = "Datum";
 "Day" = "Den";
 "Delete" = "Smazat";
+"Delete selected items?" = "Odebrat vybrané položky?";
 "Delete “%@”?" = "Opravdu chcete odstranit \"%@\"?";
 "Delete…" = "Smazat…";
 "Device" = "Zařízení";

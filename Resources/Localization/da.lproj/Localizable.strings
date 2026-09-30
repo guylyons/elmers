@@ -44,6 +44,7 @@
 "Date" = "Dato";
 "Day" = "Dag";
 "Delete" = "Slet";
+"Delete selected items?" = "Er du sikker på, at du vil slette udvalgte elementer?";
 "Delete “%@”?" = "Er du sikker på, at du vil slette \"%@\"?";
 "Delete…" = "Slet…";
 "Device" = "Enhed";

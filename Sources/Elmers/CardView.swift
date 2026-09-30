@@ -49,6 +49,7 @@ struct CardView: View {
                     }
                     TimelineView(.periodic(from: .now, by: 15)) { context in
                         Text(Self.relativeTime(item.copiedAt, now: context.date)).font(.system(size: 12)).opacity(0.9).lineLimit(1)
+                            .help(item.copiedAt.formatted(date: .abbreviated, time: .shortened))
                     }
                 }
                 Spacer(minLength: 0)

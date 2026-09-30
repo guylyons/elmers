@@ -119,6 +119,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             poll(0)
             return
         }
+        if ProcessInfo.processInfo.arguments.contains("--check-delete-confirmation") {
+            // Paste asks before deleting several items: Cancel keeps them, Delete removes them, one item goes without asking.
+            precondition(model.isDemo, "Deletion checks require --demo")
+            func fail(_ message: String) -> Never { print("FAIL: \(message)"); fflush(stdout); exit(1) }
+            func controls(in view: NSView) -> [NSView] { view.subviews + view.subviews.flatMap(controls) }
+            /// Answers the next alert with the button titled `button` after checking its title and button order.
+            func answer(_ button: String) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    guard let content = NSApp.modalWindow?.contentView else { fail("no confirmation appeared") }
+                    let views = controls(in: content)
+                    let texts = views.compactMap { ($0 as? NSTextField)?.stringValue }
+                    let buttons = views.compactMap { $0 as? NSButton }.filter { !$0.title.isEmpty }.sorted { $0.convert($0.bounds, to: nil).minX < $1.convert($1.bounds, to: nil).minX }
+                    guard texts.contains(String(localized: "Delete selected items?")) else { fail("alert text \(texts)") }
+                    guard buttons.map(\.title) == [String(localized: "Cancel"), String(localized: "Delete")] else { fail("alert buttons \(buttons.map(\.title))") }
+                    buttons.first { $0.title == button }?.performClick(nil)
+                }
+            }
+            for text in ["delete check one", "delete check two", "delete check three"] { model.newText(text) }
+            panelController.show()
+            model.selectAll()
+            answer(String(localized: "Cancel")); model.deleteSelection()
+            guard model.visibleItems.count == 3 else { fail("Cancel deleted items") }
+            answer(String(localized: "Delete")); model.deleteSelection()
+            guard model.visibleItems.isEmpty else { fail("Delete kept \(model.visibleItems.count) items") }
+            model.newText("delete check single")
+            if let item = model.visibleItems.first { model.select(item.id) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { if NSApp.modalWindow != nil { fail("asked before deleting one item") } }
+            model.deleteSelection()
+            guard model.visibleItems.isEmpty else { fail("single item was not deleted") }
+            print("PASS: deleting several items asks first; Cancel keeps them, Delete removes them, one item goes at once"); exit(0)
+        }
         if ProcessInfo.processInfo.arguments.contains("--check-stack") {
             // Paste Stack without keyboard focus: copies join it in order while it is open, and it reverses, deletes and closes.
             precondition(model.isDemo, "Stack checks require --demo")

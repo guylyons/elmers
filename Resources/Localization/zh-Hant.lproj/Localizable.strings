@@ -44,6 +44,7 @@
 "Date" = "日期";
 "Day" = "天";
 "Delete" = "刪除";
+"Delete selected items?" = "您確定要刪除所選項目嗎？";
 "Delete “%@”?" = "您確定要刪除 \"%@\" 嗎？";
 "Delete…" = "刪除⋯";
 "Device" = "裝置";

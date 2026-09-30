@@ -482,7 +482,7 @@ final class KeyboardInteractionChecks {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                 guard controller.copiedHUD.isVisible else { print("FAIL: Copied HUD vanished early"); fflush(stdout); exit(1) }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
                     guard !controller.copiedHUD.isVisible else { print("FAIL: Copied HUD stayed visible"); fflush(stdout); exit(1) }
                     print("PASS: Copied HUD shows for about a second, then fades")
                     fflush(stdout); exit(0)

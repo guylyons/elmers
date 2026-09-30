@@ -44,6 +44,7 @@
 "Date" = "Datum";
 "Day" = "Dag";
 "Delete" = "Verwijder";
+"Delete selected items?" = "Weet je zeker dat je geselecteerde items wilt verwijderen?";
 "Delete “%@”?" = "Weet je zeker dat je \"%@\" wilt verwijderen?";
 "Delete…" = "Verwijder…";
 "Device" = "Apparaat";

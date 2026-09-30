@@ -44,6 +44,7 @@
 "Date" = "日期";
 "Day" = "天";
 "Delete" = "删除";
+"Delete selected items?" = "您确定要删除所选项目吗？";
 "Delete “%@”?" = "删除“%@”？";
 "Delete…" = "删除…";
 "Device" = "设备";

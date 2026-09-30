@@ -520,6 +520,14 @@ final class AppModel: ObservableObject {
         for id in ids { history.movePinned(id, before: target, in: board) }
         persist()
     }
+    /// Set by the panel: asks before several items are deleted and says whether to go ahead.
+    var confirmDeletion: (() -> Bool)?
+    /// Delete from the keyboard or the card menu. Paste asks first when more than one item is selected.
+    func deleteSelection() {
+        let items = selectedItems
+        guard items.count < 2 || confirmDeletion?() ?? true else { return }
+        deleteItems(items)
+    }
     func delete(_ item: ClipboardItem) { deleteItems([item]) }
     func deleteItems(_ items: [ClipboardItem]) {
         guard canEdit else { return }

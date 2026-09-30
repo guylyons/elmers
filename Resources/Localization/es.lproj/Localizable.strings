@@ -44,6 +44,7 @@
 "Date" = "Fecha";
 "Day" = "Día";
 "Delete" = "Eliminar";
+"Delete selected items?" = "¿Estás seguro de que quieres eliminar los elementos seleccionados?";
 "Delete “%@”?" = "¿Estás seguro de que quieres eliminar \"%@\"?";
 "Delete…" = "Eliminar…";
 "Device" = "Dispositivo";
