@@ -5,11 +5,15 @@ Open items for 1:1 parity with Paste 6.3.11, compiled on 2026-09-25 from `docs/p
 ## Not built
 
 - [ ] iCloud sync and shared pinboards (blocked: code signing, entitlements, a second device)
-- [ ] "Delete selected items?" confirmation (observe when Paste asks and which buttons it shows)
+- [ ] "Delete selected items?" confirmation (observed September 30 for ⌘A + Delete: centered alert, Cancel / Delete; single-item Delete still unobserved)
 - [ ] In-app tips: Enable Direct Paste, Open at Login, Run in Background, Enable iCloud Sync (observe placement)
 - [ ] Pause: "Paused until …" label and "Paste Paused" / "Paste Resumed" notices
 - [ ] Menu bar icon animation (17 frames; observe its trigger)
-- [ ] Resizable panel (drag the top edge) and Compact Mode at small heights
+- [ ] Resizable panel (drag the top edge) and Compact Mode at small heights (observed September 30: card side = height − 100; min, max and compact threshold still to measure)
+- [ ] Copied overlay fades over about 0.5 s (Elmers 0.25 s)
+- [ ] Empty state centered in the card area at any height
+- [ ] Write `org.nspasteboard.source` when copying out of Elmers
+- [ ] Tooltip with the full date on each card's time
 - [x] "≡ 1" card marker: Quick Paste numbers while ⌘ is held (September 25)
 - [ ] Highlighted matches in search results
 - [ ] "Show in" item on search results
