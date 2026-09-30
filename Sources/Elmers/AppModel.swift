@@ -86,6 +86,11 @@ final class AppModel: ObservableObject {
     /// Name of the app that will receive a paste, shown in the card context menu as "Paste to …".
     @Published var destinationApp: String?
     @Published var paused = false { didSet { captureEpoch += 1; refreshScreenshotMonitoring() } }
+    /// The panel's height, which a drag on its top edge changes. While dragging it can stretch past Paste's limits;
+    /// the settled height is saved, and Paste shows the panel at it from then on.
+    @Published var panelHeight: CGFloat = PanelMetrics.defaultHeight
+    var panelMetrics: PanelMetrics { PanelMetrics(stretched: panelHeight) }
+    func savePanelHeight() { defaults.set(Double(PanelMetrics(height: panelHeight).height), forKey: "panelHeight") }
     @Published var captureScreenshots: Bool { didSet { defaults.set(captureScreenshots, forKey: "captureScreenshots"); refreshScreenshotMonitoring(force: true) } }
     @Published private(set) var screenshotFolder: URL?
     @Published private(set) var screenshotStatus: String?
@@ -206,6 +211,7 @@ final class AppModel: ObservableObject {
                                       "excludedApps": "com.apple.keychainaccess\ncom.apple.Passwords", "soundEffects": true,
                                       "alwaysPlainText": false, "runInBackground": true, "showDuringScreenSharing": true, "linkPreviews": false, "captureScreenshots": true])
         captureScreenshots = defaults.bool(forKey: "captureScreenshots")
+        panelHeight = PanelMetrics(height: (defaults.object(forKey: "panelHeight") as? Double).map { CGFloat($0) } ?? PanelMetrics.defaultHeight).height
         retentionDays = defaults.integer(forKey: "retentionDays")
         directPaste = defaults.bool(forKey: "directPaste")
         soundEffects = defaults.bool(forKey: "soundEffects")

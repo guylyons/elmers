@@ -41,6 +41,7 @@ let pasteboard = PasteboardTests()
 let screenshots = ScreenshotTests()
 let store = HistoryStoreTests()
 let motion = MotionTests()
+let panelMetrics = PanelMetricsTests()
 let security = StorageSecurityTests()
 let searchFilters = SearchFilterTests()
 let colors = ColorTests()
@@ -50,6 +51,9 @@ let stackTests = PasteStackTests()
 let checks: [(String, () throws -> Void)] = [
     ("panel timing curves match Paste's recorded motion", motion.testPanelCurvesMatchPasteRecordings),
     ("the menu bar gulp squashes, stretches and settles", motion.testGulpSquashesStretchesAndSettles),
+    ("cards follow the panel height", panelMetrics.testCardsFollowThePanelHeight),
+    ("compact mode below 300 pt", panelMetrics.testCompactModeBelowThreeHundred),
+    ("dragging the panel rubber-bands past its limits", panelMetrics.testDragRubberBandsPastTheLimits),
     ("deleted and replaced content leaves no trace on disk", security.testDeletedAndReplacedContentLeavesNoTraceOnDisk),
     ("an existing database is scrubbed when opened", security.testExistingDatabaseIsScrubbedWhenOpened),
     ("the history folder is excluded from backups", security.testHistoryFolderIsExcludedFromBackups),

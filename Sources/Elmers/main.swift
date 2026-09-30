@@ -119,6 +119,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             poll(0)
             return
         }
+        if ProcessInfo.processInfo.arguments.contains("--check-panel-resize") {
+            // Paste's panel resizes from its top edge between 252 and 412 pt, rubber-bands past the limits, springs
+            // back on release, switches to Compact Mode below 300 pt and keeps the height. Real mouse events, no focus.
+            precondition(model.isDemo, "Resize checks require --demo")
+            let model: AppModel = self.model, panelController: PanelController = self.panelController
+            func fail(_ message: String) -> Never { print("FAIL: \(message)"); fflush(stdout); exit(1) }
+            model.panelHeight = PanelMetrics.defaultHeight; model.savePanelHeight()
+            panelController.show()
+            let window = panelController.panel
+            guard let handle = KeyboardInteractionChecks.subview(of: window.contentView, where: { $0 is PanelResizeHandle }) else { fail("no resize handle") }
+            /// Presses on the handle, drags `dy` points up (negative is down) in steps and, if asked, lets go.
+            func drag(_ dy: CGFloat, release: Bool = true) {
+                let start = window.convertPoint(toScreen: handle.convert(NSPoint(x: handle.bounds.midX, y: handle.bounds.midY), to: nil))
+                func post(_ type: NSEvent.EventType, _ screenY: CGFloat) {
+                    let point = window.convertPoint(fromScreen: NSPoint(x: start.x, y: screenY))
+                    let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                   windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
+                    window.sendEvent(event)
+                }
+                post(.leftMouseDown, start.y)
+                for step in 1...10 { post(.leftMouseDragged, start.y + dy * CGFloat(step) / 10) }
+                if release { post(.leftMouseUp, start.y + dy) }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                drag(80)
+                guard model.panelHeight == 412, window.frame.height == 412, model.panelMetrics.cardSide == 312 else { fail("dragging up 80 pt gave \(model.panelHeight), window \(window.frame.height)") }
+                drag(60, release: false)
+                guard model.panelHeight > 412, model.panelHeight < 412 + PanelMetrics.stretch else { fail("no rubber band past the top: \(model.panelHeight)") }
+                window.sendEvent(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                    windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    guard model.panelHeight == 412 else { fail("did not spring back to 412: \(model.panelHeight)") }
+                    drag(-400)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        guard model.panelHeight == 252, window.frame.height == 252, model.panelMetrics.isCompact else { fail("dragging far down settled at \(model.panelHeight)") }
+                        KeyboardInteractionChecks.capturePanel(panelController, name: "panel-compact")
+                        panelController.hide(restoreFocus: false)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                            panelController.show()
+                            guard window.frame.height == 252 else { fail("the height was not kept: \(window.frame.height)") }
+                            model.panelHeight = PanelMetrics.defaultHeight; model.savePanelHeight()
+                            print("PASS: the panel resizes from its top edge, rubber-bands, springs back, goes compact below 300 pt and keeps its height"); exit(0)
+                        }
+                    }
+                }
+            }
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--check-delete-confirmation") {
             // Paste asks before deleting several items: Cancel keeps them, Delete removes them, one item goes without asking.
             precondition(model.isDemo, "Deletion checks require --demo")

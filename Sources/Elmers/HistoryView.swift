@@ -28,7 +28,7 @@ struct HistoryView: View {
                                 CardView(item: item, selected: model.selection.ids.contains(item.id), ringDimmed: hoveredID != nil && hoveredID != item.id, index: index,
                                          quickPasteNumber: model.quickPasteNumbersShown && index < 9 ? index + 1 : nil,
                                          renaming: model.renamingID == item.id, onRename: { model.finishRenaming(item, title: $0) },
-                                         onBeginRename: { if model.canEdit { model.renamingID = item.id } })
+                                         onBeginRename: { if model.canEdit { model.renamingID = item.id } }, metrics: model.panelMetrics)
                                     .id(item.id)
                                     .onHover { inside in if inside { hoveredID = item.id } else if hoveredID == item.id { hoveredID = nil } }
                                     .onTapGesture(count: 2) { model.activate(item) }
@@ -57,7 +57,7 @@ struct HistoryView: View {
                     }
                     // Paste 6.3.11: cards start 8 pt below the 60-pt toolbar and end 24 pt above the panel's bottom
                     // edge. A taller scroll view would center them vertically instead.
-                    .frame(height: CardView.height + 16)
+                    .frame(height: model.panelMetrics.cardSide + 16)
                     // `.hidden` still lets macOS show a scroller when scroll bars are set to always show (or a mouse
                     // is connected); that scroller took the bottom of the card row and clipped the cards. Paste shows none.
                     .scrollIndicators(.never)

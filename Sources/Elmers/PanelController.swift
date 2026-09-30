@@ -19,7 +19,11 @@ final class PanelController: NSObject, NSWindowDelegate {
     /// False from the moment `hide()` starts, even while the slide-out is still on screen.
     private(set) var isShown = false
     private var transitionGeneration = 0
-    static let windowHeight: CGFloat = 332
+    /// The panel's height before it has been resized; afterwards it follows `model.panelHeight`.
+    static let windowHeight: CGFloat = PanelMetrics.defaultHeight
+    private var settleTimer: Timer?
+    /// How long a panel stretched past a limit takes to spring back to it when the drag ends.
+    static let settleDuration: TimeInterval = 0.2
     static let inset: CGFloat = 8
     static let cornerRadius: CGFloat = 25
     /// Measured from 60 fps recordings of Paste 6.3.11: the panel rises 332 pt in 0.15 s, covering over half the
@@ -63,6 +67,13 @@ final class PanelController: NSObject, NSWindowDelegate {
         glass.frame = NSRect(x: Self.inset, y: Self.inset, width: root.bounds.width - 2 * Self.inset, height: root.bounds.height - Self.inset)
         glass.autoresizingMask = [.width, .height]
         root.addSubview(glass)
+        let handle = PanelResizeHandle(frame: NSRect(x: Self.inset, y: root.bounds.height - PanelResizeHandle.thickness,
+                                                     width: root.bounds.width - 2 * Self.inset, height: PanelResizeHandle.thickness))
+        handle.autoresizingMask = [.width, .minYMargin]
+        handle.began = { [weak self] in self?.settleTimer?.invalidate(); return self?.model.panelHeight ?? Self.windowHeight }
+        handle.changed = { [weak self] height in self?.setPanelHeight(height) }
+        handle.ended = { [weak self] in self?.settlePanelHeight() }
+        root.addSubview(handle)
         panel.contentView = root
         model.deliver = { [weak self] item, plain in self?.paste(item, plainText: plain) }
         model.dismiss = { [weak self] in self?.hide() }
@@ -126,7 +137,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     /// Core Animation move would leave the glass behind; like Paste's own animator, the frame is stepped on every
     /// display refresh instead. The window itself stays still: fast window moves were not composited in step.
     private func slide(visible: Bool, completion: (() -> Void)? = nil) {
-        let target = visible ? Self.inset : Self.inset - Self.windowHeight
+        let target = visible ? Self.inset : Self.inset - model.panelHeight
         slideLink?.invalidate(); slideLink = nil
         slideCompletion = nil
         let from = glass.frame.origin.y
@@ -172,8 +183,8 @@ final class PanelController: NSObject, NSWindowDelegate {
         // running, which then reverses from where it is.
         if let screen, !(panel.isVisible && (isShown || slideLink != nil)) {
             restingScreen = screen
-            panel.setFrame(NSRect(x: screen.frame.minX, y: screen.frame.minY, width: screen.frame.width, height: Self.windowHeight), display: true)
-            glass.setFrameOrigin(NSPoint(x: Self.inset, y: Self.inset - Self.windowHeight))
+            panel.setFrame(NSRect(x: screen.frame.minX, y: screen.frame.minY, width: screen.frame.width, height: model.panelHeight), display: true)
+            glass.setFrameOrigin(NSPoint(x: Self.inset, y: Self.inset - model.panelHeight))
         }
         if resetState { model.resetForActivation() } else { model.reconcileSelection() }
         ThumbnailCache.shared.prewarm(model.visibleItems.prefix(40))
@@ -184,6 +195,28 @@ final class PanelController: NSObject, NSWindowDelegate {
         slide(visible: true)
         focusResults()
         updateQuickPasteNumbers(NSEvent.modifierFlags)
+    }
+    /// Paste resizes its panel from the top edge, keeping it flush with the bottom of the screen; the cards follow
+    /// the height as it changes (logged September 30).
+    private func setPanelHeight(_ height: CGFloat) {
+        guard let screen = restingScreen ?? panel.screen else { return }
+        let height = height.rounded()
+        model.panelHeight = height
+        panel.setFrame(NSRect(x: screen.frame.minX, y: screen.frame.minY, width: screen.frame.width, height: height), display: true)
+    }
+    /// Letting go past a limit springs back to it (Paste: 242 → 252, 420 → 412); the settled height is kept.
+    private func settlePanelHeight() {
+        let from = model.panelHeight, to = PanelMetrics(height: from).height
+        model.savePanelHeight()
+        guard from != to, animatesTransitions else { setPanelHeight(to); return }
+        let start = CACurrentMediaTime()
+        settleTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 120, repeats: true) { [weak self] timer in
+            MainActor.assumeIsolated {
+                let progress = min((CACurrentMediaTime() - start) / Self.settleDuration, 1)
+                self?.setPanelHeight(from + (to - from) * CGFloat(TimingCurve.panelIn.value(at: progress)))
+                if progress >= 1 { timer.invalidate() }
+            }
+        }
     }
     func hide(restoreFocus: Bool = true) {
         guard isShown else { return }
@@ -459,5 +492,36 @@ extension KeyModifiers {
         if flags.contains(.shift) { insert(.shift) }
         if flags.contains(.option) { insert(.option) }
         if flags.contains(.control) { insert(.control) }
+    }
+}
+
+/// Paste's `MainWindow.ResizeHandle`: a strip along the panel's top edge that shows the up-down resize cursor. Dragging
+/// it asks for the height under the pointer, rubber-banded past the limits by `PanelMetrics.dragged(to:)`.
+final class PanelResizeHandle: NSView {
+    static let thickness: CGFloat = 6
+    var began: () -> CGFloat = { PanelMetrics.defaultHeight }
+    var changed: (CGFloat) -> Void = { _ in }
+    var ended: () -> Void = {}
+    private var startY: CGFloat = 0, startHeight: CGFloat = 0, dragging = false
+    private static var cursor: NSCursor {
+        if #available(macOS 15.0, *) { return .frameResize(position: .top, directions: .all) }
+        return .resizeUpDown
+    }
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        // The panel never activates Elmers, so the cursor is set on entry rather than through cursor rects.
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+    }
+    override func mouseEntered(with event: NSEvent) { Self.cursor.set() }
+    override func mouseExited(with event: NSEvent) { if !dragging { NSCursor.arrow.set() } }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    /// The pointer in screen coordinates; the window moves under it while the drag resizes the panel.
+    private func screenY(_ event: NSEvent) -> CGFloat { window?.convertPoint(toScreen: event.locationInWindow).y ?? NSEvent.mouseLocation.y }
+    override func mouseDown(with event: NSEvent) { startY = screenY(event); startHeight = began(); dragging = true; Self.cursor.set() }
+    override func mouseDragged(with event: NSEvent) { changed(PanelMetrics.dragged(to: startHeight + screenY(event) - startY)) }
+    override func mouseUp(with event: NSEvent) {
+        dragging = false; ended()
+        if !NSMouseInRect(convert(event.locationInWindow, from: nil), bounds, isFlipped) { NSCursor.arrow.set() }
     }
 }

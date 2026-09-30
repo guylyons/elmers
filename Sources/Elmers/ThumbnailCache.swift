@@ -72,7 +72,8 @@ final class ThumbnailCache {
             (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
         }.value
         if let entry = files.object(forKey: url.path as NSString), entry.modified == modified { return entry.image }
-        let side = Self.fileThumbnailSide
+        // Made for the largest card, so a taller panel does not scale the picture up.
+        let side = Self.fileThumbnailSide * PanelMetrics(height: PanelMetrics.maximumHeight).cardSide / 232
         let request = QLThumbnailGenerator.Request(fileAt: url, size: CGSize(width: side, height: side), scale: 2, representationTypes: .all)
         request.iconMode = true
         let image = (try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request))?.nsImage
