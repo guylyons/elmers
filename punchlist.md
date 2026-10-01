@@ -9,7 +9,7 @@ Open items for 1:1 parity with Paste 6.3.11, compiled on 2026-09-25 from `docs/p
 - [ ] In-app tips: Enable Direct Paste, Open at Login, Run in Background, Enable iCloud Sync (observe placement)
 - [ ] Pause: "Paused until …" label and "Paste Paused" / "Paste Resumed" notices
 - [ ] Menu bar icon animation (17 frames; observe its trigger)
-- [x] Resizable panel (drag the top edge, 252–412 pt, rubber-banded) and Compact Mode below 300 pt (September 30; compact header height inferred, not measured by pixels; not yet dragged by hand)
+- [x] Resizable panel (drag the top edge, 252–412 pt, rubber-banded) and Compact Mode below 300 pt (September 30; October 1: compact cards measured and matched, with no band, content under the title and the switch animated as in Paste; not yet dragged by hand)
 - [x] Copied overlay fades over about 0.5 s (September 30)
 - [x] Empty state centered in the card area at any height (September 30)
 - [ ] Write `org.nspasteboard.source` when copying out of Elmers (needs the re-capture of Elmers' own copies to ignore the marker, or every copy becomes a new card)

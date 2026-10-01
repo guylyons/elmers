@@ -1,6 +1,6 @@
 # Checkpoint — September 15, 2026
 
-The latest checkpoint is **September 29**, at the end of this file. Sections run oldest first; the September 15 ones describe the project before it was committed, under its old `glue` path.
+The latest checkpoint is **October 1**, at the end of this file. Sections run oldest first; the September 15 ones describe the project before it was committed, under its old `glue` path.
 
 Repository: `/Users/guy/github/glue`. The built app is still named Elmers. Full Paste parity is unfinished. Reference inspected: Paste 6.3.11 on macOS 26.5.
 
@@ -226,3 +226,29 @@ Remaining work, in priority order (the full list is `punchlist.md`):
 5. A real ⌘⇧3/4/5 screenshot into history; the About window.
 6. Right-to-left for Hebrew, a VoiceOver audit, native-speaker review of Elmers-only strings.
 7. iCloud sync (blocked on signing, entitlements and a second device).
+
+## October 1 — checkpoint (0.3.0, build 4)
+
+All work is on `main` and pushed to `github`. Details are in `docs/paste-parity.md` (September 30 and October 1 sections) and `issues.md`.
+
+What changed since September 29:
+
+- **September 30, committed**: the panel resizes from its top edge (252–412 pt, rubber-banded, kept between shows) at the display's frame rate; "Delete selected items?"; the mouse wheel and sideways swipes scroll as in Paste; the card menu's Finder, Share and plain-text items work; Color cards pick dark or white type as Paste does; Image and Screenshot are separate in search; card headers use Paste's palette with the large app icon cut by the corner; image cards show "W × H" pills; text fades above its count. Version 0.3.0 (4).
+- **October 1: cards across panel heights.** Inspected live in Paste at 14 heights, with a recording of its switch. Paste removes nothing from 412 down to 300 pt. Below 300 its cards drop the header band: title and short time on the card itself, pictures, colors and link previews running up under them, and no text count or image size. The switch animates in about 0.23 s. Elmers' cards are now layered the same way (`CardView`, `PanelMetrics.contentTop`/`textTop`/`fileThumbnailTop`): the band, count and size pill fade, the content slides, the titles crossfade and the icon resizes, with each part carrying its own 0.22-s animation. Also: tall pictures are fitted over a checkerboard (`PanelMetrics.imageFills`); a link preview's picture fills the card above a footer with its title and address; the link placeholder fades from white to #F3F4F7; addresses drop "www."; the compact time shows seconds ("30s").
+- Fixed along the way: lines scrambled during the switch, a washed-out link picture (two copies crossfading), and a 4–6-frame stall at the switch.
+- Debug aids: `ELMERS_CARD_FIXTURES=resize` (the eight test cards), `ELMERS_NO_KEY=1` (shows the demo panel without making it key, so captures and recordings do not take the user's typing), `ELMERS_RESIZE_PROFILE=switch` and `=frames` (`FrameGapProbe`). `--check-card-layout` now covers compact cards.
+
+Verification: `./scripts/test.sh` 83/83; lint clean; `--check-card-layout` (15), `--check-panel-resize` and `--check-card-menu` pass; `--check-scroll-performance` p95 6.1–6.4 ms; switch probe 0 dropped refreshes in 20 switches. The demo panel was compared side by side with Paste at 412, 332, 300, 299, 270 and 252 pt, and 60-fps recordings of both switches were compared frame by frame. `--check-interaction` was not run, because the Mac was in use. The rebuilt `dist/Elmers.app` is running; nobody has dragged its real panel by hand since this change.
+
+Testing notes: Paste closes its panel whenever another app activates (Chrome, and a short-lived `com.guylyons.View` helper did so repeatedly), so open and capture in one step. Before capturing Paste, check its accessibility tree: every time label in the region must be a test item's ("N seconds/minutes ago"). Record behind a plain window (`cover` in the session scratchpad) so nothing else shows above a short panel. Run demo captures with `ELMERS_NO_KEY=1` whenever someone may be typing.
+
+Remaining work, in priority order (the full list is `punchlist.md`):
+
+1. Drag the real panel across 300 pt by hand, and run `--check-interaction` on an idle Mac.
+2. Compact Mode leftovers: Paste's dark appearance, more picture shapes (to pin down the fill threshold), multi-file and screenshot cards, the compact text fade length, the path's head truncation on file cards.
+3. Highlighted matches in search results, the "Show in" item on results, Pause's "Paused until …" and notices, in-app tips, Show in Menu Bar.
+4. Compare built surfaces with Paste: Paste Stack window and a real ⌘V, the Space preview, onboarding, rename field, image editor.
+5. Direct paste into browsers, Electron apps and terminals, with Accessibility denied, and after the destination quits.
+6. A real ⌘⇧3/4/5 screenshot into history; the About window.
+7. Right-to-left for Hebrew, a VoiceOver audit, native-speaker review of Elmers-only strings.
+8. iCloud sync (blocked on signing, entitlements and a second device).

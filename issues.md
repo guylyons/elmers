@@ -191,3 +191,13 @@
   draws large and cut by the corner, now matched. Image cards fill with the picture and show "W × H" in a pill. Headers use
   Paste's fixed colors chosen by the icon's dominant hue: 10 of 12 apps match exactly. Screenshot headers are system gray.
   Details in docs/paste-parity.md › September 30, card headers.)
+
+- [fixed 2026-10-01; compared side by side with Paste] changing the bar's height: Paste collapses and removes parts of a card,
+  like responsive web design, and cleanly animates it; Elmers just shrank things and pushed them down
+  (Paste 6.3.11 removes nothing from 412 down to 300 pt. Below 300 its cards drop the colored header band: the title and a
+  short time sit on the card itself, pictures, colors and link previews run up under them, and the text count and image size
+  go. The switch animates in about 0.23 s. Elmers kept a 36-pt band and squeezed the body under it. Cards are now layered as in
+  Paste: the band, count and size pill fade, the content slides, the titles crossfade and the icon resizes. Three bugs spoiled
+  that motion and are fixed: lines scrambled while the drag changed the width, a link picture washed out as two copies
+  crossfaded, and the panel stalled for 4–6 frames because the whole card was animated. Tall pictures are now fitted over a
+  checkerboard, as in Paste. Details in docs/paste-parity.md › October 1.)
