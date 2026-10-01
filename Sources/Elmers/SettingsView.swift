@@ -17,13 +17,18 @@ struct SettingsView: View {
     }()
     @State private var helpVisible = false
     enum Section: String, CaseIterable, Identifiable {
-        case general = "General", privacy = "Privacy", shortcuts = "Shortcuts"
+        /// Paste's three panes, then Elmers' own Screenshots pane: screenshot capture is Elmers-only, and at the bottom of
+        /// Privacy its switch went unnoticed.
+        case general = "General", privacy = "Privacy", shortcuts = "Shortcuts", screenshots = "Screenshots"
         var id: String { rawValue }
         var symbol: String {
-            switch self { case .general: return "gearshape"; case .privacy: return "hand.raised"; case .shortcuts: return "keyboard" }
+            switch self {
+            case .general: return "gearshape"; case .privacy: return "hand.raised"; case .shortcuts: return "keyboard"
+            case .screenshots: return "camera.viewfinder"
+            }
         }
         var title: LocalizedStringKey {
-            switch self { case .general: return "General"; case .privacy: return "Privacy"; case .shortcuts: return "Shortcuts" }
+            switch self { case .general: return "General"; case .privacy: return "Privacy"; case .shortcuts: return "Shortcuts"; case .screenshots: return "Screenshots" }
         }
     }
     var body: some View {
@@ -57,6 +62,7 @@ struct SettingsView: View {
                         case .general: GeneralSettings(model: model)
                         case .privacy: PrivacySettings(model: model)
                         case .shortcuts: ShortcutSettingsView(model: model)
+                        case .screenshots: ScreenshotSettings(model: model)
                         }
                     }.padding(.top, 17)
                 }.scrollBounceBehavior(.basedOnSize)
@@ -328,7 +334,35 @@ private struct RetentionLabels: View {
     }
 }
 
-private struct PrivacySettings: View {
+private /// Elmers' own pane: whether screenshots macOS saves are added to history, the folder Elmers watches (the one set in
+/// the Screenshot app's Options), and what to do when Elmers cannot read it.
+struct ScreenshotSettings: View {
+    @ObservedObject var model: AppModel
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SettingsGroup {
+                SettingsDetailToggle(title: "Add saved screenshots to history", detail: "Screenshots stay in your macOS save location. Elmers keeps a copy for searching and pasting.", isOn: $model.captureScreenshots)
+                if let folder = model.screenshotFolder {
+                    SettingsSeparator()
+                    HStack {
+                        Label(folder.lastPathComponent, systemImage: "folder").lineLimit(1).truncationMode(.middle).help(folder.path)
+                        Spacer()
+                        Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([folder]) }.buttonStyle(.link)
+                    }.font(.system(size: 12)).padding(.horizontal, 12).frame(height: SettingsStyle.rowHeight)
+                }
+                if model.captureScreenshots, let status = model.screenshotStatus {
+                    SettingsSeparator()
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(status).font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        if model.screenshotNeedsAccess { Button("Allow Folder Access…") { model.allowScreenshotFolderAccess() } }
+                    }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+    }
+}
+
+struct PrivacySettings: View {
     @ObservedObject var model: AppModel
     @State private var selectedApp: String?
     var body: some View {
@@ -366,26 +400,6 @@ private struct PrivacySettings: View {
                         .disabled(selectedApp == nil).help("Remove Application").accessibilityLabel("Remove Application")
                     Spacer()
                 }.buttonStyle(.borderless).font(.system(size: 12)).padding(.horizontal, 2).frame(height: 24)
-            }
-            // Elmers-only: Paste has no screenshot setting, so this group sits below Paste's layout.
-            SettingsHeader(title: "Screenshots")
-            SettingsGroup {
-                SettingsDetailToggle(title: "Add saved screenshots to history", detail: "Screenshots stay in your macOS save location. Elmers keeps a copy for searching and pasting.", isOn: $model.captureScreenshots)
-                if let folder = model.screenshotFolder {
-                    SettingsSeparator()
-                    HStack {
-                        Label(folder.lastPathComponent, systemImage: "folder").lineLimit(1).truncationMode(.middle).help(folder.path)
-                        Spacer()
-                        Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([folder]) }.buttonStyle(.link)
-                    }.font(.system(size: 12)).padding(.horizontal, 12).frame(height: SettingsStyle.rowHeight)
-                }
-                if model.captureScreenshots, let status = model.screenshotStatus {
-                    SettingsSeparator()
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(status).font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                        if model.screenshotNeedsAccess { Button("Allow Folder Access…") { model.allowScreenshotFolderAccess() } }
-                    }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
-                }
             }
         }
     }
