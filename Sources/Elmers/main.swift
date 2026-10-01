@@ -142,10 +142,59 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 for step in 1...10 { post(.leftMouseDragged, start.y + dy * CGFloat(step) / 10) }
                 if release { post(.leftMouseUp, start.y + dy) }
             }
+            /// ELMERS_RESIZE_PROFILE: times what one display refresh of a drag costs, 2 pt at a time from 332 up to 412,
+            /// down to 252 and back, split into layout, display and the Core Animation commit. Before the fixes of
+            /// September 30 a step took 17 ms (every card re-evaluated through the model); it should stay near 8 ms.
+            func profile() {
+                var durations: [Double] = []
+                var parts = [0.0, 0.0, 0.0, 0.0]
+                for dy in Array(stride(from: 2, through: 80, by: 2)) + Array(stride(from: 78, through: -80, by: -2)) + Array(stride(from: -78, through: 0, by: 2)) {
+                    let begin = CFAbsoluteTimeGetCurrent()
+                    model.panelHeight = PanelMetrics.defaultHeight + CGFloat(dy)
+                    let t0 = CFAbsoluteTimeGetCurrent(); window.contentView?.layoutSubtreeIfNeeded()
+                    let t1 = CFAbsoluteTimeGetCurrent(); window.displayIfNeeded()
+                    let t2 = CFAbsoluteTimeGetCurrent(); CATransaction.flush()
+                    let t3 = CFAbsoluteTimeGetCurrent()
+                    durations.append((t3 - begin) * 1000)
+                    parts[0] += (t0 - begin) * 1000; parts[1] += (t1 - t0) * 1000; parts[2] += (t2 - t1) * 1000; parts[3] += (t3 - t2) * 1000
+                }
+                let sorted = durations.sorted()
+                print(String(format: "RESULT: %d resize steps, median %.2f ms, p95 %.2f ms, max %.2f ms, %d over 8.3 ms", durations.count,
+                             sorted[sorted.count / 2], sorted[Int(Double(sorted.count - 1) * 0.95)], sorted.last ?? 0, durations.filter { $0 > 8.3 }.count))
+                print(String(format: "PARTS per step: change %.2f ms, layout %.2f ms, display %.2f ms, commit %.2f ms", parts[0] / Double(durations.count),
+                             parts[1] / Double(durations.count), parts[2] / Double(durations.count), parts[3] / Double(durations.count)))
+                model.panelHeight = PanelMetrics.defaultHeight; model.savePanelHeight()
+            }
+            for index in 0..<30 { model.newText("resize fixture \(index) " + String(repeating: "lorem ipsum dolor sit amet ", count: 8)) }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                if ProcessInfo.processInfo.environment["ELMERS_RESIZE_PROFILE"] != nil { profile(); exit(0) }
+                if ProcessInfo.processInfo.environment["ELMERS_RESIZE_DEMO"] != nil {
+                    // ELMERS_RESIZE_DEMO, for recording with `screencapture -v`: a drag at 120 Hz from 332 up to 412, down to 252 and back, over 3 s, then release.
+                    let start = window.convertPoint(toScreen: handle.convert(NSPoint(x: handle.bounds.midX, y: handle.bounds.midY), to: nil))
+                    func post(_ type: NSEvent.EventType, _ dy: CGFloat) {
+                        window.sendEvent(NSEvent.mouseEvent(with: type, location: window.convertPoint(fromScreen: NSPoint(x: start.x, y: start.y + dy)), modifierFlags: [],
+                                                            timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!)
+                    }
+                    print("PANEL \(window.frame)"); fflush(stdout)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        post(.leftMouseDown, 0)
+                        let began = CACurrentMediaTime()
+                        Timer.scheduledTimer(withTimeInterval: 1.0 / 120, repeats: true) { timer in
+                            MainActor.assumeIsolated {
+                                let t = (CACurrentMediaTime() - began) / 3
+                                let dy: CGFloat = t < 0.25 ? 80 * t * 4 : t < 0.75 ? 80 - 160 * (t - 0.25) * 2 : -80 + 80 * (t - 0.75) * 4
+                                if t >= 1 { post(.leftMouseUp, 0); timer.invalidate(); DispatchQueue.main.asyncAfter(deadline: .now() + 1) { exit(0) } }
+                                else { post(.leftMouseDragged, dy) }
+                            }
+                        }
+                    }
+                    return
+                }
                 drag(80)
                 guard model.panelHeight == 412, window.frame.height == 412, model.panelMetrics.cardSide == 312 else { fail("dragging up 80 pt gave \(model.panelHeight), window \(window.frame.height)") }
                 drag(60, release: false)
+                // Heights asked for during a drag apply on the next display refresh.
+                RunLoop.main.run(until: Date().addingTimeInterval(0.1))
                 guard model.panelHeight > 412, model.panelHeight < 412 + PanelMetrics.stretch else { fail("no rubber band past the top: \(model.panelHeight)") }
                 window.sendEvent(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
                                                     windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!)

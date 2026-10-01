@@ -34,7 +34,7 @@ enum CardLayoutChecks {
 
     /// Rows from the card's top edge, down its left margin, that are still the header tint.
     private static func headerHeight(of item: ClipboardItem, capture name: String) -> Int {
-        let renderer = ImageRenderer(content: CardView(item: item, selected: false, index: 0).environment(\.colorScheme, .light))
+        let renderer = ImageRenderer(content: CardView(item: item, selected: false, index: 0).frame(width: 232, height: 232).environment(\.colorScheme, .light))
         renderer.scale = 1
         guard let cgImage = renderer.cgImage else { return -1 }
         let bitmap = NSBitmapImageRep(cgImage: cgImage)

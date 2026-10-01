@@ -88,8 +88,14 @@ final class AppModel: ObservableObject {
     @Published var paused = false { didSet { captureEpoch += 1; refreshScreenshotMonitoring() } }
     /// The panel's height, which a drag on its top edge changes. While dragging it can stretch past Paste's limits;
     /// the settled height is saved, and Paste shows the panel at it from then on.
-    @Published var panelHeight: CGFloat = PanelMetrics.defaultHeight
-    var panelMetrics: PanelMetrics { PanelMetrics(stretched: panelHeight) }
+    /// Kept out of the model's own publishing: a drag changes it on every mouse event, and only the cards and their
+    /// row read it, so the rest of the history view is not re-evaluated while the panel resizes.
+    let panelGeometry = PanelGeometry()
+    var panelHeight: CGFloat {
+        get { panelGeometry.height }
+        set { panelGeometry.height = newValue }
+    }
+    var panelMetrics: PanelMetrics { panelGeometry.metrics }
     func savePanelHeight() { defaults.set(Double(PanelMetrics(height: panelHeight).height), forKey: "panelHeight") }
     @Published var captureScreenshots: Bool { didSet { defaults.set(captureScreenshots, forKey: "captureScreenshots"); refreshScreenshotMonitoring(force: true) } }
     @Published private(set) var screenshotFolder: URL?
@@ -211,7 +217,7 @@ final class AppModel: ObservableObject {
                                       "excludedApps": "com.apple.keychainaccess\ncom.apple.Passwords", "soundEffects": true,
                                       "alwaysPlainText": false, "runInBackground": true, "showDuringScreenSharing": true, "linkPreviews": false, "captureScreenshots": true])
         captureScreenshots = defaults.bool(forKey: "captureScreenshots")
-        panelHeight = PanelMetrics(height: (defaults.object(forKey: "panelHeight") as? Double).map { CGFloat($0) } ?? PanelMetrics.defaultHeight).height
+        panelGeometry.height = PanelMetrics(height: (defaults.object(forKey: "panelHeight") as? Double).map { CGFloat($0) } ?? PanelMetrics.defaultHeight).height
         retentionDays = defaults.integer(forKey: "retentionDays")
         directPaste = defaults.bool(forKey: "directPaste")
         soundEffects = defaults.bool(forKey: "soundEffects")
@@ -629,4 +635,10 @@ final class AppModel: ObservableObject {
         }
     }
     func flush() { saveQueue.sync {} }
+}
+
+/// The panel's live height, observed on its own (see `AppModel.panelGeometry`).
+@Observable final class PanelGeometry {
+    var height: CGFloat = PanelMetrics.defaultHeight
+    var metrics: PanelMetrics { PanelMetrics(stretched: height) }
 }

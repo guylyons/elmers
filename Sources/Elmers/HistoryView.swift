@@ -25,10 +25,10 @@ struct HistoryView: View {
                     ScrollView(.horizontal) {
                         LazyHStack(spacing: 24) {
                             ForEach(Array(model.visibleItems.enumerated()), id: \.element.id) { index, item in
-                                CardView(item: item, selected: model.selection.ids.contains(item.id), ringDimmed: hoveredID != nil && hoveredID != item.id, index: index,
+                                SizedCard(geometry: model.panelGeometry) { style in CardView(item: item, selected: model.selection.ids.contains(item.id), ringDimmed: hoveredID != nil && hoveredID != item.id, index: index,
                                          quickPasteNumber: model.quickPasteNumbersShown && index < 9 ? index + 1 : nil,
                                          renaming: model.renamingID == item.id, onRename: { model.finishRenaming(item, title: $0) },
-                                         onBeginRename: { if model.canEdit { model.renamingID = item.id } }, metrics: model.panelMetrics)
+                                         onBeginRename: { if model.canEdit { model.renamingID = item.id } }, style: style) }
                                     .id(item.id)
                                     .onHover { inside in if inside { hoveredID = item.id } else if hoveredID == item.id { hoveredID = nil } }
                                     .onTapGesture(count: 2) { model.activate(item) }
@@ -57,7 +57,7 @@ struct HistoryView: View {
                     }
                     // Paste 6.3.11: cards start 8 pt below the 60-pt toolbar and end 24 pt above the panel's bottom
                     // edge. A taller scroll view would center them vertically instead.
-                    .frame(height: model.panelMetrics.cardSide + 16)
+                    .modifier(CardRowHeight(geometry: model.panelGeometry))
                     // `.hidden` still lets macOS show a scroller when scroll bars are set to always show (or a mouse
                     // is connected); that scroller took the bottom of the card row and clipped the cards. Paste shows none.
                     .scrollIndicators(.never)
@@ -383,5 +383,22 @@ private struct ToolbarLayout: Layout {
             }
             plus.place(at: CGPoint(x: x + 7, y: y), anchor: .leading, proposal: ProposedViewSize(width: 34, height: 34))
         }
+    }
+}
+
+/// The card row's height, read here rather than in `HistoryView.body` so a resize re-lays out only the row.
+private struct CardRowHeight: ViewModifier {
+    let geometry: PanelGeometry
+    func body(content: Content) -> some View { content.frame(height: geometry.metrics.cardSide + 16) }
+}
+
+/// A card at the panel's current size. Only this wrapper reads the live height; the card inside is compared by value, so
+/// a resize step re-evaluates it only when its rounded style changes.
+private struct SizedCard: View {
+    let geometry: PanelGeometry
+    let card: (CardStyle) -> CardView
+    var body: some View {
+        let metrics = geometry.metrics
+        card(CardStyle(metrics)).equatable().frame(width: metrics.cardSide, height: metrics.cardSide)
     }
 }

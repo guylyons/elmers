@@ -3,7 +3,24 @@ import SwiftUI
 import WebKit
 import ElmersCore
 
-struct CardView: View {
+/// What a card draws differently as the panel resizes, rounded so that most steps of a drag change only the card's
+/// frame and not its contents.
+struct CardStyle: Equatable {
+    var isCompact: Bool
+    var headerHeight: CGFloat
+    var iconSide: CGFloat
+    /// Previews scale with the card; Paste's measurements were taken on the default 232-pt card.
+    var scale: CGFloat
+    init(_ metrics: PanelMetrics) {
+        isCompact = metrics.isCompact; headerHeight = metrics.headerHeight.rounded()
+        iconSide = (46 * metrics.iconScale).rounded(); scale = (metrics.cardSide / 232 * 50).rounded() / 50
+    }
+    static let standard = CardStyle(PanelMetrics(height: PanelMetrics.defaultHeight))
+}
+
+/// Equatable without its closures, so that while the panel is resized SwiftUI only lays cards out at their new size
+/// instead of re-evaluating each one (a resize step cost about 10 ms of layout with every card re-evaluated).
+struct CardView: View, Equatable {
     let item: ClipboardItem
     let selected: Bool
     /// Paste turns the selected card's ring gray while the pointer rests on a different card.
@@ -15,10 +32,17 @@ struct CardView: View {
     var renaming = false
     var onRename: (String?) -> Void = { _ in }
     var onBeginRename: () -> Void = {}
-    /// The card's size and layout follow the panel's height, as in Paste (Compact Mode below 300 pt).
-    var metrics = PanelMetrics(height: PanelMetrics.defaultHeight)
-    /// Paste scales previews with the card; its measurements were taken on the default 232-pt card.
-    private var scale: CGFloat { metrics.cardSide / 232 }
+    /// The card's layout follows the panel's height, as in Paste (Compact Mode below 300 pt); its size is set by the
+    /// caller's frame.
+    var style = CardStyle.standard
+    private var metrics: CardStyle { style }
+    private var scale: CGFloat { style.scale }
+    static func == (a: CardView, b: CardView) -> Bool {
+        a.item.id == b.item.id && a.item.fingerprint == b.item.fingerprint && a.item.title == b.item.title && a.item.copiedAt == b.item.copiedAt
+            && a.item.boardIDs == b.item.boardIDs && a.item.linkPreview == b.item.linkPreview && a.item.sourceBundleID == b.item.sourceBundleID
+            && a.item.screenshot == b.item.screenshot && a.selected == b.selected && a.ringDimmed == b.ringDimmed && a.index == b.index
+            && a.quickPasteNumber == b.quickPasteNumber && a.renaming == b.renaming && a.style == b.style
+    }
     static let cornerRadius: CGFloat = 16
     /// Pinboard colors in Display P3. Paste's red renders #FE3A3C, which no sRGB system red reaches; the other seven
     /// take Apple's light-mode system values as P3 components in the same way and are not yet compared with Paste.
@@ -26,7 +50,7 @@ struct CardView: View {
                                   (0.686, 0.322, 0.871), (1, 0.176, 0.333), (0.557, 0.557, 0.576)]
         .map { Color(.displayP3, red: $0.0, green: $0.1, blue: $0.2) }
     private var accent: Color {
-        if let id = item.sourceBundleID, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id),
+        if let id = item.sourceBundleID, let url = CardImageCache.shared.appURL(for: id),
            let color = CardImageCache.shared.color(for: id, url: url) { return color }
         switch item.kind {
         case .link: return Color(red: 0.19, green: 0.52, blue: 0.77)
@@ -36,7 +60,7 @@ struct CardView: View {
         }
     }
     private var appIcon: NSImage? {
-        guard let id = item.sourceBundleID, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) else { return nil }
+        guard let id = item.sourceBundleID, let url = CardImageCache.shared.appURL(for: id) else { return nil }
         return CardImageCache.shared.icon(for: id, url: url)
     }
     var body: some View {
@@ -82,8 +106,7 @@ struct CardView: View {
                 .background(item.kind == .link && item.linkPreview == nil ? Self.linkBodyColor : Self.bodyColor)
             }
         }
-        .frame(width: metrics.cardSide, height: metrics.cardSide)
-        .animation(.easeInOut(duration: 0.25), value: metrics.isCompact)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous))
         .shadow(color: .black.opacity(0.08), radius: 3, y: 1)
         // Paste 6.3.11 draws the selection as a 4-pt ring hugging the outside of the card, with no gap and no
@@ -99,22 +122,20 @@ struct CardView: View {
         .accessibilityValue(selected ? String(localized: "Selected") : "")
         .help(index < 9 ? String(localized: "\(item.source) · \(item.kind.title) · ⌘\(index + 1) to paste") : "\(item.source) · \(item.kind.title)")
     }
-    @ViewBuilder private var header: some View {
-        if metrics.isCompact {
-            // Paste's Compact Mode: the title and a short time ("59m") on one line, and a 22-pt app icon 6 pt from the
-            // card's edge, centered in a 36-pt header.
-            HStack(spacing: 4) {
-                title(size: 13)
-                TimelineView(.periodic(from: .now, by: 15)) { context in
-                    Text(Self.shortTime(item.copiedAt, now: context.date)).font(.system(size: 12)).opacity(0.9).lineLimit(1).fixedSize()
-                        .help(item.copiedAt.formatted(date: .abbreviated, time: .shortened))
+    /// Paste's Compact Mode puts the title and a short time ("59m") on one line in a 36-pt header with a 22-pt app icon
+    /// 6 pt from the card's edge. The text changes layout at once; the icon is one view in both layouts, so it shrinks
+    /// and grows over a few frames, as Paste's did (its icon frame went 78, 63, 44, 37, 28, 22 pt).
+    private var header: some View {
+        HStack(spacing: metrics.isCompact ? 4 : 8) {
+            if metrics.isCompact {
+                HStack(spacing: 4) {
+                    title(size: 13)
+                    TimelineView(.periodic(from: .now, by: 15)) { context in
+                        Text(Self.shortTime(item.copiedAt, now: context.date)).font(.system(size: 12)).opacity(0.9).lineLimit(1).fixedSize()
+                            .help(item.copiedAt.formatted(date: .abbreviated, time: .shortened))
+                    }
                 }
-                Spacer(minLength: 0)
-                icon(side: 22)
-            }
-            .padding(.leading, 12).padding(.trailing, 6)
-        } else {
-            HStack(spacing: 8) {
+            } else {
                 VStack(alignment: .leading, spacing: -1) {
                     title(size: 15)
                     TimelineView(.periodic(from: .now, by: 15)) { context in
@@ -122,11 +143,12 @@ struct CardView: View {
                             .help(item.copiedAt.formatted(date: .abbreviated, time: .shortened))
                     }
                 }
-                Spacer(minLength: 0)
-                icon(side: 46 * metrics.iconScale)
             }
-            .padding(.leading, 13).padding(.trailing, 3)
+            Spacer(minLength: 0)
+            icon(side: metrics.isCompact ? 22 : metrics.iconSide)
+                .animation(.easeOut(duration: 0.15), value: metrics.isCompact)
         }
+        .padding(.leading, metrics.isCompact ? 12 : 13).padding(.trailing, metrics.isCompact ? 6 : 3)
     }
     @ViewBuilder private func title(size: CGFloat) -> some View {
         if renaming {
@@ -369,6 +391,14 @@ final class CardImageCache {
     static let shared = CardImageCache()
     private let icons = NSCache<NSString, NSImage>()
     private var colors: [String: Color?] = [:]
+    private var urls: [String: URL?] = [:]
+    /// Launch Services is asked once per app: cards read this on every evaluation, which a resize repeats per frame.
+    func appURL(for id: String) -> URL? {
+        if let cached = urls[id] { return cached }
+        let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id)
+        urls[id] = url
+        return url
+    }
     func icon(for id: String, url: URL) -> NSImage {
         if let icon = icons.object(forKey: id as NSString) { return icon }
         let icon = NSWorkspace.shared.icon(forFile: url.path)

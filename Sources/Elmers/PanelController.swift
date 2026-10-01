@@ -21,7 +21,15 @@ final class PanelController: NSObject, NSWindowDelegate {
     private var transitionGeneration = 0
     /// The panel's height before it has been resized; afterwards it follows `model.panelHeight`.
     static let windowHeight: CGFloat = PanelMetrics.defaultHeight
-    private var settleTimer: Timer?
+    /// A drag's latest height, applied once per display refresh by `resizeLink`: mouse events come faster than the
+    /// screen refreshes, and laying the cards out for each one made the panel miss frames (33-ms gaps at 60 Hz).
+    private var pendingHeight: CGFloat?
+    private var resizeLink: CADisplayLink?
+    private var settle: (from: CGFloat, to: CGFloat, start: CFTimeInterval)?
+    /// True from the start of a drag until its spring-back ends. The window is then held at its largest height and
+    /// only the glass inside it changes: resizing the full-width window on every frame dropped frames in the window
+    /// server, as moving it did for the slide.
+    private var resizing = false
     /// How long a panel stretched past a limit takes to spring back to it when the drag ends.
     static let settleDuration: TimeInterval = 0.2
     static let inset: CGFloat = 8
@@ -67,13 +75,14 @@ final class PanelController: NSObject, NSWindowDelegate {
         glass.frame = NSRect(x: Self.inset, y: Self.inset, width: root.bounds.width - 2 * Self.inset, height: root.bounds.height - Self.inset)
         glass.autoresizingMask = [.width, .height]
         root.addSubview(glass)
-        let handle = PanelResizeHandle(frame: NSRect(x: Self.inset, y: root.bounds.height - PanelResizeHandle.thickness,
-                                                     width: root.bounds.width - 2 * Self.inset, height: PanelResizeHandle.thickness))
+        // The handle rides on the glass's top edge, also while the glass alone is resized during a drag.
+        let handle = PanelResizeHandle(frame: NSRect(x: 0, y: glass.bounds.height - PanelResizeHandle.thickness,
+                                                     width: glass.bounds.width, height: PanelResizeHandle.thickness))
         handle.autoresizingMask = [.width, .minYMargin]
-        handle.began = { [weak self] in self?.settleTimer?.invalidate(); return self?.model.panelHeight ?? Self.windowHeight }
-        handle.changed = { [weak self] height in self?.setPanelHeight(height) }
+        handle.began = { [weak self] in self?.beginResize(); return self?.model.panelHeight ?? Self.windowHeight }
+        handle.changed = { [weak self] height in self?.requestPanelHeight(height) }
         handle.ended = { [weak self] in self?.settlePanelHeight() }
-        root.addSubview(handle)
+        glass.addSubview(handle)
         panel.contentView = root
         model.deliver = { [weak self] item, plain in self?.paste(item, plainText: plain) }
         model.dismiss = { [weak self] in self?.hide() }
@@ -202,21 +211,56 @@ final class PanelController: NSObject, NSWindowDelegate {
         guard let screen = restingScreen ?? panel.screen else { return }
         let height = height.rounded()
         model.panelHeight = height
-        panel.setFrame(NSRect(x: screen.frame.minX, y: screen.frame.minY, width: screen.frame.width, height: height), display: true)
+        if resizing { glass.setFrameSize(NSSize(width: glass.frame.width, height: height - Self.inset)); return }
+        panel.setFrame(NSRect(x: screen.frame.minX, y: screen.frame.minY, width: screen.frame.width, height: height), display: false)
+    }
+    private func beginResize() {
+        settle = nil
+        guard !resizing, let screen = restingScreen ?? panel.screen else { return }
+        resizing = true
+        glass.autoresizingMask = [.width, .maxYMargin]
+        panel.setFrame(NSRect(x: screen.frame.minX, y: screen.frame.minY, width: screen.frame.width,
+                              height: PanelMetrics.maximumHeight + PanelMetrics.stretch), display: false)
+    }
+    private func endResize() {
+        guard resizing else { return }
+        resizing = false
+        setPanelHeight(model.panelHeight)
+        glass.frame = NSRect(x: Self.inset, y: Self.inset, width: panel.frame.width - 2 * Self.inset, height: model.panelHeight - Self.inset)
+        glass.autoresizingMask = [.width, .height]
+    }
+    private func requestPanelHeight(_ height: CGFloat) {
+        pendingHeight = height
+        startResizeLink()
+    }
+    private func startResizeLink() {
+        guard resizeLink == nil else { return }
+        guard let screen = restingScreen ?? panel.screen else { if let height = pendingHeight { pendingHeight = nil; setPanelHeight(height) }; return }
+        let link = screen.displayLink(target: self, selector: #selector(stepResize(_:)))
+        link.add(to: .main, forMode: .common)
+        resizeLink = link
+    }
+    @objc private func stepResize(_ link: CADisplayLink) {
+        if let settle {
+            let progress = min((link.targetTimestamp - settle.start) / Self.settleDuration, 1)
+            setPanelHeight(settle.from + (settle.to - settle.from) * CGFloat(TimingCurve.panelIn.value(at: progress)))
+            if progress >= 1 { self.settle = nil; endResize() }
+        } else if let height = pendingHeight {
+            pendingHeight = nil
+            setPanelHeight(height)
+        } else {
+            link.invalidate(); resizeLink = nil
+        }
     }
     /// Letting go past a limit springs back to it (Paste: 242 → 252, 420 → 412); the settled height is kept.
     private func settlePanelHeight() {
+        // The last height the pointer asked for counts, even if its refresh has not come yet.
+        if let height = pendingHeight { pendingHeight = nil; setPanelHeight(height) }
         let from = model.panelHeight, to = PanelMetrics(height: from).height
         model.savePanelHeight()
-        guard from != to, animatesTransitions else { setPanelHeight(to); return }
-        let start = CACurrentMediaTime()
-        settleTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 120, repeats: true) { [weak self] timer in
-            MainActor.assumeIsolated {
-                let progress = min((CACurrentMediaTime() - start) / Self.settleDuration, 1)
-                self?.setPanelHeight(from + (to - from) * CGFloat(TimingCurve.panelIn.value(at: progress)))
-                if progress >= 1 { timer.invalidate() }
-            }
-        }
+        guard from != to, animatesTransitions else { setPanelHeight(to); endResize(); return }
+        settle = (from, to, CACurrentMediaTime())
+        startResizeLink()
     }
     func hide(restoreFocus: Bool = true) {
         guard isShown else { return }
