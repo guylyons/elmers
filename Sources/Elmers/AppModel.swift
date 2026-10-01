@@ -349,9 +349,13 @@ final class AppModel: ObservableObject {
                        ("Safari", "com.apple.Safari", 103), ("Finder", "com.apple.finder", 104)]
         let only = ProcessInfo.processInfo.environment["ELMERS_CARD_FIXTURES"]   // "text" or "image" for one kind only, "resize" for the October 1 set
         if only == "resize" { seedResizeFixtures(words: words); return }
-        for (name, id, index) in sources where only == nil || (only == "image") == (index % 2 == 0) {
-            let payload = index % 2 == 0 ? image(index) : .text("Elmers card fixture \(index) " + String(repeating: words, count: 6))
-            captureForChecks(payload, source: name, bundleID: id)
+        // ELMERS_CARD_FIXTURES_REPEAT: the set several times over, for a row long enough to scroll.
+        let repeats = Int(ProcessInfo.processInfo.environment["ELMERS_CARD_FIXTURES_REPEAT"] ?? "") ?? 1
+        for round in 0..<repeats {
+            for (name, id, index) in sources where only == nil || (only == "image") == (index % 2 == 0) {
+                let payload = index % 2 == 0 ? image(index + round * 10) : .text("Elmers card fixture \(index + round * 10) " + String(repeating: words, count: 6))
+                captureForChecks(payload, source: name, bundleID: id)
+            }
         }
     }
     /// The eight cards of the October 1 Paste capture across panel heights, all copied from Ghostty, newest first: long
@@ -694,5 +698,7 @@ final class AppModel: ObservableObject {
 /// The panel's live height, observed on its own (see `AppModel.panelGeometry`).
 @Observable final class PanelGeometry {
     var height: CGFloat = PanelMetrics.defaultHeight
+    /// How far the card row is nudged past its start (positive) or end (negative) by a mouse wheel's bounce.
+    var rowBounce: CGFloat = 0
     var metrics: PanelMetrics { PanelMetrics(stretched: height) }
 }

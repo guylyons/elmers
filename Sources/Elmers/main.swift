@@ -57,6 +57,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ScreenshotInteractionChecks.run(model: model, controller: panelController)
             return
         }
+        if ProcessInfo.processInfo.arguments.contains("--check-scroll-bounce") {
+            precondition(model.isDemo, "Scroll checks require --demo")
+            ScrollBounceChecks.run(model: model, controller: panelController); return
+        }
         if ProcessInfo.processInfo.arguments.contains("--check-scroll-input") {
             precondition(model.isDemo, "Scroll checks require --demo")
             ScrollInputChecks.run(model: model, controller: panelController); return

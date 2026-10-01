@@ -128,7 +128,12 @@ final class PanelController: NSObject, NSWindowDelegate {
     func remappedScroll(_ event: NSEvent) -> NSEvent {
         guard let cg = event.cgEvent?.copy() else { return event }
         let precise = event.hasPreciseScrollingDeltas
-        func remap(_ x: Double, _ y: Double) -> (dx: Double, dy: Double) { ScrollMapping.remap(dx: x, dy: y, precise: precise) }
+        // Toward the start is a positive delta. A wheel scrolls the row with its vertical delta when it has no sideways one.
+        let toward = precise || event.scrollingDeltaX != 0 ? event.scrollingDeltaX : event.scrollingDeltaY
+        let edge = rowEdge
+        let pastEdge = edge.over || (edge.atStart && toward > 0) || (edge.atEnd && toward < 0)
+        if !precise, pastEdge, toward != 0 { bounceRow(toward > 0 ? 1 : -1) }
+        func remap(_ x: Double, _ y: Double) -> (dx: Double, dy: Double) { ScrollMapping.remap(dx: x, dy: y, precise: precise, pastEdge: pastEdge) }
         // Every original value is read first: writing one delta field makes the event recompute the others (a doubled
         // line delta turned 10 pt into 16), so lines go first, then fixed-point, then the point deltas a trackpad's
         // scrollingDelta comes from.
@@ -142,6 +147,34 @@ final class PanelController: NSObject, NSWindowDelegate {
         cg.setIntegerValueField(.scrollWheelEventPointDeltaAxis2, value: Int64(point.dx.rounded()))
         cg.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: Int64(point.dy.rounded()))
         return NSEvent(cgEvent: cg) ?? event
+    }
+    private weak var historyScroll: NSScrollView?
+    /// Where the card row's scroll view is: at its start, at its end, or stretched past one of them by a trackpad.
+    private var rowEdge: (atStart: Bool, atEnd: Bool, over: Bool) {
+        if historyScroll?.window == nil { historyScroll = Self.horizontalScroll(in: panel.contentView) }
+        guard let scroll = historyScroll else { return (true, true, false) }
+        let x = scroll.contentView.bounds.origin.x
+        let end = max(0, (scroll.documentView?.frame.width ?? 0) - scroll.contentView.bounds.width)
+        return (x <= 0.5, x >= end - 0.5, x < -0.5 || x > end + 0.5)
+    }
+    /// The card row's scroll view: the tallest in the panel (the pinboard pills in the toolbar scroll too).
+    private static func horizontalScroll(in view: NSView?) -> NSScrollView? {
+        func all(_ view: NSView) -> [NSScrollView] { ((view as? NSScrollView).map { [$0] } ?? []) + view.subviews.flatMap(all) }
+        return view.flatMap { all($0).max { $0.frame.height < $1.frame.height } }
+    }
+    private var bounceWork: DispatchWorkItem?
+    /// A little bounce when a mouse wheel scrolls past the start or end of the row, asked for by the user (October 1).
+    /// Paste's wheel stops dead there and AppKit gives a wheel no rubber band, so this is Elmers' own: each notch nudges
+    /// the row 8 pt further out (16 at most), and it springs back with a slight overshoot.
+    private func bounceRow(_ direction: CGFloat) {
+        guard animatesTransitions else { return }
+        let geometry = model.panelGeometry
+        let target = max(-16, min(16, geometry.rowBounce + direction * 8))
+        withAnimation(.easeOut(duration: 0.08)) { geometry.rowBounce = target }
+        bounceWork?.cancel()
+        let work = DispatchWorkItem { withAnimation(.spring(response: 0.34, dampingFraction: 0.6)) { geometry.rowBounce = 0 } }
+        bounceWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.09, execute: work)
     }
     /// Paste numbers the first nine cards while the Quick Paste modifier is held, as the keys ⌘1…⌘9 paste them.
     func updateQuickPasteNumbers(_ flags: NSEvent.ModifierFlags) {

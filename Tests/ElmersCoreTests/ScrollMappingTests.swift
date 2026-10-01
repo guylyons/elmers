@@ -13,5 +13,9 @@ struct ScrollMappingTests {
         XCTAssertEqual(wheel.dx, -3); XCTAssertEqual(wheel.dy, 0)
         let sideways = ScrollMapping.remap(dx: -1, dy: 0, precise: false)
         XCTAssertEqual(sideways.dx, -1); XCTAssertEqual(sideways.dy, 0)
+        // Past an edge Paste stretches about 8 pt per 100 px of swipe (29 per 400), AppKit's own rubber band for
+        // undoubled deltas, so the gain stops while the row is pushed past its start or end.
+        XCTAssertEqual(ScrollMapping.remap(dx: 10, dy: 0, precise: true, pastEdge: true).dx, 10)
+        XCTAssertEqual(ScrollMapping.remap(dx: 10, dy: 0, precise: true, pastEdge: false).dx, 20)
     }
 }

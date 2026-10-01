@@ -58,6 +58,9 @@ struct HistoryView: View {
                     // Paste 6.3.11: cards start 8 pt below the 60-pt toolbar and end 24 pt above the panel's bottom
                     // edge. A taller scroll view would center them vertically instead.
                     .modifier(CardRowHeight(geometry: model.panelGeometry))
+                    // Outside the scroll view: an offset on its content stopped AppKit's rubber band from starting at
+                    // the edges.
+                    .modifier(RowBounce(geometry: model.panelGeometry))
                     // `.hidden` still lets macOS show a scroller when scroll bars are set to always show (or a mouse
                     // is connected); that scroller took the bottom of the card row and clipped the cards. Paste shows none.
                     .scrollIndicators(.never)
@@ -452,4 +455,10 @@ enum SharingServices {
         return services
     }
     @MainActor private static var cache: [ContentKind: [NSSharingService]] = [:]
+}
+
+/// The wheel's bounce at the ends of the row (`PanelController.bounceRow`), read here so only the row redraws.
+private struct RowBounce: ViewModifier {
+    let geometry: PanelGeometry
+    func body(content: Content) -> some View { content.offset(x: geometry.rowBounce) }
 }
