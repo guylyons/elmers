@@ -1,5 +1,21 @@
 # Paste parity inventory
 
+## September 30 — scroll input
+
+Reference: Paste 6.3.11 on macOS 27.0 (26A428), panel on the 2560×1440 external display at 1×, light appearance. Paste's history was given 40 harmless test items (lorem-ipsum text and plain colored PNGs, copied with Elmers quit, at the user's OK; they remain in Paste's history). Scroll events were posted with `CGEvent` at the pointer over Paste's panel, and the leftmost card title's x was read from the accessibility tree before and after (no pixels). Elmers was measured the same way through `--demo --check-scroll-input`.
+
+| Input | Observed in Paste 6.3.11 | Elmers status |
+|---|---|---|
+| Mouse wheel, vertical | Scrolls the row sideways: 30 pt for 3 lines, about 10 pt a line | **implemented** (`ScrollMapping`, `PanelController.remappedScroll`): 10 pt a line; was 0 |
+| Mouse wheel, sideways | 10 pt a line | 10 pt a line, unchanged |
+| Trackpad, sideways (gesture phases set) | 100 pt for 5 × 10 px, 69 pt for 10 × 4 px: about 1.7–2× the fingers, during the gesture | **implemented**: 2× (20 pt per 10 px); was 1:1. Momentum events get the same gain |
+| Trackpad, vertical | Does not scroll the row, in either direction. Unphased vertical pixel events (no gesture) closed the panel | does not scroll; closing on a downward swipe not built (unclear whether a real gesture does it) |
+| Plain pixel events without a gesture phase | Ignored | scroll 2× like gestures |
+
+Scroll events over the panel are rewritten before the history's NSScrollView sees them, keeping AppKit's smooth line scrolling, momentum and edge bounce. Frame cost: an Animation Hitches trace of a scripted 80-pt-per-event flick on 120 mixed demo cards found 3 late frames in about 4 s. `--check-scroll-performance` had regressed to 30 of 161 steps over 16.7 ms because the card menu built each image card's full image; the Share submenu now finds services per content type and builds content only when one is chosen (2–8 over, p95 14–16 ms on a machine at load 7).
+
+Not compared: a real trackpad's acceleration and momentum against Paste's; Magic Mouse; scrolling with the pointer over the toolbar; whether Paste rubber-bands at the ends. Checks: core 81/81 (new "scroll input maps as Paste's"); `--check-scroll-input` prints the distances above; `--check-scroll-performance`, `--check-card-menu`, `--check-delete-confirmation`, `--check-stack`, `--check-status-item` pass. `--check-interaction` not rerun on an idle Mac.
+
 ## September 30 — resizable panel, Compact Mode, delete confirmation (passive log)
 
 Reference: Paste 6.3.11 on macOS 27.0 (26A428), panel on the 2560×1440 external display at 1×, light appearance, Paste Items set to To clipboard with Always paste as Plain Text on (no Accessibility for Paste). Evidence: a passive logger (session scratchpad, not committed) running while the user used Paste for about four minutes. It polled Paste's on-screen windows through `CGWindowListCopyWindowInfo` every 0.1 s (frame, layer, alpha), took accessibility snapshots on window, menu and resize notifications, logged focus, modifier-only flags while Paste was up, and clipboard type names. Text was kept only when it matched Paste's own English `Localizable.strings` (format arguments redacted); card content was reduced to its length. No pixels, keystrokes or clipboard data were recorded.

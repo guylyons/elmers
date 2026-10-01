@@ -176,3 +176,9 @@
   show the pixel size, Elmers shows the file size.
   (Paste's binary has FooterView with a GradientEffectView (gradientLayer, gradientAlpha) and a ShadowOverlayView. The
   gradient's height and colors still need measuring on harmless fixture cards in Paste.)
+
+- [fixed 2026-09-30; measured, not yet tried by the user] scrolling is very very slow (mouse wheel and trackpad sideways)
+  (A vertical mouse wheel did not scroll the row at all, and sideways swipes moved it 1:1. Paste scrolls about 10 pt
+  per wheel line and moves 1.7–2× a sideways swipe. Scroll events over the panel are now rewritten to match
+  (`ScrollMapping`). Also removed a full image read and decode per image card from the card menu, which made image
+  cards hitch as they scrolled in. Details in docs/paste-parity.md › September 30, scroll input.)
