@@ -55,6 +55,7 @@ let checks: [(String, () throws -> Void)] = [
     ("the menu bar gulp squashes, stretches and settles", motion.testGulpSquashesStretchesAndSettles),
     ("cards follow the panel height", panelMetrics.testCardsFollowThePanelHeight),
     ("compact mode below 300 pt", panelMetrics.testCompactModeBelowThreeHundred),
+    ("images fill their frame only when little is cut", panelMetrics.testImagesFillOnlyWhenLittleIsCut),
     ("dragging the panel rubber-bands past its limits", panelMetrics.testDragRubberBandsPastTheLimits),
     ("scroll input maps as Paste's: wheel sideways, trackpad doubled", scrollMapping.testScrollInputMapsAsPaste),
     ("header colors snap to Paste's palette", headerPalette.testIconColorsSnapToPastesPalette),

@@ -347,10 +347,40 @@ final class AppModel: ObservableObject {
         }
         let sources = [("Messages", "com.apple.MobileSMS", 100), ("Calculator", "com.apple.calculator", 101), ("VLC", "org.videolan.vlc", 102),
                        ("Safari", "com.apple.Safari", 103), ("Finder", "com.apple.finder", 104)]
-        let only = ProcessInfo.processInfo.environment["ELMERS_CARD_FIXTURES"]   // "text" or "image" for one kind only
+        let only = ProcessInfo.processInfo.environment["ELMERS_CARD_FIXTURES"]   // "text" or "image" for one kind only, "resize" for the October 1 set
+        if only == "resize" { seedResizeFixtures(words: words); return }
         for (name, id, index) in sources where only == nil || (only == "image") == (index % 2 == 0) {
             let payload = index % 2 == 0 ? image(index) : .text("Elmers card fixture \(index) " + String(repeating: words, count: 6))
             captureForChecks(payload, source: name, bundleID: id)
+        }
+    }
+    /// The eight cards of the October 1 Paste capture across panel heights, all copied from Ghostty, newest first: long
+    /// text, a link with a fetched preview, a 600 × 400 image, a color, a link without a preview, a 300 × 600 image, short
+    /// text and a file.
+    private func seedResizeFixtures(words: String) {
+        func png(_ width: Int, _ height: Int, hue: CGFloat, draw: ((NSRect) -> Void)? = nil) -> Data {
+            let image = NSImage(size: NSSize(width: width, height: height), flipped: false) { rect in
+                NSColor(hue: hue, saturation: 0.55, brightness: 0.85, alpha: 1).setFill(); rect.fill(); draw?(rect); return true
+            }
+            return NSBitmapImageRep(data: image.tiffRepresentation!)!.representation(using: .png, properties: [:])!
+        }
+        let ghostty = ("Ghostty", "com.mitchellh.ghostty")
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("Elmers fixture.txt")
+        try? Data("Elmers resize fixture file\nlorem ipsum dolor sit amet consectetur adipiscing elit\n".utf8).write(to: file)
+        // A dark page picture with a light tile in the middle, standing in for the fetched preview.
+        let page = png(1200, 630, hue: 0.6) { rect in
+            NSColor(white: 0.05, alpha: 1).setFill(); rect.fill()
+            NSColor(white: 0.75, alpha: 1).setFill(); NSBezierPath(roundedRect: NSRect(x: 520, y: 230, width: 160, height: 160), xRadius: 36, yRadius: 36).fill()
+        }
+        let payloads: [ClipboardPayload] = [
+            .text("Elmers fixture 200"), .init(items: [["public.png": png(300, 600, hue: 0.74)]]), .text("https://example.com/elmers/fixture/202"),
+            .text("#FF8800"), .init(items: [[NSPasteboard.PasteboardType.fileURL.rawValue: Data(file.absoluteString.utf8)]]),
+            .init(items: [["public.png": png(600, 400, hue: 0.08)]]), .text("https://www.apple.com/macos/"),
+            .text("Elmers resize fixture 207 " + String(repeating: words, count: 6)),
+        ]
+        for payload in payloads { captureForChecks(payload, source: ghostty.0, bundleID: ghostty.1) }
+        if let link = history.items.first(where: { $0.text == "https://www.apple.com/macos/" }) {
+            history.setLinkPreview(link.id, LinkPreview(title: "macOS 27 Golden Gate - Apple", image: page))
         }
     }
     #endif

@@ -17,14 +17,31 @@ struct PanelMetricsTests {
         XCTAssertEqual(PanelMetrics(height: 332).iconScale, 1)
         XCTAssertTrue(abs(PanelMetrics(height: 412).iconScale - 86.0 / 78) < 0.001)
     }
-    /// Compact Mode below 300 pt: seen at 299 and below, full size at 300 and above; a 36-pt header.
+    /// Compact Mode below 300 pt: seen at 299 and below, full size at 300 and above. Compact cards have no header band:
+    /// content starts at the card's top edge, text 36 pt down under the title row and file thumbnails 45 pt down.
     func testCompactModeBelowThreeHundred() {
         XCTAssertTrue(PanelMetrics(height: 299).isCompact)
         XCTAssertTrue(PanelMetrics(height: 252).isCompact)
         XCTAssertTrue(!PanelMetrics(height: 300).isCompact)
         XCTAssertTrue(!PanelMetrics(height: 332).isCompact)
-        XCTAssertEqual(PanelMetrics(height: 280).headerHeight, 36)
         XCTAssertEqual(PanelMetrics(height: 280).iconScale, 1)
+        XCTAssertEqual(PanelMetrics(height: 280).contentTop, 0)
+        XCTAssertEqual(PanelMetrics(height: 280).textTop, 36)
+        XCTAssertEqual(PanelMetrics(height: 280).fileThumbnailTop, 45)
+        XCTAssertEqual(PanelMetrics(height: 332).contentTop, 50)
+        XCTAssertEqual(PanelMetrics(height: 332).textTop, 60)
+        XCTAssertEqual(PanelMetrics(height: 332).fileThumbnailTop, 57)
+    }
+    /// Paste fills a card with a 600 × 400 image at full size (212 × 163 and 312 × 256 bodies) but fits it in a square
+    /// compact card, and fits a 300 × 600 image everywhere.
+    func testImagesFillOnlyWhenLittleIsCut() {
+        let wide = CGSize(width: 600, height: 400), tall = CGSize(width: 300, height: 600)
+        XCTAssertTrue(PanelMetrics.imageFills(wide, in: CGSize(width: 211, height: 163)))
+        XCTAssertTrue(PanelMetrics.imageFills(wide, in: CGSize(width: 312, height: 256)))
+        XCTAssertTrue(!PanelMetrics.imageFills(wide, in: CGSize(width: 190, height: 190)))
+        XCTAssertTrue(!PanelMetrics.imageFills(tall, in: CGSize(width: 211, height: 163)))
+        XCTAssertTrue(!PanelMetrics.imageFills(tall, in: CGSize(width: 152, height: 152)))
+        XCTAssertTrue(PanelMetrics.imageFills(CGSize(width: 500, height: 500), in: CGSize(width: 152, height: 152)))
     }
     /// Dragging past a limit stretches with growing resistance (Paste reached 242 and 420) and never passes the
     /// stretch limit; letting go settles on the limit.

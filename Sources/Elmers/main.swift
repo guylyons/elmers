@@ -130,7 +130,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let model: AppModel = self.model, panelController: PanelController = self.panelController
             func fail(_ message: String) -> Never { print("FAIL: \(message)"); fflush(stdout); exit(1) }
             model.panelHeight = PanelMetrics.defaultHeight; model.savePanelHeight()
-            for index in 0..<30 { model.newText("resize fixture \(index) " + String(repeating: "lorem ipsum dolor sit amet ", count: 8)) }
+            // With --demo-card-fixtures (ELMERS_CARD_FIXTURES=resize for recordings), the fixture cards stand alone.
+            if !ProcessInfo.processInfo.arguments.contains("--demo-card-fixtures") {
+                for index in 0..<30 { model.newText("resize fixture \(index) " + String(repeating: "lorem ipsum dolor sit amet ", count: 8)) }
+            }
             panelController.show()
             let window = panelController.panel
             guard let handle = KeyboardInteractionChecks.subview(of: window.contentView, where: { $0 is PanelResizeHandle }) else { fail("no resize handle") }
@@ -153,7 +156,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             func profile() {
                 var durations: [Double] = []
                 var parts = [0.0, 0.0, 0.0, 0.0]
-                for dy in Array(stride(from: 2, through: 80, by: 2)) + Array(stride(from: 78, through: -80, by: -2)) + Array(stride(from: -78, through: 0, by: 2)) {
+                // ELMERS_RESIZE_PROFILE=switch times only the Compact Mode switch: 300 and 299 pt, back and forth.
+                let steps = ProcessInfo.processInfo.environment["ELMERS_RESIZE_PROFILE"] == "switch" ? (0..<20).map { $0 % 2 == 0 ? -33 : -32 }
+                    : Array(stride(from: 2, through: 80, by: 2)) + Array(stride(from: 78, through: -80, by: -2)) + Array(stride(from: -78, through: 0, by: 2))
+                for dy in steps {
                     let begin = CFAbsoluteTimeGetCurrent()
                     model.panelHeight = PanelMetrics.defaultHeight + CGFloat(dy)
                     let t0 = CFAbsoluteTimeGetCurrent(); window.contentView?.layoutSubtreeIfNeeded()
@@ -177,6 +183,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { whenShown(body, deadline: deadline) }
             }
             whenShown {
+                if ProcessInfo.processInfo.environment["ELMERS_RESIZE_PROFILE"] == "frames" { FrameGapProbe.run(model: model, window: window); return }
                 if ProcessInfo.processInfo.environment["ELMERS_RESIZE_PROFILE"] != nil { profile(); exit(0) }
                 if ProcessInfo.processInfo.environment["ELMERS_RESIZE_DEMO"] != nil {
                     // ELMERS_RESIZE_DEMO, for recording with `screencapture -v`: a drag at 120 Hz from 332 up to 412, down to 252 and back, over 3 s, then release.

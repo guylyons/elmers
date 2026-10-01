@@ -7,19 +7,31 @@ import ElmersCore
 /// frame and not its contents.
 struct CardStyle: Equatable {
     var isCompact: Bool
+    /// The header band's height; Compact Mode fades the band out.
     var headerHeight: CGFloat
     var iconSide: CGFloat
     /// Previews scale with the card; Paste's measurements were taken on the default 232-pt card.
     var scale: CGFloat
+    var contentTop: CGFloat
+    var textTop: CGFloat
+    var fileThumbnailTop: CGFloat
     init(_ metrics: PanelMetrics) {
         isCompact = metrics.isCompact; headerHeight = metrics.headerHeight.rounded()
         iconSide = (78 * metrics.iconScale).rounded(); scale = (metrics.cardSide / 232 * 50).rounded() / 50
+        contentTop = metrics.contentTop.rounded(); textTop = metrics.textTop.rounded(); fileThumbnailTop = metrics.fileThumbnailTop.rounded()
     }
+    /// The card's side, to within the rounding of `scale`.
+    var side: CGFloat { 232 * scale }
     static let standard = CardStyle(PanelMetrics(height: PanelMetrics.defaultHeight))
 }
 
 /// Equatable without its closures, so that while the panel is resized SwiftUI only lays cards out at their new size
 /// instead of re-evaluating each one (a resize step cost about 10 ms of layout with every card re-evaluated).
+///
+/// A card is layered: its content fills the whole card, the header band lies over the top, and the title and app icon
+/// over that. At full size the content starts under the band. Compact Mode (Paste 6.3.11, observed October 1) has no
+/// band: the title and a short time sit on the card itself, pictures, colors and link previews run up under them, and
+/// the text count and image size are dropped. Crossing 300 pt animates between the two.
 struct CardView: View, Equatable {
     let item: ClipboardItem
     let selected: Bool
@@ -44,6 +56,11 @@ struct CardView: View, Equatable {
             && a.quickPasteNumber == b.quickPasteNumber && a.renaming == b.renaming && a.style == b.style
     }
     static let cornerRadius: CGFloat = 16
+    /// Paste switches layouts in about 0.22 s (14 frames at 60 fps, both ways): the band and the dropped footers fade,
+    /// the two title layouts crossfade, the content slides and the app icon resizes together. Each of those carries the
+    /// animation itself: on the whole card it also animated every size change the drag made in that frame, and the
+    /// panel stalled for 4–6 refreshes at the switch.
+    static let modeChange = Animation.easeInOut(duration: 0.22)
     /// Pinboard colors in Display P3. Paste's red renders #FE3A3C, which no sRGB system red reaches; the other seven
     /// take Apple's light-mode system values as P3 components in the same way and are not yet compared with Paste.
     static let colors: [Color] = [(1, 0.23, 0.24), (1, 0.584, 0), (1, 0.8, 0), (0.204, 0.78, 0.349), (0, 0.478, 1),
@@ -66,39 +83,22 @@ struct CardView: View, Equatable {
         return CardImageCache.shared.icon(for: id, url: url)
     }
     var body: some View {
-        VStack(spacing: 0) {
-            header.foregroundStyle(.white).frame(height: metrics.headerHeight)
-                .background(accent) // Paste's header is a flat tint (#1C3EC3 top to bottom), not a gradient.
-            if let color = HexColor(item.text), item.kind == .color {
-                // Paste 6.3.11 fills the whole body with the color and centers the value in 18-pt monospaced type,
-                // with no count footer.
-                Text(color.display).font(.system(size: 18, design: .monospaced))
-                    .foregroundStyle(color.prefersDarkText ? Color.black.opacity(0.85) : Color.white.opacity(0.9))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(.sRGB, red: color.red, green: color.green, blue: color.blue))
-                    .overlay(alignment: .bottomTrailing) {
-                        quickPasteBadge.foregroundStyle(color.prefersDarkText ? Color.black.opacity(0.65) : Color.white.opacity(0.65))
-                    }
-            } else if item.kind.isImage, hasImageData(item) {
-                // Paste fills the body with the picture down to the card's bottom edge and lays its size and number in
-                // pills over it.
-                CardThumbnail(item: item, quickPasteNumber: quickPasteNumber)
-            } else if [.text, .other].contains(item.kind), !item.text.isEmpty {
-                textBody
-            } else {
-                VStack(spacing: 0) {
-                    // minHeight 0 lets a tall preview (a link's fixed-height image, title and two-line address) clip
-                    // instead of overflowing the card, which would center the overflow and lift the header off the top.
-                    preview
-                        .frame(maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
-                        .clipped()
-                    if !metrics.isCompact || item.kind == .link || filePath != nil { footerRow }
-                }
-                .overlay(alignment: .bottomTrailing) { quickPasteBadge.foregroundStyle(Self.badgeInk) }
-                .background(item.kind == .link && item.linkPreview == nil ? Self.linkBodyColor : Self.bodyColor)
+        ZStack(alignment: .top) {
+            content.frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Paste's header is a flat band of the app's color (#1C3EC3 top to bottom, not a gradient).
+            accent.frame(height: metrics.headerHeight).opacity(metrics.isCompact ? 0 : 1)
+                .animation(Self.modeChange, value: metrics.isCompact).allowsHitTesting(false)
+            // A compact title over a picture has a shade behind it: black at 32 % along the top edge, gone 60 pt down,
+            // measured over an image's checkerboard.
+            if titleOverPicture {
+                LinearGradient(colors: [.black.opacity(0.32), .black.opacity(0)], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 60).opacity(metrics.isCompact ? 1 : 0)
+                    .animation(Self.modeChange, value: metrics.isCompact).allowsHitTesting(false)
             }
+            header.animation(Self.modeChange, value: metrics.isCompact)
+            appIconView.animation(Self.modeChange, value: metrics.isCompact)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .clipShape(RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous))
         .shadow(color: .black.opacity(0.08), radius: 3, y: 1)
         // Paste 6.3.11 draws the selection as a 4-pt ring hugging the outside of the card, with no gap and no
@@ -114,34 +114,88 @@ struct CardView: View, Equatable {
         .accessibilityValue(selected ? String(localized: "Selected") : "")
         .help(index < 9 ? String(localized: "\(item.source) · \(item.kind.title) · ⌘\(index + 1) to paste") : "\(item.source) · \(item.kind.title)")
     }
-    /// Paste's footer sits on the bottom edge: counts are centered on one line, link addresses are left-aligned and may
-    /// wrap onto a second line that grows upward. Compact Mode drops the counts.
-    private var footerRow: some View {
-        HStack(alignment: .bottom, spacing: 5) {
-            if !item.boardIDs.isEmpty { Image(systemName: "pin.fill").font(.system(size: 9)).padding(.bottom, 3) }
-            if let path = filePath {
-                // Paste 6.3.11 shows a single file's full path on up to two lines, cut without an ellipsis.
-                Text(verbatim: path).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, maxHeight: Self.twoFooterLines, alignment: .topLeading).clipped()
-                    .padding(.trailing, quickPasteNumber == nil ? 0 : Self.badgeWidth)
-            } else if item.kind == .link {
-                Text(footer).lineLimit(2).truncationMode(.tail).multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.trailing, quickPasteNumber == nil ? 0 : Self.badgeWidth)
-            } else {
-                Text(footer).lineLimit(1).frame(maxWidth: .infinity)
+    @ViewBuilder private var content: some View {
+        if let color = HexColor(item.text), item.kind == .color {
+            // Paste 6.3.11 fills the whole card with the color, under the band at full size, and centers the value in
+            // 18-pt monospaced type below the band (in the whole card in Compact Mode), with no count footer.
+            Color(.sRGB, red: color.red, green: color.green, blue: color.blue)
+                .overlay {
+                    Text(color.display).font(.system(size: 18, design: .monospaced))
+                        .foregroundStyle(color.prefersDarkText ? Color.black.opacity(0.85) : Color.white.opacity(0.9))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity).padding(.top, metrics.contentTop)
+                        .animation(Self.modeChange, value: metrics.isCompact)
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    quickPasteBadge.foregroundStyle(color.prefersDarkText ? Color.black.opacity(0.65) : Color.white.opacity(0.65))
+                }
+        } else if item.kind.isImage, hasImageData(item) {
+            // Paste draws the picture down to the card's bottom edge with its size and number in pills over it; in
+            // Compact Mode it runs up under the title and the size pill goes.
+            CardThumbnail(item: item, quickPasteNumber: quickPasteNumber, showsSize: !metrics.isCompact,
+                          frameSize: CGSize(width: metrics.side, height: metrics.side - metrics.contentTop))
+                .padding(.top, metrics.contentTop)
+                .animation(Self.modeChange, value: metrics.isCompact)
+        } else if [.text, .other].contains(item.kind), !item.text.isEmpty {
+            textBody
+        } else {
+            VStack(spacing: 0) {
+                // minHeight 0 lets a tall preview clip instead of overflowing the card, which would center the overflow
+                // and lift the header off the top.
+                preview
+                    .animation(Self.modeChange, value: metrics.isCompact)
+                    .frame(maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
+                    .clipped()
+                if !metrics.isCompact || item.kind == .link || filePath != nil { footerRow }
             }
+            .overlay(alignment: .bottomTrailing) { quickPasteBadge.foregroundStyle(Self.badgeInk) }
+            .background(Self.bodyColor)
         }
-        .font(.system(size: 12)).foregroundStyle(.secondary).padding(.horizontal, 13).padding(.bottom, 9).padding(.top, 4)
+    }
+    /// Paste's footer sits on the bottom edge: counts are centered on one line, link addresses are left-aligned and may
+    /// wrap onto a second line that grows upward, and a link preview's title sits in bold over its address. Compact
+    /// Mode drops the counts.
+    private var footerRow: some View {
+        HStack(alignment: .bottom, spacing: 5) { footerContent.transaction { $0.animation = nil } }
+            .font(.system(size: 12)).foregroundStyle(.secondary).padding(.horizontal, 13).padding(.bottom, 9).padding(.top, 4)
+    }
+    /// Not animated: an address that wraps differently at the next drag step would otherwise morph between wrappings.
+    @ViewBuilder private var footerContent: some View {
+        if !item.boardIDs.isEmpty { Image(systemName: "pin.fill").font(.system(size: 9)).padding(.bottom, 3) }
+        if let path = filePath {
+            // Paste 6.3.11 shows a single file's full path on up to two lines, cut without an ellipsis.
+            Text(verbatim: path).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, maxHeight: Self.twoFooterLines, alignment: .topLeading).clipped()
+                .padding(.trailing, quickPasteNumber == nil ? 0 : Self.badgeWidth)
+        } else if item.kind == .link, let title = item.linkPreview?.title, item.linkPreview?.image != nil {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.system(size: 13, weight: .semibold)).foregroundStyle(Color(nsColor: .labelColor)).lineLimit(1)
+                Text(footer).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.trailing, quickPasteNumber == nil ? 0 : Self.badgeWidth)
+        } else if item.kind == .link {
+            Text(footer).lineLimit(2).truncationMode(.tail).multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.trailing, quickPasteNumber == nil ? 0 : Self.badgeWidth)
+        } else {
+            Text(footer).lineLimit(1).frame(maxWidth: .infinity)
+        }
     }
     /// Paste's text card (measured September 30 on a 211-pt card): the text starts 12 pt in and 10 pt under the header,
     /// runs on under the footer without an ellipsis, and fades out linearly over 35 pt, gone 16 pt above the bottom edge,
-    /// level with the middle of the count.
+    /// level with the middle of the count. In Compact Mode it starts under the title row and fades to the bottom edge.
     private var textBody: some View {
         ZStack(alignment: .bottom) {
             Text(String(item.text.prefix(1600)))
                 .font(.system(size: 13)).foregroundStyle(Color(nsColor: .textColor))
+                // The lines never morph: SwiftUI otherwise animated each line between wrappings, and they scrambled
+                // while the drag kept changing the card's width during the switch.
+                .contentTransition(.identity)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.leading, metrics.isCompact ? 11 : 12).padding(.trailing, metrics.isCompact ? 11 : 12).padding(.top, metrics.isCompact ? 5 : 10)
+                // Laid out at its compact place and moved down by an offset at full size, so the switch slides the text
+                // without laying it out again.
+                .padding(.horizontal, 12).padding(.top, PanelMetrics.compactTextTop)
+                .offset(y: metrics.textTop - PanelMetrics.compactTextTop)
+                .animation(Self.modeChange, value: metrics.isCompact)
                 // minHeight 0: the text keeps its full height and is cut by the card instead of growing it.
                 .frame(maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
                 .clipped()
@@ -151,59 +205,90 @@ struct CardView: View, Equatable {
                         LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: metrics.isCompact ? 24 : 35)
                         Color.clear.frame(height: metrics.isCompact ? 0 : 16)
                     }
+                    .animation(Self.modeChange, value: metrics.isCompact)
                 }
-            if !metrics.isCompact { footerRow }
+            // Faded rather than removed, so the switch does not lay the card out again.
+            footerRow.opacity(metrics.isCompact ? 0 : 1).animation(Self.modeChange, value: metrics.isCompact)
         }
         .overlay(alignment: .bottomTrailing) { quickPasteBadge.foregroundStyle(Self.badgeInk) }
         .background(Self.bodyColor)
     }
-    /// Paste's Compact Mode puts the title and a short time ("59m") on one line in a 36-pt header with a 22-pt app icon
-    /// 6 pt from the card's edge. The text changes layout at once; the icon is one view in both layouts, so it shrinks
-    /// and grows over a few frames, as Paste's did (its icon frame went 78, 63, 44, 37, 28, 22 pt).
+    /// Full size: the title over the relative time, in white, centered in the band. Compact Mode: the title and a short
+    /// time ("59m") on one line centered 18 pt below the card's top, dark on the card's own surface and white over a
+    /// picture. The two crossfade as the mode changes.
     private var header: some View {
-        Group {
+        ZStack(alignment: .topLeading) {
             if metrics.isCompact {
+                let ink = compactInk
                 HStack(spacing: 4) {
-                    title(size: 13)
+                    title(size: 13, ink: ink.title)
                     TimelineView(.periodic(from: .now, by: 15)) { context in
-                        Text(Self.shortTime(item.copiedAt, now: context.date)).font(.system(size: 12)).opacity(0.9).lineLimit(1).fixedSize()
+                        Text(Self.shortTime(item.copiedAt, now: context.date)).font(.system(size: 13)).foregroundStyle(ink.time)
+                            .lineLimit(1).fixedSize()
                             .help(item.copiedAt.formatted(date: .abbreviated, time: .shortened))
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: PanelMetrics.compactTitleCenter * 2)
+                .padding(.trailing, PanelMetrics.compactIconSide + PanelMetrics.compactIconInset + 6)
             } else {
                 VStack(alignment: .leading, spacing: -1) {
-                    title(size: 15)
+                    title(size: 15, ink: .white)
                     TimelineView(.periodic(from: .now, by: 15)) { context in
                         Text(Self.relativeTime(item.copiedAt, now: context.date)).font(.system(size: 12)).opacity(0.9).lineLimit(1)
                             .help(item.copiedAt.formatted(date: .abbreviated, time: .shortened))
                     }
                 }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: metrics.headerHeight)
+                .padding(.trailing, 56)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .padding(.leading, 12).padding(.trailing, metrics.isCompact ? 34 : 56)
-        // Paste draws the app icon large and lets the header and the card's corner cut it: a 78-pt frame on a 232-pt
-        // card (86 at 312), centered on the header's middle 23 pt from the right edge (measured from its accessibility
-        // frames, September 30). In Compact Mode it is 22 pt, 17 pt in.
-        .overlay(alignment: .trailing) {
-            let side = metrics.isCompact ? 22 : metrics.iconSide
-            icon(side: side).offset(x: side / 2 - (metrics.isCompact ? 17 : 23))
-                .animation(.easeOut(duration: 0.15), value: metrics.isCompact)
-        }
-        .clipped()
+        .padding(.leading, 12)
     }
-    @ViewBuilder private func title(size: CGFloat) -> some View {
+    /// Paste draws the app icon large and lets the header and the card's corner cut it: a 78-pt frame on a 232-pt card
+    /// (86 at 312), centered on the header's middle 23 pt from the right edge (measured from its accessibility frames,
+    /// September 30). In Compact Mode it is 22 pt, 6 pt from the edge, centered on the title row. One view in both
+    /// layouts, so it shrinks and grows with the switch, as Paste's did (its frame went 78, 63, 44, 37, 28, 22 pt).
+    private var appIconView: some View {
+        let compact = metrics.isCompact
+        let side = compact ? PanelMetrics.compactIconSide : metrics.iconSide
+        let inset = compact ? PanelMetrics.compactIconInset + PanelMetrics.compactIconSide / 2 : 23
+        let center = compact ? PanelMetrics.compactTitleCenter : metrics.headerHeight / 2
+        return icon(side: side)
+            .offset(x: side / 2 - inset, y: center - side / 2)
+            .frame(maxWidth: .infinity, alignment: .topTrailing)
+            .frame(height: compact ? PanelMetrics.compactTitleCenter * 2 + 4 : metrics.headerHeight, alignment: .top)
+            .clipped()
+            .allowsHitTesting(false)
+    }
+    /// Over a picture, a compact title is white over a shade; on a color it goes by the color's brightness.
+    private var titleOverPicture: Bool {
+        (item.kind.isImage && hasImageData(item)) || (item.kind == .link && item.linkPreview?.image != nil)
+    }
+    private var compactInk: (title: Color, time: Color) {
+        if titleOverPicture { return (.white, .white.opacity(0.75)) }
+        if item.kind == .color, let color = HexColor(item.text) {
+            return color.prefersDarkText ? (.black.opacity(0.85), .black.opacity(0.5)) : (.white, .white.opacity(0.75))
+        }
+        return (Color(nsColor: .labelColor), Color(nsColor: .secondaryLabelColor))
+    }
+    @ViewBuilder private func title(size: CGFloat, ink: Color) -> some View {
         if renaming {
-            TitleField(initial: item.title ?? "", placeholder: item.kind.title, size: size, commit: onRename)
+            TitleField(initial: item.title ?? "", placeholder: item.kind.title, size: size, ink: ink, commit: onRename)
         } else {
-            Text(item.title ?? item.kind.title).font(.system(size: size, weight: .semibold)).lineLimit(1)
+            Text(item.title ?? item.kind.title).font(.system(size: size, weight: .semibold)).foregroundStyle(ink).lineLimit(1)
                 .onTapGesture { if selected { onBeginRename() } }
         }
     }
     @ViewBuilder private func icon(side: CGFloat) -> some View {
         if let icon = appIcon { Image(nsImage: icon).resizable().frame(width: side, height: side) }
         // Without an app icon the type's symbol keeps its own size inside Paste's larger icon frame.
-        else { Image(systemName: symbol).font(.system(size: min(28, side * 28 / 46))).frame(width: side, height: side).opacity(0.85) }
+        else {
+            Image(systemName: symbol).font(.system(size: min(28, side * 28 / 46))).frame(width: side, height: side).opacity(0.85)
+                .foregroundStyle(metrics.isCompact ? compactInk.title : .white)
+        }
     }
     /// Measured on Paste 6.3.11: a 10-pt `text.justify.left` glyph, then the number on the footer's baseline, 12.5 pt in
     /// from the card's right edge, in 65 % ink (#ACACAC on a dark card, brighter than the 55 % footer). It sits over the
@@ -230,14 +315,14 @@ struct CardView: View, Equatable {
         formatter.unitsStyle = .full; formatter.dateTimeStyle = .named
         return formatter.localizedString(for: date, relativeTo: now)
     }
-    /// Compact Mode's time: Paste showed three characters for an item copied 59 minutes before ("59m") and two for
-    /// five days ("5d").
+    /// Compact Mode's time: Paste showed "now" for an item copied seconds before, "30s" at 30 seconds, three characters
+    /// for 59 minutes ("59m") and two for five days ("5d"). "now" lasts 30 s, as at full size.
     static func shortTime(_ date: Date, now: Date = Date()) -> String {
         let seconds = now.timeIntervalSince(date)
-        if seconds < 60 { return String(localized: "now") }
+        if seconds < 30 { return String(localized: "now") }
         let formatter = DateComponentsFormatter()
         formatter.unitsStyle = .abbreviated; formatter.maximumUnitCount = 1
-        formatter.allowedUnits = [.minute, .hour, .day, .weekOfMonth, .month, .year]
+        formatter.allowedUnits = [.second, .minute, .hour, .day, .weekOfMonth, .month, .year]
         return formatter.string(from: seconds) ?? ""
     }
     /// Paste's ring is a Display P3 blue (renders #016EFE), more saturated than the sRGB system accent.
@@ -261,48 +346,52 @@ struct CardView: View, Equatable {
         switch item.kind {
         case .text: return String(localized: "\(item.text.count) characters") // Paste: "1 character", "41 characters" (plural rules)
         case .link:
-            // Paste shows the address without its scheme: "pasteapp.io/help".
+            // Paste shows the address without its scheme or a leading "www.": "pasteapp.io/help", "apple.com/macos".
             guard let url = URL(string: item.text.components(separatedBy: "\n").first ?? item.text), let host = url.host else { return "Link" }
             let path = url.path == "/" ? "" : url.path
-            return host + path + (url.query.map { "?" + $0 } ?? "")
+            return (host.hasPrefix("www.") ? String(host.dropFirst(4)) : host) + path + (url.query.map { "?" + $0 } ?? "")
         case .file: return String(localized: "\(item.payload.itemCount) files")
         default: return ByteCountFormatter.string(fromByteCount: Int64(item.byteCount), countStyle: .file)
         }
     }
+    /// The body of a link, file or unknown card, above its footer. It starts under the band at full size and at the
+    /// card's top edge in Compact Mode, where a link preview's picture runs up under the title.
     @ViewBuilder private var preview: some View {
-        if item.kind.isImage, hasImageData(item) {
-            CardThumbnail(item: item)
-        } else if item.kind == .link, let preview = item.linkPreview, preview.title != nil || preview.image != nil {
-            VStack(alignment: .leading, spacing: 0) {
-                if let data = preview.image, let image = NSImage(data: data) {
-                    Image(nsImage: image).resizable().scaledToFill().frame(maxWidth: .infinity).frame(height: (preview.title == nil ? 154 : 108) * scale).clipped()
-                }
-                if let title = preview.title {
-                    Text(title).font(.system(size: 13, weight: .medium)).lineLimit(preview.image == nil ? 5 : 2).padding(13)
-                }
-            }
+        if item.kind == .link, let image = CardImageCache.shared.linkImage(for: item) {
+            // Paste fills everything above the footer with the page's picture; the page title moves into the footer.
+            Color.clear
+                .overlay { Image(nsImage: image).resizable().scaledToFill() }
+                .clipped()
+                .padding(.top, metrics.contentTop)
+        } else if item.kind == .link, let title = item.linkPreview?.title {
+            Text(title).font(.system(size: 13, weight: .medium)).lineLimit(5).contentTransition(.identity)
+                .padding(.horizontal, 13).padding(.top, metrics.isCompact ? metrics.textTop : metrics.contentTop + 13)
         } else if item.kind == .link {
+            // Paste's placeholder: a compass over a fade from white under the band to #F3F4F7 above the white footer.
             Image(systemName: "safari").font(.system(size: 34, weight: .thin)).foregroundStyle(.tertiary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(LinearGradient(colors: [Self.bodyColor, Self.linkBodyColor], startPoint: .top, endPoint: .bottom))
+                .padding(.top, metrics.contentTop)
         } else if item.kind == .file, let url = item.payload.fileURLs.first {
-            // Measured on Paste 6.3.11: centered, the page's top 16.5 pt below the header.
+            // Measured on Paste 6.3.11 (October 1): the thumbnail is fitted in a frame 12 pt in from the sides, from 7 pt
+            // under the band (45 pt below the card's top in Compact Mode) to 10 pt above the path.
             CardFileThumbnail(url: url)
-                .frame(maxWidth: ThumbnailCache.fileThumbnailSide * scale, maxHeight: ThumbnailCache.fileThumbnailSide * scale)
-                .frame(maxWidth: .infinity).padding(.top, metrics.isCompact ? 6 : 10)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.horizontal, 12).padding(.top, metrics.fileThumbnailTop).padding(.bottom, 6)
         } else if item.kind == .file {
             VStack(alignment: .leading, spacing: 8) {
                 Image(systemName: "doc.fill").font(.system(size: 40)).foregroundStyle(.orange)
                 Text(item.text.components(separatedBy: "\n").compactMap { URL(string: $0)?.lastPathComponent }.joined(separator: "\n"))
                     .font(.system(size: 13, weight: .medium)).lineLimit(4)
-            }.padding(13)
+            }
+            .padding(13).padding(.top, metrics.isCompact ? metrics.textTop - 13 : metrics.contentTop)
         } else {
-            if item.text.isEmpty { PreviewUnavailable(compact: true) }
+            if item.text.isEmpty { PreviewUnavailable(compact: true).padding(.top, metrics.isCompact ? PanelMetrics.compactTitleCenter * 2 : metrics.contentTop) }
             else {
                 Text(String(item.text.prefix(1600)))
-                    .font(.system(size: 13)).foregroundStyle(Color(nsColor: .textColor))
+                    .font(.system(size: 13)).foregroundStyle(Color(nsColor: .textColor)).contentTransition(.identity)
                     .frame(maxWidth: .infinity, alignment: .topLeading)
-                    // Compact Mode starts the text just under the header, 11 pt in from the sides.
-                    .padding(.horizontal, metrics.isCompact ? 11 : 13).padding(.top, metrics.isCompact ? 5 : 13).padding(.bottom, 13)
+                    .padding(.horizontal, 12).padding(.top, metrics.textTop).padding(.bottom, 13)
             }
         }
     }
@@ -343,19 +432,28 @@ func imagePreview(_ item: ClipboardItem) -> NSImage? { imageData(of: item).flatM
 private struct CardThumbnail: View {
     let item: ClipboardItem
     var quickPasteNumber: Int? = nil
+    /// Compact Mode drops the size pill.
+    var showsSize = true
+    /// The frame the picture is drawn in, to choose between filling it and fitting inside it.
+    var frameSize = CGSize(width: 232, height: 182)
+    @Environment(\.colorScheme) private var colorScheme
     var body: some View {
         // Reading `ready` makes this view redraw when the thumbnail arrives.
         let image = ThumbnailCache.shared.ready.keys.contains(item.fingerprint) ? ThumbnailCache.shared.cached(item) : ThumbnailCache.shared.cached(item)
+        let size = ThumbnailCache.shared.pixelSize(of: item)
+        // Paste crops a picture to fill the card only when little is lost, and otherwise fits it over a checkerboard of
+        // 8-pt squares (#FFFFFF and #F5F5F5): a tall screenshot shows whole, as does a wide one in a square compact card.
+        let fills = size.map { PanelMetrics.imageFills($0, in: frameSize) } ?? true
         Color.clear
             .overlay {
-                if let image { Image(nsImage: image).resizable().interpolation(.high).scaledToFill() }
+                if let image { Image(nsImage: image).resizable().interpolation(.high).aspectRatio(contentMode: fills ? .fill : .fit) }
             }
             .clipped()
-            .background(CardView.bodyColor)
+            .background(Rectangle().fill(colorScheme == .dark ? Self.darkCheckerboard : Self.checkerboard))
             // Measured on Paste 6.3.11 (211-pt card): a 19-pt pill with the size in pixels ("600 × 400") centered 8 pt
             // above the bottom edge, and the Quick Paste number in a matching pill 8 pt from the right.
             .overlay(alignment: .bottom) {
-                if image != nil, let size = ThumbnailCache.shared.pixelSize(of: item) {
+                if showsSize, image != nil, let size {
                     Self.pill { Text(verbatim: "\(Int(size.width)) × \(Int(size.height))") }.padding(.bottom, 8)
                 }
             }
@@ -371,6 +469,17 @@ private struct CardThumbnail: View {
                 }
             }
             .task(id: item.fingerprint) { _ = await ThumbnailCache.shared.thumbnail(for: item) }
+    }
+    static let checkerboard = checkers(NSColor.white, NSColor(white: 0xF5 / 255.0, alpha: 1))
+    /// Paste's dark appearance has not been seen with a fitted picture; these are the dark card body and a step lighter.
+    static let darkCheckerboard = checkers(NSColor(white: 0.078, alpha: 1), NSColor(white: 0.12, alpha: 1))
+    private static func checkers(_ light: NSColor, _ dark: NSColor) -> ImagePaint {
+        let tile = NSImage(size: NSSize(width: 16, height: 16), flipped: true) { _ in
+            light.setFill(); NSRect(x: 0, y: 0, width: 16, height: 16).fill()
+            dark.setFill(); NSRect(x: 8, y: 0, width: 8, height: 8).fill(); NSRect(x: 0, y: 8, width: 8, height: 8).fill()
+            return true
+        }
+        return ImagePaint(image: Image(nsImage: tile))
     }
     /// Paste's pill: about 42 % black over the picture (it measured #007C7C over #62D9D8, #423C85 over #6262D9), with
     /// light 12-pt text.
@@ -410,12 +519,14 @@ private struct TitleField: View {
     let initial: String
     let placeholder: String
     var size: CGFloat = 15
+    /// White in the band; in Compact Mode, the title's color on the card.
+    var ink: Color = .white
     let commit: (String?) -> Void
     @State private var text = ""
     @FocusState private var focused: Bool
     var body: some View {
-        TextField(text: $text, prompt: Text(placeholder).foregroundStyle(.white.opacity(0.55))) { Text(placeholder) }
-            .textFieldStyle(.plain).font(.system(size: size, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
+        TextField(text: $text, prompt: Text(placeholder).foregroundStyle(ink.opacity(0.55))) { Text(placeholder) }
+            .textFieldStyle(.plain).font(.system(size: size, weight: .semibold)).foregroundStyle(ink).lineLimit(1)
             .focused($focused)
             .onAppear { text = initial; DispatchQueue.main.async { focused = true } }
             .onSubmit { commit(text.trimmingCharacters(in: .whitespacesAndNewlines)) }
@@ -460,6 +571,17 @@ final class CardImageCache {
     private let icons = NSCache<NSString, NSImage>()
     private var colors: [String: Color?] = [:]
     private var urls: [String: URL?] = [:]
+    private let linkImages = NSCache<NSString, NSImage>()
+    /// A link preview's picture, decoded once. A new image on every evaluation made SwiftUI crossfade two copies, which
+    /// washed the picture out while the card switched layouts.
+    func linkImage(for item: ClipboardItem) -> NSImage? {
+        guard let data = item.linkPreview?.image else { return nil }
+        let key = "\(item.id.uuidString)-\(data.count)" as NSString
+        if let image = linkImages.object(forKey: key) { return image }
+        guard let image = NSImage(data: data) else { return nil }
+        linkImages.setObject(image, forKey: key)
+        return image
+    }
     /// Launch Services is asked once per app: cards read this on every evaluation, which a resize repeats per frame.
     func appURL(for id: String) -> URL? {
         if let cached = urls[id] { return cached }

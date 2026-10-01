@@ -230,7 +230,13 @@ final class PanelController: NSObject, NSWindowDelegate {
         transitionGeneration += 1
         panel.ignoresMouseEvents = false
         isShown = true
+        #if DEBUG
+        // ELMERS_NO_KEY: captures and recordings show the panel without making it key, so typing elsewhere on the Mac
+        // does not land in the demo panel.
+        if ProcessInfo.processInfo.environment["ELMERS_NO_KEY"] != nil { panel.orderFrontRegardless() } else { panel.makeKeyAndOrderFront(nil) }
+        #else
         panel.makeKeyAndOrderFront(nil)
+        #endif
         slide(visible: true)
         focusResults()
         updateQuickPasteNumbers(NSEvent.modifierFlags)
