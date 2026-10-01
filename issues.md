@@ -182,3 +182,14 @@
   per wheel line and moves 1.7–2× a sideways swipe. Scroll events over the panel are now rewritten to match
   (`ScrollMapping`). Also removed a full image read and decode per image card from the card menu, which made image
   cards hitch as they scrolled in. Details in docs/paste-parity.md › September 30, scroll input.)
+
+- [fixed 2026-09-30; compared side by side with Paste] rounding is better on corners in Paste, images show dimensions, and its
+  header background colors are better; Screenshot headers should be a system gray
+  (Corners already match Paste's profile best at the current continuous 16 pt; the difference was the app icon, which Paste
+  draws large and cut by the corner, now matched. Image cards fill with the picture and show "W × H" in a pill. Headers use
+  Paste's fixed colors chosen by the icon's dominant hue: 10 of 12 apps match exactly. Screenshot headers are system gray.
+  Details in docs/paste-parity.md › September 30, card headers.)
+
+- [fixed 2026-09-30] the shading behind a card's footer
+  (Text now fades out over 35 pt above the count, as measured on Paste. Image cards have no gradient in Paste; their size
+  and number sit in dark pills, now matched. Status of the earlier open entry above.)
