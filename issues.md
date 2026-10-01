@@ -153,3 +153,26 @@
   local self-signed "Elmers Development" identity, whose designated requirement is the bundle ID plus certificate leaf,
   and the grant was reset and re-granted against it. `/Applications/Elmers.app` is still ad-hoc and stays without
   direct paste until it is replaced with a build signed this way.)
+
+- [fixed 2026-09-30; measured, not compared frame by frame with Paste] resizing the panel works but looks awful next to Paste's fluid motion
+  (Each drag step cost 17 ms and a third of screen updates came 33 ms apart. Four causes, each measured: the height was
+  published through AppModel and re-evaluated the whole history view; a card-wide animation ran after the Compact Mode
+  switch; every mouse event laid the panel out synchronously; and the full-width window was resized every frame. Now
+  the height lives in PanelGeometry, cards are Equatable, only the icon animates, heights apply once per display refresh,
+  and the window holds still while the glass resizes. Recorded: 163–164 of 170 updates on time. Details in
+  docs/paste-parity.md › September 30.)
+
+- [fixed 2026-09-30; checked with real clicks] most card menu options do not work
+  (Tested every item with real clicks while Elmers was inactive. Show in Finder, Open, Reveal in Finder and ⌘O handed
+  focus back to the previous app over Finder or the browser; Share… presented nothing; Paste as Plain Text was offered on
+  images and did nothing. Fixed with AppModel.handOff, a Share submenu of sharing services as in Paste, and disabling
+  Paste as Plain Text without text. The rest worked. `--check-card-menu` covers Share and Paste as Plain Text.)
+
+- [fixed 2026-09-30] text over hex codes is white in Paste (#668184), dark in Elmers
+  (Paste goes by perceived brightness: dark type on #FF8800, white on #668184. `HexColor.prefersDarkText`.)
+
+- [open 2026-09-30] the shading behind a card's footer: Paste fades the last lines of text out above "229 characters", and
+  lays a dark gradient over an image behind its footer ("817 × 620", "≡ 1"); Elmers has neither. Image footers in Paste
+  show the pixel size, Elmers shows the file size.
+  (Paste's binary has FooterView with a GradientEffectView (gradientLayer, gradientAlpha) and a ShadowOverlayView. The
+  gradient's height and colors still need measuring on harmless fixture cards in Paste.)
