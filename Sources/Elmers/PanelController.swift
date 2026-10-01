@@ -86,6 +86,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         panel.contentView = root
         model.deliver = { [weak self] item, plain in self?.paste(item, plainText: plain) }
         model.dismiss = { [weak self] in self?.hide() }
+        model.handOff = { [weak self] in self?.hide(restoreFocus: false) }
         model.showCopied = { [weak self] in self?.showCopied() }
         model.confirmDeletion = { [weak self] in self?.confirmDeletion() ?? false }
         copiedHUD.openSettings = { [weak self] in self?.openSettings() }
@@ -475,7 +476,7 @@ final class PanelController: NSObject, NSWindowDelegate {
                     for value in item.text.components(separatedBy: "\n") {
                         if let url = URL(string: value), ["http", "https", "file"].contains(url.scheme ?? "") { NSWorkspace.shared.open(url) }
                     }
-                    hide()
+                    hide(restoreFocus: false)
                 }
             case .rename: NotificationCenter.default.post(name: .elmersRename, object: nil)
             case .edit: NotificationCenter.default.post(name: .elmersEdit, object: nil)

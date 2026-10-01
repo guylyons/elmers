@@ -68,11 +68,14 @@ public struct HexColor: Equatable, Sendable {
         red = Double(value >> 16 & 0xFF) / 255; green = Double(value >> 8 & 0xFF) / 255; blue = Double(value & 0xFF) / 255
         display = "#" + digits
     }
-    /// Relative luminance (WCAG), used to pick dark or light text on the swatch.
+    /// Relative luminance (WCAG).
     public var luminance: Double {
         func linear(_ c: Double) -> Double { c <= 0.039_28 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }
         return 0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue)
     }
+    /// Whether the swatch takes dark type rather than white. Paste 6.3.11 went dark on #FF8800 (brightness 156 of 255)
+    /// and white on #668184 (121), so it goes by perceived brightness (299R + 587G + 114B) / 1000 against the middle.
+    public var prefersDarkText: Bool { (0.299 * red + 0.587 * green + 0.114 * blue) * 255 >= 128 }
 }
 
 public struct ClipboardPayload: Codable, Equatable, Sendable {

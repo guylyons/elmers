@@ -24,6 +24,12 @@ final class ColorTests {
         XCTAssertTrue(orange.luminance > 0.3)
         XCTAssertTrue(HexColor("#123456")!.luminance < 0.05)
         XCTAssertNil(HexColor("#12345"))
+        // Paste 6.3.11 writes the value in dark type on #FF8800 and in white on #668184 (whose WCAG luminance, 0.20, is
+        // above the 0.18 Elmers used to switch at): it goes by perceived brightness.
+        XCTAssertTrue(orange.prefersDarkText)
+        XCTAssertTrue(!HexColor("#668184")!.prefersDarkText)
+        XCTAssertTrue(HexColor("FFFFFF")!.prefersDarkText)
+        XCTAssertTrue(!HexColor("#123456")!.prefersDarkText)
     }
 
     func testColorIsAFilter() {

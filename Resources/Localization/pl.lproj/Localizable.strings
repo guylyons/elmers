@@ -182,6 +182,7 @@
 "Set up and start using Elmers." = "Skonfiguruj i zacznij używać Elmers.";
 "Settings" = "Ustawienia";
 "Settings…" = "Ustawienia…";
+"Share" = "Udostępnij";
 "Share…" = "Udostępnij…";
 "Shortcuts" = "Skróty";
 "Shortcuts using the Option key without Command or Control may not work correctly before macOS 15.2. Please consider updating to the latest version of macOS." = "Klawisz Option może być używany tylko razem z Command lub Control.";

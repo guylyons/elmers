@@ -126,6 +126,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let model: AppModel = self.model, panelController: PanelController = self.panelController
             func fail(_ message: String) -> Never { print("FAIL: \(message)"); fflush(stdout); exit(1) }
             model.panelHeight = PanelMetrics.defaultHeight; model.savePanelHeight()
+            for index in 0..<30 { model.newText("resize fixture \(index) " + String(repeating: "lorem ipsum dolor sit amet ", count: 8)) }
             panelController.show()
             let window = panelController.panel
             guard let handle = KeyboardInteractionChecks.subview(of: window.contentView, where: { $0 is PanelResizeHandle }) else { fail("no resize handle") }
@@ -165,8 +166,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                              parts[1] / Double(durations.count), parts[2] / Double(durations.count), parts[3] / Double(durations.count)))
                 model.panelHeight = PanelMetrics.defaultHeight; model.savePanelHeight()
             }
-            for index in 0..<30 { model.newText("resize fixture \(index) " + String(repeating: "lorem ipsum dolor sit amet ", count: 8)) }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            /// Runs `body` once the panel has slid in, with its handle along the window's top edge.
+            func whenShown(_ body: @escaping () -> Void, deadline: Date = Date().addingTimeInterval(3)) {
+                if handle.convert(handle.bounds, to: nil).maxY >= window.frame.height - 1 { body(); return }
+                guard Date() < deadline else { fail("the panel did not slide in") }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { whenShown(body, deadline: deadline) }
+            }
+            whenShown {
                 if ProcessInfo.processInfo.environment["ELMERS_RESIZE_PROFILE"] != nil { profile(); exit(0) }
                 if ProcessInfo.processInfo.environment["ELMERS_RESIZE_DEMO"] != nil {
                     // ELMERS_RESIZE_DEMO, for recording with `screencapture -v`: a drag at 120 Hz from 332 up to 412, down to 252 and back, over 3 s, then release.
@@ -215,6 +221,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
             return
+        }
+        if ProcessInfo.processInfo.arguments.contains("--check-card-menu") {
+            precondition(model.isDemo, "Card menu checks require --demo")
+            CardMenuChecks.run(model: model, controller: panelController); return
         }
         if ProcessInfo.processInfo.arguments.contains("--check-delete-confirmation") {
             // Paste asks before deleting several items: Cancel keeps them, Delete removes them, one item goes without asking.

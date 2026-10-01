@@ -228,14 +228,21 @@ struct HistoryView: View {
             .font(.system(size: 26)).foregroundStyle(.tertiary)
             .frame(maxWidth: .infinity, maxHeight: .infinity).offset(y: -17)
     }
+    /// What a card shares: its image, its link, its files, or its text.
+    private func shareItems(_ item: ClipboardItem, urls: [URL]) -> [Any] {
+        if item.kind.isImage { return imagePreview(item).map { [$0] } ?? [] }
+        if item.kind == .link { return urls.prefix(1).map { $0 } }
+        if item.kind == .file { return item.payload.fileURLs }
+        return item.text.isEmpty ? [] : [item.text]
+    }
     @ViewBuilder private func itemMenu(_ item: ClipboardItem) -> some View {
         let urls = item.text.components(separatedBy: "\n").compactMap { URL(string: $0) }.filter { ["http", "https", "file"].contains($0.scheme ?? "") }
         if item.kind == .link {
-            Button("Open") { urls.forEach { NSWorkspace.shared.open($0) }; model.dismiss?() }.keyboardShortcut("o")
+            Button("Open") { urls.forEach { NSWorkspace.shared.open($0) }; model.handOff?() }.keyboardShortcut("o")
             Divider()
         }
         if item.kind == .file {
-            Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting(item.payload.fileURLs); model.dismiss?() }
+            Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting(item.payload.fileURLs); model.handOff?() }
             Divider()
         }
         if item.screenshot != nil {
@@ -247,7 +254,12 @@ struct HistoryView: View {
         // Holding the Plain Text modifier (⇧ by default) swaps Paste for Paste as Plain Text, the menu form of ⇧↩.
         if #available(macOS 15, *) {
             let plain = EventModifiers(model.shortcuts.plainTextModifier)
-            paste.modifierKeyAlternate(plain) { Button("Paste as Plain Text") { model.activate(plainText: true) }.keyboardShortcut(.return, modifiers: plain) }
+            // An image or file without text has nothing to paste as plain text; choosing it used to do nothing. The menu is
+            // built before the right-click's selection is drawn, so this goes by the card, or by a selection that holds it.
+            let hasText = model.selection.ids.contains(item.id) ? model.selectedItems.contains { !$0.text.isEmpty } : !item.text.isEmpty
+            paste.modifierKeyAlternate(plain) {
+                Button("Paste as Plain Text") { model.activate(plainText: true) }.keyboardShortcut(.return, modifiers: plain).disabled(!hasText)
+            }
         } else { paste }
         Button("Copy") { if let aggregate = model.selectedAggregate(), model.copy(aggregate) { model.showCopied?() } }.keyboardShortcut("c")
         Divider()
@@ -271,9 +283,18 @@ struct HistoryView: View {
         if let board = model.boardID { Button("Unpin") { model.unpin(model.selectedItems, from: board) } }
         Divider()
         Button("Preview") { model.preview?(item) }.keyboardShortcut(.space, modifiers: [])
-        if item.kind.isImage, let image = imagePreview(item) { ShareLink("Share…", item: Image(nsImage: image), preview: SharePreview(item.title ?? item.kind.title, image: Image(nsImage: image))) }
-        else if let url = urls.first, item.kind == .link { ShareLink("Share…", item: url) }
-        else if !item.text.isEmpty { ShareLink("Share…", item: item.text) }
+        // Paste's card menu has Share as a submenu of sharing services. SwiftUI's ShareLink could not present its picker
+        // from this context menu: choosing it did nothing.
+        let shared = shareItems(item, urls: urls)
+        if !shared.isEmpty {
+            Menu("Share") {
+                ForEach(Array(SharingServices.services(for: shared).enumerated()), id: \.offset) { _, service in
+                    Button { model.handOff?(); service.perform(withItems: shared) } label: {
+                        Label { Text(verbatim: service.title) } icon: { Image(nsImage: service.image) }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -401,4 +422,16 @@ private struct SizedCard: View {
         let metrics = geometry.metrics
         card(CardStyle(metrics)).equatable().frame(width: metrics.cardSide, height: metrics.cardSide)
     }
+}
+
+/// The sharing services for a card's content. `NSSharingService.sharingServices(forItems:)` is deprecated in favor of
+/// the picker's own menu item, which a SwiftUI menu cannot hold; it is reached through a protocol so the one call
+/// does not warn.
+enum SharingServices {
+    private protocol Lister { static func services(for items: [Any]) -> [NSSharingService] }
+    private enum Deprecated: Lister {
+        @available(macOS, deprecated: 13.0)
+        static func services(for items: [Any]) -> [NSSharingService] { NSSharingService.sharingServices(forItems: items) }
+    }
+    static func services(for items: [Any]) -> [NSSharingService] { (Deprecated.self as Lister.Type).services(for: items) }
 }

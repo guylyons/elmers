@@ -71,11 +71,11 @@ struct CardView: View, Equatable {
                 // Paste 6.3.11 fills the whole body with the color and centers the value in 18-pt monospaced type,
                 // with no count footer.
                 Text(color.display).font(.system(size: 18, design: .monospaced))
-                    .foregroundStyle(color.luminance > 0.18 ? Color.black.opacity(0.85) : Color.white.opacity(0.9))
+                    .foregroundStyle(color.prefersDarkText ? Color.black.opacity(0.85) : Color.white.opacity(0.9))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color(.sRGB, red: color.red, green: color.green, blue: color.blue))
                     .overlay(alignment: .bottomTrailing) {
-                        quickPasteBadge.foregroundStyle(color.luminance > 0.18 ? Color.black.opacity(0.65) : Color.white.opacity(0.65))
+                        quickPasteBadge.foregroundStyle(color.prefersDarkText ? Color.black.opacity(0.65) : Color.white.opacity(0.65))
                     }
             } else {
                 VStack(spacing: 0) {

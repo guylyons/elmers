@@ -123,6 +123,9 @@ final class AppModel: ObservableObject {
     var showSettings: (() -> Void)?
     var deliver: ((ClipboardItem, Bool) -> Void)?
     var dismiss: (() -> Void)?
+    /// Closes the panel without giving focus back to the app that was in front, for actions that bring another app
+    /// forward (Finder, a browser, a sharing service); restoring focus pulled that app back over them.
+    var handOff: (() -> Void)?
     /// Shows the Copied confirmation overlay (owned by the panel controller).
     var showCopied: (() -> Void)?
     var preview: ((ClipboardItem) -> Void)?
@@ -401,7 +404,7 @@ final class AppModel: ObservableObject {
             if copyFile {
                 let file = ClipboardItem(payload: .init(items: [["public.file-url": Data(url.absoluteString.utf8)]]), source: "Elmers")
                 if self.copy(file) { self.showCopied?() }
-            } else { NSWorkspace.shared.activateFileViewerSelecting([url]); self.dismiss?() }
+            } else { NSWorkspace.shared.activateFileViewerSelecting([url]); self.handOff?() }
         }
     }
     func reconcileSelection() { selection.reconcile(in: visibleItems.map(\.id)) }
