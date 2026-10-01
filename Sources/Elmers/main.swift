@@ -300,7 +300,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Writes the demo panel as panel.png and quits, e.g. to check a translation. Requires --demo.
             precondition(model.isDemo, "Panel captures require --demo")
             model.start(); panelController.show(); applyDemoQuery()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            /// Captures once the panel has slid in and its cards had a moment to draw (a fixed 1-s wait could catch an
+            /// empty glass when launch work delayed the slide).
+            func whenSettled(_ body: @escaping () -> Void, deadline: Date = Date().addingTimeInterval(5)) {
+                let delay = Double(ProcessInfo.processInfo.environment["ELMERS_CAPTURE_DELAY"] ?? "") ?? 0.6
+                if self.panelController.isSettled || Date() > deadline { DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: body); return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { whenSettled(body, deadline: deadline) }
+            }
+            whenSettled {
                 KeyboardInteractionChecks.capturePanel(self.panelController, name: "panel")
                 // The menu bar icon, normal and paused, at 4× on a light and a dark bar.
                 let icons = [StatusIcon.make(), StatusIcon.make(paused: true)]

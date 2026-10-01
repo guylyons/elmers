@@ -13,7 +13,7 @@ struct CardStyle: Equatable {
     var scale: CGFloat
     init(_ metrics: PanelMetrics) {
         isCompact = metrics.isCompact; headerHeight = metrics.headerHeight.rounded()
-        iconSide = (46 * metrics.iconScale).rounded(); scale = (metrics.cardSide / 232 * 50).rounded() / 50
+        iconSide = (78 * metrics.iconScale).rounded(); scale = (metrics.cardSide / 232 * 50).rounded() / 50
     }
     static let standard = CardStyle(PanelMetrics(height: PanelMetrics.defaultHeight))
 }
@@ -50,6 +50,8 @@ struct CardView: View, Equatable {
                                   (0.686, 0.322, 0.871), (1, 0.176, 0.333), (0.557, 0.557, 0.576)]
         .map { Color(.displayP3, red: $0.0, green: $0.1, blue: $0.2) }
     private var accent: Color {
+        // Screenshots are Elmers' own type; at the user's request their header is a system gray whatever app took them.
+        if item.kind == .screenshot { return Color(nsColor: .systemGray) }
         if let id = item.sourceBundleID, let url = CardImageCache.shared.appURL(for: id),
            let color = CardImageCache.shared.color(for: id, url: url) { return color }
         switch item.kind {
@@ -77,6 +79,12 @@ struct CardView: View, Equatable {
                     .overlay(alignment: .bottomTrailing) {
                         quickPasteBadge.foregroundStyle(color.prefersDarkText ? Color.black.opacity(0.65) : Color.white.opacity(0.65))
                     }
+            } else if item.kind.isImage, hasImageData(item) {
+                // Paste fills the body with the picture down to the card's bottom edge and lays its size and number in
+                // pills over it.
+                CardThumbnail(item: item, quickPasteNumber: quickPasteNumber)
+            } else if [.text, .other].contains(item.kind), !item.text.isEmpty {
+                textBody
             } else {
                 VStack(spacing: 0) {
                     // minHeight 0 lets a tall preview (a link's fixed-height image, title and two-line address) clip
@@ -84,23 +92,7 @@ struct CardView: View, Equatable {
                     preview
                         .frame(maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
                         .clipped()
-                    // Paste's footer sits on the bottom edge: counts are centered on one line, link addresses are
-                    // left-aligned and may wrap onto a second line that grows upward. Compact Mode drops the counts.
-                    if !metrics.isCompact || item.kind == .link || filePath != nil { HStack(alignment: .bottom, spacing: 5) {
-                        if !item.boardIDs.isEmpty { Image(systemName: "pin.fill").font(.system(size: 9)).padding(.bottom, 3) }
-                        if let path = filePath {
-                            // Paste 6.3.11 shows a single file's full path on up to two lines, cut without an ellipsis.
-                            Text(verbatim: path).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
-                                .frame(maxWidth: .infinity, maxHeight: Self.twoFooterLines, alignment: .topLeading).clipped()
-                                .padding(.trailing, quickPasteNumber == nil ? 0 : Self.badgeWidth)
-                        } else if item.kind == .link {
-                            Text(footer).lineLimit(2).truncationMode(.tail).multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.trailing, quickPasteNumber == nil ? 0 : Self.badgeWidth)
-                        } else {
-                            Text(footer).lineLimit(1).frame(maxWidth: .infinity)
-                        }
-                    }
-                    .font(.system(size: 12)).foregroundStyle(.secondary).padding(.horizontal, 13).padding(.bottom, 10).padding(.top, 4) }
+                    if !metrics.isCompact || item.kind == .link || filePath != nil { footerRow }
                 }
                 .overlay(alignment: .bottomTrailing) { quickPasteBadge.foregroundStyle(Self.badgeInk) }
                 .background(item.kind == .link && item.linkPreview == nil ? Self.linkBodyColor : Self.bodyColor)
@@ -122,11 +114,54 @@ struct CardView: View, Equatable {
         .accessibilityValue(selected ? String(localized: "Selected") : "")
         .help(index < 9 ? String(localized: "\(item.source) · \(item.kind.title) · ⌘\(index + 1) to paste") : "\(item.source) · \(item.kind.title)")
     }
+    /// Paste's footer sits on the bottom edge: counts are centered on one line, link addresses are left-aligned and may
+    /// wrap onto a second line that grows upward. Compact Mode drops the counts.
+    private var footerRow: some View {
+        HStack(alignment: .bottom, spacing: 5) {
+            if !item.boardIDs.isEmpty { Image(systemName: "pin.fill").font(.system(size: 9)).padding(.bottom, 3) }
+            if let path = filePath {
+                // Paste 6.3.11 shows a single file's full path on up to two lines, cut without an ellipsis.
+                Text(verbatim: path).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, maxHeight: Self.twoFooterLines, alignment: .topLeading).clipped()
+                    .padding(.trailing, quickPasteNumber == nil ? 0 : Self.badgeWidth)
+            } else if item.kind == .link {
+                Text(footer).lineLimit(2).truncationMode(.tail).multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.trailing, quickPasteNumber == nil ? 0 : Self.badgeWidth)
+            } else {
+                Text(footer).lineLimit(1).frame(maxWidth: .infinity)
+            }
+        }
+        .font(.system(size: 12)).foregroundStyle(.secondary).padding(.horizontal, 13).padding(.bottom, 9).padding(.top, 4)
+    }
+    /// Paste's text card (measured September 30 on a 211-pt card): the text starts 12 pt in and 10 pt under the header,
+    /// runs on under the footer without an ellipsis, and fades out linearly over 35 pt, gone 16 pt above the bottom edge,
+    /// level with the middle of the count.
+    private var textBody: some View {
+        ZStack(alignment: .bottom) {
+            Text(String(item.text.prefix(1600)))
+                .font(.system(size: 13)).foregroundStyle(Color(nsColor: .textColor))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.leading, metrics.isCompact ? 11 : 12).padding(.trailing, metrics.isCompact ? 11 : 12).padding(.top, metrics.isCompact ? 5 : 10)
+                // minHeight 0: the text keeps its full height and is cut by the card instead of growing it.
+                .frame(maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
+                .clipped()
+                .mask {
+                    VStack(spacing: 0) {
+                        Color.black
+                        LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: metrics.isCompact ? 24 : 35)
+                        Color.clear.frame(height: metrics.isCompact ? 0 : 16)
+                    }
+                }
+            if !metrics.isCompact { footerRow }
+        }
+        .overlay(alignment: .bottomTrailing) { quickPasteBadge.foregroundStyle(Self.badgeInk) }
+        .background(Self.bodyColor)
+    }
     /// Paste's Compact Mode puts the title and a short time ("59m") on one line in a 36-pt header with a 22-pt app icon
     /// 6 pt from the card's edge. The text changes layout at once; the icon is one view in both layouts, so it shrinks
     /// and grows over a few frames, as Paste's did (its icon frame went 78, 63, 44, 37, 28, 22 pt).
     private var header: some View {
-        HStack(spacing: metrics.isCompact ? 4 : 8) {
+        Group {
             if metrics.isCompact {
                 HStack(spacing: 4) {
                     title(size: 13)
@@ -144,11 +179,18 @@ struct CardView: View, Equatable {
                     }
                 }
             }
-            Spacer(minLength: 0)
-            icon(side: metrics.isCompact ? 22 : metrics.iconSide)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .padding(.leading, 12).padding(.trailing, metrics.isCompact ? 34 : 56)
+        // Paste draws the app icon large and lets the header and the card's corner cut it: a 78-pt frame on a 232-pt
+        // card (86 at 312), centered on the header's middle 23 pt from the right edge (measured from its accessibility
+        // frames, September 30). In Compact Mode it is 22 pt, 17 pt in.
+        .overlay(alignment: .trailing) {
+            let side = metrics.isCompact ? 22 : metrics.iconSide
+            icon(side: side).offset(x: side / 2 - (metrics.isCompact ? 17 : 23))
                 .animation(.easeOut(duration: 0.15), value: metrics.isCompact)
         }
-        .padding(.leading, metrics.isCompact ? 12 : 13).padding(.trailing, metrics.isCompact ? 6 : 3)
+        .clipped()
     }
     @ViewBuilder private func title(size: CGFloat) -> some View {
         if renaming {
@@ -160,7 +202,8 @@ struct CardView: View, Equatable {
     }
     @ViewBuilder private func icon(side: CGFloat) -> some View {
         if let icon = appIcon { Image(nsImage: icon).resizable().frame(width: side, height: side) }
-        else { Image(systemName: symbol).font(.system(size: side * 28 / 46)).frame(width: side, height: side).opacity(0.85) }
+        // Without an app icon the type's symbol keeps its own size inside Paste's larger icon frame.
+        else { Image(systemName: symbol).font(.system(size: min(28, side * 28 / 46))).frame(width: side, height: side).opacity(0.85) }
     }
     /// Measured on Paste 6.3.11: a 10-pt `text.justify.left` glyph, then the number on the footer's baseline, 12.5 pt in
     /// from the card's right edge, in 65 % ink (#ACACAC on a dark card, brighter than the 55 % footer). It sits over the
@@ -299,18 +342,43 @@ func imagePreview(_ item: ClipboardItem) -> NSImage? { imageData(of: item).flatM
 /// A card's image, drawn from a downsampled thumbnail that is decoded off the main thread.
 private struct CardThumbnail: View {
     let item: ClipboardItem
-    @State private var loaded: NSImage?
+    var quickPasteNumber: Int? = nil
     var body: some View {
-        GeometryReader { geometry in
-            if let image = loaded ?? ThumbnailCache.shared.cached(item) {
-                Image(nsImage: image).resizable().interpolation(.high).scaledToFit()
-                    .frame(width: geometry.size.width, height: geometry.size.height)
+        // Reading `ready` makes this view redraw when the thumbnail arrives.
+        let image = ThumbnailCache.shared.ready.keys.contains(item.fingerprint) ? ThumbnailCache.shared.cached(item) : ThumbnailCache.shared.cached(item)
+        Color.clear
+            .overlay {
+                if let image { Image(nsImage: image).resizable().interpolation(.high).scaledToFill() }
             }
-        }
-        .task(id: item.fingerprint) {
-            guard ThumbnailCache.shared.cached(item) == nil else { return }
-            loaded = await ThumbnailCache.shared.thumbnail(for: item)
-        }
+            .clipped()
+            .background(CardView.bodyColor)
+            // Measured on Paste 6.3.11 (211-pt card): a 19-pt pill with the size in pixels ("600 × 400") centered 8 pt
+            // above the bottom edge, and the Quick Paste number in a matching pill 8 pt from the right.
+            .overlay(alignment: .bottom) {
+                if image != nil, let size = ThumbnailCache.shared.pixelSize(of: item) {
+                    Self.pill { Text(verbatim: "\(Int(size.width)) × \(Int(size.height))") }.padding(.bottom, 8)
+                }
+            }
+            .overlay(alignment: .bottomTrailing) {
+                if let number = quickPasteNumber {
+                    Self.pill {
+                        HStack(spacing: 3.5) {
+                            Image(systemName: "text.justify.left").font(.system(size: 10))
+                            Text(verbatim: "\(number)").monospacedDigit()
+                        }
+                    }
+                    .padding([.bottom, .trailing], 8).accessibilityHidden(true)
+                }
+            }
+            .task(id: item.fingerprint) { _ = await ThumbnailCache.shared.thumbnail(for: item) }
+    }
+    /// Paste's pill: about 42 % black over the picture (it measured #007C7C over #62D9D8, #423C85 over #6262D9), with
+    /// light 12-pt text.
+    static func pill<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        content()
+            .font(.system(size: 12)).foregroundStyle(.white.opacity(0.75))
+            .padding(.horizontal, 6).frame(height: 19)
+            .background(Color.black.opacity(0.42), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
     }
 }
 
@@ -412,31 +480,40 @@ final class CardImageCache {
         colors[id] = color
         return color
     }
+    /// Paste's header color for an app (`HeaderPalette`): the icon's dominant colorful hue, matched to Paste's palette,
+    /// or gray or black for an icon with almost no color. Checked against 12 apps: 10 match Paste exactly.
     private static func dominantColor(of image: NSImage) -> NSColor? {
-        let size = 24
-        guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: size, pixelsHigh: size, bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
+        let size = 32
+        guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: size, pixelsHigh: size, bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .calibratedRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
         image.draw(in: NSRect(x: 0, y: 0, width: size, height: size), from: .zero, operation: .copy, fraction: 1)
         NSGraphicsContext.restoreGraphicsState()
-        // Weight opaque, saturated, mid-brightness pixels; bucket hues so a vivid accent beats a large neutral area.
-        var buckets: [Int: (weight: CGFloat, r: CGFloat, g: CGFloat, b: CGFloat)] = [:]
+        var hues: [Int: (count: Int, hue: CGFloat, saturation: CGFloat, brightness: CGFloat)] = [:]
+        var opaque = 0, grays = 0, grayBrightness: CGFloat = 0
         for y in 0..<size { for x in 0..<size {
-            guard let pixel = bitmap.colorAt(x: x, y: y), pixel.alphaComponent > 0.6 else { continue }
+            guard let pixel = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB), pixel.alphaComponent > 0.9 else { continue }
+            opaque += 1
             var h: CGFloat = 0, s: CGFloat = 0, v: CGFloat = 0, a: CGFloat = 0
             pixel.getHue(&h, saturation: &s, brightness: &v, alpha: &a)
-            let weight = s * s * min(v, 1 - abs(v - 0.55)) + 0.001
-            let key = Int(h * 12) * 4 + Int(s * 3.99)
-            var bucket = buckets[key] ?? (0, 0, 0, 0)
-            bucket.weight += weight; bucket.r += pixel.redComponent * weight; bucket.g += pixel.greenComponent * weight; bucket.b += pixel.blueComponent * weight
-            buckets[key] = bucket
+            guard s >= 0.3, v >= 0.25 else {
+                if v < 0.92 { grays += 1; grayBrightness += v }
+                continue
+            }
+            var bucket = hues[Int(h * 24) % 24] ?? (0, 0, 0, 0)
+            bucket.count += 1; bucket.hue += h; bucket.saturation += s; bucket.brightness += v
+            hues[Int(h * 24) % 24] = bucket
         } }
-        guard let best = buckets.values.max(by: { $0.weight < $1.weight }), best.weight > 0.5 else { return nil }
-        let color = NSColor(red: best.r / best.weight, green: best.g / best.weight, blue: best.b / best.weight, alpha: 1)
-        var h: CGFloat = 0, s: CGFloat = 0, v: CGFloat = 0, a: CGFloat = 0
-        color.getHue(&h, saturation: &s, brightness: &v, alpha: &a)
-        // Paste lifts the hue into a vivid header tint (a navy terminal icon becomes bright blue); keep white text legible.
-        return NSColor(hue: h, saturation: min(max(s, 0.6), 0.9), brightness: min(max(v, 0.72), 0.9), alpha: 1)
+        let colorful = hues.values.reduce(0) { $0 + $1.count }
+        let rgb: HeaderPalette.RGB
+        if let best = hues.values.max(by: { $0.count < $1.count }), Double(colorful) >= Double(opaque) * HeaderPalette.colorfulShare {
+            let n = CGFloat(best.count)
+            let average = NSColor(hue: best.hue / n, saturation: best.saturation / n, brightness: best.brightness / n, alpha: 1)
+            rgb = HeaderPalette.color(dominant: .init(Double(average.redComponent), Double(average.greenComponent), Double(average.blueComponent)))
+        } else if grays > 0 {
+            rgb = HeaderPalette.color(grayBrightness: Double(grayBrightness) / Double(grays))
+        } else { return nil }
+        return NSColor(srgbRed: rgb.red, green: rgb.green, blue: rgb.blue, alpha: 1)
     }
 }
 

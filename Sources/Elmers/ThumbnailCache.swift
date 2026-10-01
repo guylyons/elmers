@@ -14,6 +14,8 @@ final class ThumbnailCache {
     private let cache = NSCache<NSString, NSImage>()
     private let files = NSCache<NSString, FileThumbnail>()
     private var failed: Set<String> = []
+    /// Each decoded image's size in pixels, read with its thumbnail, for the card's "600 × 400" footer.
+    private var sizes: [String: CGSize] = [:]
     private var waiting: [String: [@MainActor (NSImage?) -> Void]] = [:]
     private let queue: OperationQueue = {
         let queue = OperationQueue()
@@ -26,6 +28,10 @@ final class ThumbnailCache {
     private init() { cache.totalCostLimit = 128 << 20; files.totalCostLimit = 32 << 20 }
 
     func cached(_ item: ClipboardItem) -> NSImage? { cache.object(forKey: item.fingerprint as NSString) }
+    /// Fingerprints whose thumbnails are ready, observed by the cards: a card's own `@State` set when its thumbnail
+    /// arrived did not redraw it, so an image copied while the panel was open stayed blank (September 30).
+    let ready = ThumbnailsReady()
+    func pixelSize(of item: ClipboardItem) -> CGSize? { sizes[item.fingerprint] }
 
     func thumbnail(for item: ClipboardItem) async -> NSImage? {
         await withCheckedContinuation { continuation in load(item) { continuation.resume(returning: $0) } }
@@ -45,14 +51,16 @@ final class ThumbnailCache {
         let maxPixelSize = Self.maxPixelSize
         queue.addOperation {
             // Large images stay in the database until needed, so even reading the bytes happens off the main thread.
-            let thumbnail = imageData(of: item).flatMap { Self.decode($0, maxPixelSize: maxPixelSize) }
-            Task { @MainActor in self.finish(key, thumbnail) }
+            let data = imageData(of: item)
+            let thumbnail = data.flatMap { Self.decode($0, maxPixelSize: maxPixelSize) }
+            let size = data.flatMap(Self.pixelSize)
+            Task { @MainActor in self.sizes[key] = size; self.finish(key, thumbnail) }
         }
     }
 
     private func finish(_ key: String, _ thumbnail: CGImage?) {
         let image = thumbnail.map { NSImage(cgImage: $0, size: NSSize(width: $0.width, height: $0.height)) }
-        if let image, let thumbnail { cache.setObject(image, forKey: key as NSString, cost: thumbnail.bytesPerRow * thumbnail.height) }
+        if let image, let thumbnail { cache.setObject(image, forKey: key as NSString, cost: thumbnail.bytesPerRow * thumbnail.height); ready.keys.insert(key) }
         else { failed.insert(key) }
         for completion in waiting.removeValue(forKey: key) ?? [] { completion(image) }
     }
@@ -82,6 +90,14 @@ final class ThumbnailCache {
         return image
     }
 
+    /// The image's size in pixels from its header, without decoding it.
+    nonisolated static func pixelSize(_ data: Data) -> CGSize? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? Int, let height = properties[kCGImagePropertyPixelHeight] as? Int else { return nil }
+        let rotated = (properties[kCGImagePropertyOrientation] as? Int).map { $0 >= 5 } ?? false
+        return rotated ? CGSize(width: height, height: width) : CGSize(width: width, height: height)
+    }
     nonisolated static func decode(_ data: Data, maxPixelSize: Int) -> CGImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary) else { return nil }
         return CGImageSourceCreateThumbnailAtIndex(source, 0, [
@@ -97,4 +113,8 @@ private final class FileThumbnail {
     let image: NSImage
     let modified: Date?
     init(image: NSImage, modified: Date?) { self.image = image; self.modified = modified }
+}
+
+@Observable final class ThumbnailsReady {
+    var keys: Set<String> = []
 }

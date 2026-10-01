@@ -18,6 +18,8 @@ final class PanelController: NSObject, NSWindowDelegate {
     private var restingScreen: NSScreen?
     /// False from the moment `hide()` starts, even while the slide-out is still on screen.
     private(set) var isShown = false
+    /// Shown and done sliding in, for captures that must not catch the panel mid-slide.
+    var isSettled: Bool { isShown && slideLink == nil }
     private var transitionGeneration = 0
     /// The panel's height before it has been resized; afterwards it follows `model.panelHeight`.
     static let windowHeight: CGFloat = PanelMetrics.defaultHeight

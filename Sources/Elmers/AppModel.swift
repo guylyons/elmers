@@ -240,6 +240,9 @@ final class AppModel: ObservableObject {
         }
         #if DEBUG
         if demo, ProcessInfo.processInfo.arguments.contains("--demo-fixtures") { seedDemoFixtures() }
+        #if DEBUG
+        if demo, ProcessInfo.processInfo.arguments.contains("--demo-card-fixtures") { seedPasteComparisonFixtures() }
+        #endif
         #endif
         if let data = defaults.data(forKey: "shortcuts"), let stored = try? JSONDecoder().decode(ShortcutSettings.self, from: data) { shortcuts = stored }
         recognizeImageText()
@@ -328,9 +331,27 @@ final class AppModel: ObservableObject {
     }
     #if DEBUG
     /// Adds synthetic content for performance checks without going through the pasteboard.
-    func captureForChecks(_ payload: ClipboardPayload, source: String) {
-        let item = history.capture(payload, source: source)
+    func captureForChecks(_ payload: ClipboardPayload, source: String, bundleID: String? = nil) {
+        let item = history.capture(payload, source: source, sourceBundleID: bundleID)
         if selectedID == nil { selectedID = item.id }
+    }
+    /// `--demo-card-fixtures`: the five cards of the September 30 Paste capture (images and text copied from Messages,
+    /// Calculator, VLC, Safari and Finder, oldest first), for side-by-side comparison at the same panel height.
+    func seedPasteComparisonFixtures() {
+        let words = "lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore "
+        func image(_ index: Int) -> ClipboardPayload {
+            let image = NSImage(size: NSSize(width: 600, height: 400), flipped: false) { rect in
+                NSColor(hue: CGFloat(index % 12) / 12, saturation: 0.55, brightness: 0.85, alpha: 1).setFill(); rect.fill(); return true
+            }
+            return .init(items: [["public.png": NSBitmapImageRep(data: image.tiffRepresentation!)!.representation(using: .png, properties: [:])!]])
+        }
+        let sources = [("Messages", "com.apple.MobileSMS", 100), ("Calculator", "com.apple.calculator", 101), ("VLC", "org.videolan.vlc", 102),
+                       ("Safari", "com.apple.Safari", 103), ("Finder", "com.apple.finder", 104)]
+        let only = ProcessInfo.processInfo.environment["ELMERS_CARD_FIXTURES"]   // "text" or "image" for one kind only
+        for (name, id, index) in sources where only == nil || (only == "image") == (index % 2 == 0) {
+            let payload = index % 2 == 0 ? image(index) : .text("Elmers card fixture \(index) " + String(repeating: words, count: 6))
+            captureForChecks(payload, source: name, bundleID: id)
+        }
     }
     #endif
     func pause(minutes: Int?) {
