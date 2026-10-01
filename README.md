@@ -31,12 +31,14 @@ That's it. No account, no subscription, no trial, no upsell. Your history never 
 ## What it does
 
 - **Remembers everything.** Text, rich text, links, images, files and colors, with every format kept, so a paste arrives exactly as you copied it.
-- **Finds anything.** Start typing to search. Type `image`, `link` or `file` to filter. Text inside screenshots is searchable too, recognized on your Mac.
+- **Finds anything.** Start typing to search. Type a kind, such as `image`, `screenshot`, `link` or `file`, to find just that kind, or pick filters by app and date. Text inside images is searchable too, recognized on your Mac.
+- **Catches your screenshots.** Screenshots you save land in history as their own kind, and the original file stays where macOS put it.
 - **Pinboards.** Keep snippets you reuse on colored boards. Pinned items never expire. Drag a card onto a board to pin it.
 - **Paste Stack.** Press **⇧⌘C**, copy several things, then press ⌘V to paste them back in order.
 - **Pastes your way.** Straight into the app you're using, or onto the clipboard. **⇧Return** pastes plain text; **⌘1–9** pastes one of the first nine items.
 - **Edit before you paste.** **⌘N** writes a new item; **⌘E** edits one, with rich text and Writing Tools.
 - **Drag and drop** cards into any app.
+- **Sized to suit you.** Drag the panel's top edge to make it taller or shorter; small sizes switch to a compact card layout. Scroll with a mouse wheel or a sideways swipe.
 - **Speaks your language.** English plus the 16 languages Paste ships.
 
 <p align="center">
@@ -97,7 +99,7 @@ open dist/Elmers.app
 Elmers is used every day and is close to Paste, though it doesn't match it everywhere yet. Every feature is tracked against Paste in [docs/paste-parity.md](docs/paste-parity.md). The main gaps:
 
 - iCloud sync and the iPhone and iPad apps
-- A final visual pass on the Paste Stack window, Compact Mode and panel resizing
+- A final visual pass on the Paste Stack window and Compact Mode, and the soft shading behind card footers
 - VoiceOver and right-to-left layout audits
 
 Found a bug? [Open an issue](https://github.com/guylyons/elmers/issues).
