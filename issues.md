@@ -201,3 +201,8 @@
   that motion and are fixed: lines scrambled while the drag changed the width, a link picture washed out as two copies
   crossfaded, and the panel stalled for 4–6 frames because the whole card was animated. Tall pictures are now fitted over a
   checkerboard, as in Paste. Details in docs/paste-parity.md › October 1.)
+
+- [done 2026-10-01; measured on the demo, not yet tried by the user] scrolling the cards should have a little bit of bounce
+  (A trackpad swipe past either end now rubber-bands at Paste's stiffness, about 8 pt per 100 px; Elmers' was twice that.
+  Paste's mouse wheel stops dead at the ends, so the wheel's bounce is an Elmers addition: 8 pt out and a springy return.
+  Details in docs/paste-parity.md › October 1, bounce.)

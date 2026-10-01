@@ -1,5 +1,18 @@
 # Paste parity inventory
 
+## October 1 — bounce at the ends of the card row
+
+Reference: Paste 6.3.11 on macOS 27.0 (26A428), panel on the 2560×1440 external display at 1×, its newest cards being test fixtures. Trackpad gestures (began, changed, ended, 16 ms apart) and wheel notches were posted with `CGEvent` at the pointer, and the leftmost card's x was sampled from the accessibility tree every few milliseconds; Elmers was measured the same way on the demo (`ELMERS_NO_KEY=1 ELMERS_CARD_FIXTURES_REPEAT=6 --demo --demo-card-fixtures --open-panel-later`). User request: scrolling the cards should have a little bounce.
+
+| Input | Observed in Paste 6.3.11 | Elmers status |
+|---|---|---|
+| Trackpad past the start | Rubber band: 8 pt of stretch for 100 px of swipe, 29 pt for 400 px, then back without overshoot over about 300 ms (72 → 65 → 62 → 59 … 48 in 170 ms) | **matched**: 7 pt for 100 px (`ScrollMapping.remap(pastEdge:)` drops the 2× gain at or past an edge, leaving AppKit's rubber band); was 15 pt for 100 px and 58 for 400 |
+| Mouse wheel past the start | No movement at all | **Elmers addition, at the user's request**: 8 pt out (16 at most), then a spring with a slight overshoot (`PanelController.bounceRow`, response 0.34 s, damping 0.6) |
+| Mouse wheel mid-row | 10 pt a line, instant, no overshoot | unchanged |
+| After a swipe mid-row | Glides on to a stop over about 450 ms | AppKit glides the same way |
+
+The wheel bounce is a SwiftUI offset on the scroll view (`RowBounce`), not on its content: on the content it stopped AppKit's rubber band from starting at the edges. Not compared: a real trackpad's momentum into an edge; the end of the row (Paste's end held the user's own cards); Magic Mouse. Checks: core 83/83 ("scroll input maps as Paste's" extended); new `--demo --check-scroll-bounce` passes three times in a row; `--check-scroll-input` unchanged (10 pt a line, 20 per 10 px); `--check-scroll-performance` p95 14.4 ms; `--check-interaction` 47 steps twice.
+
 ## October 1 — cards across panel heights: what Compact Mode removes, and the switch
 
 Reference: Paste 6.3.11 on macOS 27.0 (26A428), panel on the 2560×1440 external display at 1×, light appearance. User report: Paste "knows to collapse certain things and remove certain things in the card" as the panel gets shorter and "cleanly animates" it, where Elmers shrank everything and pushed it down. Evidence: eight harmless test items copied into Paste with Elmers quit, at the user's OK (long and short lorem-ipsum text, a link with a fetched preview, an example.com link, a 600 × 400 and a 300 × 600 plain-color PNG, `#FF8800`, and a text file copied in Finder; they stay in Paste's history and sync). The panel's top edge was dragged with scripted mouse events to 412, 380, 350, 332, 320, 311, 310, 300, 299, 290, 280, 270, 260 and 252 pt. At each height the panel was captured window-bound, but only after its accessibility tree showed that every card in the captured region was a test item; element frames come from the same tree, with text reduced to type names, counts and times. A 9-s `screencapture -v -R` recording of a scripted drag 252 → 412 → 252, made with a plain gray window behind the panel so nothing else was recorded, was reduced to per-frame positions at 60 fps. Elmers was rendered with the same eight cards (`ELMERS_CARD_FIXTURES=resize --demo --demo-card-fixtures --show-panel`) at 412, 332, 300, 299, 270 and 252 and compared side by side.
