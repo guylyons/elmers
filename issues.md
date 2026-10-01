@@ -171,11 +171,13 @@
 - [fixed 2026-09-30] text over hex codes is white in Paste (#668184), dark in Elmers
   (Paste goes by perceived brightness: dark type on #FF8800, white on #668184. `HexColor.prefersDarkText`.)
 
-- [open 2026-09-30] the shading behind a card's footer: Paste fades the last lines of text out above "229 characters", and
+- [fixed 2026-09-30] the shading behind a card's footer: Paste fades the last lines of text out above "229 characters", and
   lays a dark gradient over an image behind its footer ("817 × 620", "≡ 1"); Elmers has neither. Image footers in Paste
   show the pixel size, Elmers shows the file size.
   (Paste's binary has FooterView with a GradientEffectView (gradientLayer, gradientAlpha) and a ShadowOverlayView. The
   gradient's height and colors still need measuring on harmless fixture cards in Paste.)
+  (Measured on test cards: text fades linearly over 35 pt, gone 16 pt above the bottom, now matched. Image cards have no
+  gradient; their size and number sit in dark pills, now matched, and the size replaces the file size.)
 
 - [fixed 2026-09-30; measured, not yet tried by the user] scrolling is very very slow (mouse wheel and trackpad sideways)
   (A vertical mouse wheel did not scroll the row at all, and sideways swipes moved it 1:1. Paste scrolls about 10 pt
@@ -189,7 +191,3 @@
   draws large and cut by the corner, now matched. Image cards fill with the picture and show "W × H" in a pill. Headers use
   Paste's fixed colors chosen by the icon's dominant hue: 10 of 12 apps match exactly. Screenshot headers are system gray.
   Details in docs/paste-parity.md › September 30, card headers.)
-
-- [fixed 2026-09-30] the shading behind a card's footer
-  (Text now fades out over 35 pt above the count, as measured on Paste. Image cards have no gradient in Paste; their size
-  and number sit in dark pills, now matched. Status of the earlier open entry above.)
