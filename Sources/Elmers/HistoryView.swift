@@ -228,7 +228,9 @@ struct HistoryView: View {
             .font(.system(size: 26)).foregroundStyle(.tertiary)
             .frame(maxWidth: .infinity, maxHeight: .infinity).offset(y: -17)
     }
-    /// What a card shares: its image, its link, its files, or its text.
+    /// What a card shares: its image, its link, its files, or its text. Built only when a service is chosen: an image's
+    /// bytes may still be in the database, and building them with every card's menu made each image card that scrolled
+    /// in read and decode its full image on the main thread.
     private func shareItems(_ item: ClipboardItem, urls: [URL]) -> [Any] {
         if item.kind.isImage { return imagePreview(item).map { [$0] } ?? [] }
         if item.kind == .link { return urls.prefix(1).map { $0 } }
@@ -285,11 +287,12 @@ struct HistoryView: View {
         Button("Preview") { model.preview?(item) }.keyboardShortcut(.space, modifiers: [])
         // Paste's card menu has Share as a submenu of sharing services. SwiftUI's ShareLink could not present its picker
         // from this context menu: choosing it did nothing.
-        let shared = shareItems(item, urls: urls)
-        if !shared.isEmpty {
+        let shareable = item.kind.isImage ? hasImageData(item) : item.kind == .link ? !urls.isEmpty
+            : item.kind == .file ? !item.payload.fileURLs.isEmpty : !item.text.isEmpty
+        if shareable {
             Menu("Share") {
-                ForEach(Array(SharingServices.services(for: shared).enumerated()), id: \.offset) { _, service in
-                    Button { model.handOff?(); service.perform(withItems: shared) } label: {
+                ForEach(Array(SharingServices.services(for: item.kind).enumerated()), id: \.offset) { _, service in
+                    Button { let shared = shareItems(item, urls: urls); model.handOff?(); service.perform(withItems: shared) } label: {
                         Label { Text(verbatim: service.title) } icon: { Image(nsImage: service.image) }
                     }
                 }
@@ -433,5 +436,20 @@ enum SharingServices {
         @available(macOS, deprecated: 13.0)
         static func services(for items: [Any]) -> [NSSharingService] { NSSharingService.sharingServices(forItems: items) }
     }
-    static func services(for items: [Any]) -> [NSSharingService] { (Deprecated.self as Lister.Type).services(for: items) }
+    /// The services for a type of content, found once with a small stand-in, so no card's own content is read until a
+    /// service is chosen.
+    @MainActor static func services(for kind: ContentKind) -> [NSSharingService] {
+        if let cached = cache[kind] { return cached }
+        let sample: [Any]
+        switch kind {
+        case .image, .screenshot: sample = [NSImage(size: NSSize(width: 1, height: 1))]
+        case .link: sample = [URL(string: "https://example.com")!]
+        case .file: sample = [URL(fileURLWithPath: NSTemporaryDirectory())]
+        default: sample = ["text"]
+        }
+        let services = (Deprecated.self as Lister.Type).services(for: sample)
+        cache[kind] = services
+        return services
+    }
+    @MainActor private static var cache: [ContentKind: [NSSharingService]] = [:]
 }

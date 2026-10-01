@@ -53,6 +53,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     private var localMonitor: Any?
     private var outsideMonitor: Any?
     private var flagsMonitor: Any?
+    private var scrollMonitor: Any?
     private var deliveryGeneration = 0
     /// Screen frame of the menu bar item that toggles the panel. Clicks there are handled by the
     /// status item action, so the outside-click monitor must not hide the panel first.
@@ -105,6 +106,11 @@ final class PanelController: NSObject, NSWindowDelegate {
             MainActor.assumeIsolated { self?.updateQuickPasteNumbers(event.modifierFlags) }
             return event
         }
+        scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            var result = event
+            MainActor.assumeIsolated { if let self, event.window === self.panel { result = self.remappedScroll(event) } }
+            return result
+        }
         outsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             Task { @MainActor in
                 guard let self, self.panel.attachedSheet == nil else { return }
@@ -114,6 +120,27 @@ final class PanelController: NSObject, NSWindowDelegate {
         }
     }
     func toggle() { isShown ? hide() : show() }
+    /// A scroll event rewritten to Paste's mapping (`ScrollMapping`): a vertical wheel scrolls the row sideways and a
+    /// sideways trackpad swipe moves it twice as far. Rewriting the event, rather than moving the row by hand, keeps the
+    /// scroll view's own smooth line scrolling, momentum and edge bounce.
+    func remappedScroll(_ event: NSEvent) -> NSEvent {
+        guard let cg = event.cgEvent?.copy() else { return event }
+        let precise = event.hasPreciseScrollingDeltas
+        func remap(_ x: Double, _ y: Double) -> (dx: Double, dy: Double) { ScrollMapping.remap(dx: x, dy: y, precise: precise) }
+        // Every original value is read first: writing one delta field makes the event recompute the others (a doubled
+        // line delta turned 10 pt into 16), so lines go first, then fixed-point, then the point deltas a trackpad's
+        // scrollingDelta comes from.
+        let line = remap(Double(cg.getIntegerValueField(.scrollWheelEventDeltaAxis2)), Double(cg.getIntegerValueField(.scrollWheelEventDeltaAxis1)))
+        let fixed = remap(cg.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2), cg.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1))
+        let point = remap(Double(cg.getIntegerValueField(.scrollWheelEventPointDeltaAxis2)), Double(cg.getIntegerValueField(.scrollWheelEventPointDeltaAxis1)))
+        cg.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: Int64(line.dx.rounded()))
+        cg.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: Int64(line.dy.rounded()))
+        cg.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: fixed.dx)
+        cg.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: fixed.dy)
+        cg.setIntegerValueField(.scrollWheelEventPointDeltaAxis2, value: Int64(point.dx.rounded()))
+        cg.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: Int64(point.dy.rounded()))
+        return NSEvent(cgEvent: cg) ?? event
+    }
     /// Paste numbers the first nine cards while the Quick Paste modifier is held, as the keys ⌘1…⌘9 paste them.
     func updateQuickPasteNumbers(_ flags: NSEvent.ModifierFlags) {
         let shown = isShown && model.shortcuts.showsQuickPasteNumbers(KeyModifiers(flags))

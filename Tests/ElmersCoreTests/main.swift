@@ -42,6 +42,7 @@ let screenshots = ScreenshotTests()
 let store = HistoryStoreTests()
 let motion = MotionTests()
 let panelMetrics = PanelMetricsTests()
+let scrollMapping = ScrollMappingTests()
 let security = StorageSecurityTests()
 let searchFilters = SearchFilterTests()
 let colors = ColorTests()
@@ -54,6 +55,7 @@ let checks: [(String, () throws -> Void)] = [
     ("cards follow the panel height", panelMetrics.testCardsFollowThePanelHeight),
     ("compact mode below 300 pt", panelMetrics.testCompactModeBelowThreeHundred),
     ("dragging the panel rubber-bands past its limits", panelMetrics.testDragRubberBandsPastTheLimits),
+    ("scroll input maps as Paste's: wheel sideways, trackpad doubled", scrollMapping.testScrollInputMapsAsPaste),
     ("deleted and replaced content leaves no trace on disk", security.testDeletedAndReplacedContentLeavesNoTraceOnDisk),
     ("an existing database is scrubbed when opened", security.testExistingDatabaseIsScrubbedWhenOpened),
     ("the history folder is excluded from backups", security.testHistoryFolderIsExcludedFromBackups),
