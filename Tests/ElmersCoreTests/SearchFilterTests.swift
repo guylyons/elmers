@@ -51,15 +51,16 @@ final class SearchFilterTests {
         filters.removeAll(); XCTAssertTrue(filters.isEmpty)
     }
 
-    func testImageChipIncludesScreenshots() throws {
+    func testImageChipExcludesScreenshots() throws {
         var history = History()
-        let image = history.capture(.init(items: [["public.png": try ScreenshotTests.image()]]), source: "Fixture")
-        var marked = image
+        let shot = history.capture(.init(items: [["public.png": try ScreenshotTests.image()]]), source: "Fixture")
+        var marked = shot
         marked.screenshot = ScreenshotOrigin(originalURL: URL(fileURLWithPath: "/tmp/fixture.png"), fileIdentity: "fixture")
         history.replaceItem(marked)
+        let plain = history.capture(.init(items: [["public.tiff": Data("plain image".utf8)]]), source: "Fixture")
         let text = history.capture(.text("words"), source: "Fixture")
-        XCTAssertEqual(history.items.filter { SearchFilters([.kind(.image)]).matches($0) }.map(\.id), [image.id])
+        XCTAssertEqual(history.items.filter { SearchFilters([.kind(.image)]).matches($0) }.map(\.id), [plain.id])
         XCTAssertEqual(history.items.filter { SearchFilters([.kind(.screenshot), .kind(.text)]).matches($0) }.map(\.id).sorted { $0.uuidString < $1.uuidString },
-                       [image.id, text.id].sorted { $0.uuidString < $1.uuidString })
+                       [shot.id, text.id].sorted { $0.uuidString < $1.uuidString })
     }
 }

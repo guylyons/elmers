@@ -87,14 +87,16 @@ enum ScreenshotInteractionChecks {
                 require(model.selectedID == selection, "screenshot capture preserves current selection")
                 guard let screenshot = model.history.items.first(where: { $0.kind == .screenshot }) else { require(false, "screenshot inserted into app history"); return }
                 require(imagePreview(screenshot) != nil, "screenshot uses real image preview")
+                // Image and Screenshot are separate types in search (user's request, September 30).
                 model.filters = SearchFilters([.kind(.image)])
-                require(model.visibleItems.contains { $0.id == screenshot.id }, "Images includes screenshot cards")
-                // A typed type word stays search text (the chip is only offered) and finds the type by name, as in Paste;
-                // a screenshot is also an image.
+                require(!model.visibleItems.contains { $0.id == screenshot.id }, "the Image chip leaves out screenshot cards")
+                model.filters = SearchFilters([.kind(.screenshot)])
+                require(model.visibleItems.contains { $0.id == screenshot.id }, "the Screenshot chip finds screenshot cards")
+                // A typed type word stays search text (the chip is only offered) and finds the type by name, as in Paste.
                 model.clearSearch(); model.query = "SCREENSHOT"
                 await until("typing screenshot finds screenshot cards by their type") { model.visibleItems.contains { $0.id == screenshot.id } && model.filters.isEmpty }
                 model.query = "imag"
-                await until("typing the start of image finds screenshot cards") { model.visibleItems.contains { $0.id == screenshot.id } }
+                await until("typing the start of image leaves out screenshot cards") { !model.visibleItems.contains { $0.id == screenshot.id } }
                 model.clearSearch()
                 let count = model.history.items.count
                 model.paused = true; model.ingestScreenshot(captures[1]); model.paused = false

@@ -16,14 +16,19 @@ final class ScreenshotTests {
         return data as Data
     }
 
-    func testImageFilterIncludesScreenshots() throws {
+    /// Image and Screenshot are separate types in search (user's request, September 30).
+    func testImageFilterExcludesScreenshots() throws {
         var history = History()
-        let image = history.capture(.init(items: [["public.png": try Self.image()]]), source: "Fixture")
-        var marked = image
+        let shot = history.capture(.init(items: [["public.png": try Self.image()]]), source: "Fixture")
+        var marked = shot
         marked.screenshot = ScreenshotOrigin(originalURL: URL(fileURLWithPath: "/tmp/fixture.png"), fileIdentity: "fixture")
         history.replaceItem(marked)
-        XCTAssertEqual(history.filtered(kind: .image).map(\.id), [image.id])
-        XCTAssertEqual(history.filtered(kind: .screenshot).map(\.id), [image.id])
+        let plain = history.capture(.init(items: [["public.tiff": Data("plain image".utf8)]]), source: "Fixture")
+        XCTAssertEqual(plain.kind, .image)
+        XCTAssertEqual(history.filtered(kind: .image).map(\.id), [plain.id])
+        XCTAssertEqual(history.filtered(kind: .screenshot).map(\.id), [shot.id])
+        XCTAssertEqual(history.filtered(query: "image").map(\.id), [plain.id])
+        XCTAssertEqual(history.filtered(query: "screenshot").map(\.id), [shot.id])
     }
 
     func testScreenshotDuplicatesInEitherOrderPreservePins() throws {

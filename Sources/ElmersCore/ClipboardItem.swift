@@ -7,12 +7,11 @@ public enum ContentKind: String, Codable, CaseIterable, Identifiable, Sendable {
     public var id: String { rawValue }
     public var isImage: Bool { self == .image || self == .screenshot }
     /// The names search matches the type by: English, as in Paste's index, and the card title in the user's language.
-    /// A screenshot is also an image, which is what Paste calls it.
+    /// Screenshots are their own type in search, not also Image (user's request, September 30).
     public var searchNames: [String] {
         let english: [String]
         switch self {
         case .other: english = ["Unknown"]
-        case .screenshot: english = ["Screenshot", "Image"]
         default: english = [rawValue]
         }
         let localized: String

@@ -43,7 +43,7 @@ public struct History: Codable, Sendable {
     public func filtered(query: String = "", kind: ContentKind? = nil, boardID: UUID? = nil) -> [ClipboardItem] {
         let tokens = query.split(whereSeparator: \.isWhitespace).map { Array(ClipboardItem.fold(String($0)).utf8) }
         let matches = items.filter { item in
-            (kind == nil || item.kind == kind || (kind == .image && item.kind.isImage)) &&
+            (kind == nil || item.kind == kind) &&
             (boardID.map { item.boardIDs.contains($0) } ?? (item.inHistory || !tokens.isEmpty)) &&
             tokens.allSatisfy { token in Self.containsWord(item.searchKey, startingWith: token) }
         }

@@ -1,5 +1,9 @@
 # Paste parity inventory
 
+## September 30 — Image and Screenshot separate in search
+
+User request: Image and Screenshot are separate types in search. Paste has no Screenshot type, so this is Elmers' own. The Image chip and typing "image" no longer find screenshots (`SearchFilters.matches`, `History.filtered`, `ContentKind.searchNames`); the Screenshot chip and typing "screenshot" find them. Screenshots still draw, preview, share and paste as images (`ContentKind.isImage`). This corrects the September 21 and September 23 notes that the Image filter includes screenshots. Checks: core 81/81 ("Image filter and search leave out screenshots", "Image filter chip leaves out screenshots", both reversed); `--check-screenshots` passes with its search steps reversed.
+
 ## September 30 — scroll input
 
 Reference: Paste 6.3.11 on macOS 27.0 (26A428), panel on the 2560×1440 external display at 1×, light appearance. Paste's history was given 40 harmless test items (lorem-ipsum text and plain colored PNGs, copied with Elmers quit, at the user's OK; they remain in Paste's history). Scroll events were posted with `CGEvent` at the pointer over Paste's panel, and the leftmost card title's x was read from the accessibility tree before and after (no pixels). Elmers was measured the same way through `--demo --check-scroll-input`.

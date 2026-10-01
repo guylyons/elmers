@@ -69,7 +69,7 @@ public struct SearchFilters: Equatable, Sendable {
             let chosen = tokens.filter { $0.category == category }
             return chosen.isEmpty || chosen.contains { filter in
                 switch filter {
-                case let .kind(kind): return item.kind == kind || (kind == .image && item.kind.isImage)
+                case let .kind(kind): return item.kind == kind
                 case let .app(name): return item.source == name
                 case let .date(range): let interval = range.interval(now: now, calendar: calendar); return interval.start <= item.copiedAt && item.copiedAt < interval.end
                 case let .device(name): return name == localDevice
